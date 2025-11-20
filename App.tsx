@@ -46,6 +46,7 @@ const mapAgent = (agent: ApiAgent): Agent => ({
   files: (agent.files ?? []).map(mapFile),
   avatarColor: pickColor(agent.id),
   model: (agent.model as LLMModel) || LLMModel.GPT51,
+  role: agent.role,
 });
 
 const mapMessage = (message: ApiMessage): Message => ({
@@ -313,6 +314,7 @@ export default function App() {
         systemInstruction: 'Ты полезный помощник.',
         summaryInstruction: 'Сделай краткий вывод.',
         model: LLMModel.GPT51,
+        role: '',
       });
       const mapped = mapAgent(response.agent);
       setAgents((prev) => [...prev, mapped]);
@@ -331,6 +333,7 @@ export default function App() {
         systemInstruction: agent.systemInstruction,
         summaryInstruction: agent.summaryInstruction,
         model: agent.model,
+        role: agent.role,
       });
       const mapped = mapAgent(response.agent);
       setAgents((prev) => prev.map((item) => (item.id === mapped.id ? mapped : item)));
@@ -340,6 +343,12 @@ export default function App() {
   };
 
   const handleDeleteAgent = async (agentId: string) => {
+    const agent = agents.find((a) => a.id === agentId);
+    // Запрещаем удаление агентов с ролью
+    if (agent && agent.role && agent.role.trim() !== '') {
+      alert('Нельзя удалить агента с назначенной ролью.');
+      return;
+    }
     if (agents.length <= 1) {
       alert('Нельзя удалить последнего агента.');
       return;
@@ -357,8 +366,9 @@ export default function App() {
         const remaining = agents.filter((agent) => agent.id !== agentId);
         setActiveAgentId(remaining[0]?.id ?? null);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete agent', error);
+      alert(error?.message || 'Не удалось удалить агента.');
     }
   };
 
@@ -573,6 +583,24 @@ export default function App() {
           onClose={() => setIsDocsOpen(false)}
           documents={projectDocuments}
           onRemoveFile={handleRemoveFile}
+          agentRole={activeAgent.role}
+          agents={agents}
+          onAgentClick={(agentId) => {
+            // TODO: Запуск агента с документом
+            console.log('Agent click:', agentId);
+            // Переключимся на этого агента
+            setActiveAgentId(agentId);
+            setIsDocsOpen(false);
+          }}
+          onOpenAgentSettings={(agentId) => {
+            // Открываем настройки выбранного агента
+            const agent = agents.find(a => a.id === agentId);
+            if (agent) {
+              setActiveAgentId(agentId);
+              setIsSettingsOpen(true);
+              setIsDocsOpen(false);
+            }
+          }}
         />
       )}
 

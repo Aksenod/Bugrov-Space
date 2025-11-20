@@ -63,6 +63,7 @@ export interface ApiAgent {
   systemInstruction: string;
   summaryInstruction: string;
   model: string;
+  role?: string;
   files: ApiFile[];
 }
 
@@ -123,6 +124,7 @@ export const api = {
     systemInstruction?: string;
     summaryInstruction?: string;
     model?: string;
+    role?: string;
   }) {
     return request<{ agent: ApiAgent }>('/agents', {
       method: 'POST',

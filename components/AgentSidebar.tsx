@@ -116,7 +116,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                   </button>
 
                   {/* Delete Action - visible on hover of the container */}
-                  {agents.length > 1 && (
+                  {agents.length > 1 && (!agent.role || agent.role.trim() === '') && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

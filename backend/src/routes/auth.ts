@@ -39,6 +39,7 @@ authRouter.post('/register', async (req, res) => {
           systemInstruction: agent.systemInstruction,
           summaryInstruction: agent.summaryInstruction,
           model: agent.model,
+          role: agent.role || '',
         })),
       },
     },

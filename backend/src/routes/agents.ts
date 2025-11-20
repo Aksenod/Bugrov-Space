@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { generateAgentResponse, generateSummaryContent } from '../services/openaiService';
+import { DEFAULT_AGENTS } from '../constants/defaultAgents';
 
 const router = Router();
 
@@ -11,17 +12,56 @@ const agentSchema = z.object({
   systemInstruction: z.string().optional(),
   summaryInstruction: z.string().optional(),
   model: z.string().optional(),
+  role: z.string().optional(),
 });
 
 router.get('/', async (req, res) => {
   const userId = req.userId!;
-  const agents = await prisma.agent.findMany({
+  let agents = await prisma.agent.findMany({
     where: { userId },
     include: {
       files: true,
     },
     orderBy: { createdAt: 'asc' },
   });
+
+  // Проверяем и создаем недостающих агентов с ролями для существующих пользователей
+  const agentsByRole = new Map(agents.map(agent => [agent.role || '', agent]));
+  const requiredRoles = ['copywriter', 'dsl', 'verstka'];
+  const agentsToCreate = [];
+
+  for (const role of requiredRoles) {
+    if (!agentsByRole.has(role)) {
+      const defaultAgent = DEFAULT_AGENTS.find(agent => agent.role === role);
+      if (defaultAgent) {
+        agentsToCreate.push({
+          userId,
+          name: defaultAgent.name,
+          description: defaultAgent.description,
+          systemInstruction: defaultAgent.systemInstruction,
+          summaryInstruction: defaultAgent.summaryInstruction,
+          model: defaultAgent.model,
+          role: defaultAgent.role || '',
+        });
+      }
+    }
+  }
+
+  if (agentsToCreate.length > 0) {
+    const created = await prisma.agent.createMany({
+      data: agentsToCreate,
+    });
+    
+    // Получаем обновленный список агентов
+    agents = await prisma.agent.findMany({
+      where: { userId },
+      include: {
+        files: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   res.json({ agents });
 });
 
@@ -40,6 +80,7 @@ router.post('/', async (req, res) => {
       systemInstruction: parsed.data.systemInstruction ?? '',
       summaryInstruction: parsed.data.summaryInstruction ?? '',
       model: parsed.data.model ?? 'gpt-5.1',
+      role: parsed.data.role ?? '',
     },
   });
 
@@ -74,6 +115,11 @@ router.delete('/:agentId', async (req, res) => {
   const existing = await prisma.agent.findFirst({ where: { id: agentId, userId } });
   if (!existing) {
     return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  // Запрещаем удаление агентов с ролью
+  if (existing.role && existing.role.trim() !== '') {
+    return res.status(400).json({ error: 'Cannot delete agent with assigned role' });
   }
 
   await prisma.agent.delete({ where: { id: agentId } });

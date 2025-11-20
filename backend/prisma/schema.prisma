@@ -30,7 +30,8 @@ model Agent {
   description        String   @default("")
   systemInstruction  String   @default("")
   summaryInstruction String   @default("")
-model              String   @default("gpt-5.1")
+  model              String   @default("gpt-5.1")
+  role               String?  @default("")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

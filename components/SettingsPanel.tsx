@@ -27,6 +27,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [name, setName] = useState(activeAgent.name);
   const [instruction, setInstruction] = useState(activeAgent.systemInstruction);
   const [summaryInst, setSummaryInst] = useState(activeAgent.summaryInstruction || "");
+  const [role, setRole] = useState(activeAgent.role || "");
   const resolveModel = (value: Agent['model']): LLMModel => {
     if (value === LLMModel.GPT51) return LLMModel.GPT51;
     if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
@@ -51,6 +52,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setInstruction(activeAgent.systemInstruction);
     setSummaryInst(activeAgent.summaryInstruction || "");
     setModel(resolveModel(activeAgent.model));
+    setRole(activeAgent.role || "");
   }, [activeAgent]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,7 +68,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       name: name,
       systemInstruction: instruction,
       summaryInstruction: summaryInst,
-      model: model
+      model: model,
+      role: role
     });
     onApplyChanges();
     onClose();
@@ -104,9 +107,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                  type="text"
                  value={name}
                  onChange={(e) => setName(e.target.value)}
-                 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner"
+                 disabled={activeAgent.role && activeAgent.role.trim() !== ''}
+                 className={`w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${
+                   activeAgent.role && activeAgent.role.trim() !== '' ? 'opacity-60 cursor-not-allowed' : ''
+                 }`}
                />
-               <Edit3 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors" />
+               <Edit3 size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
+                 activeAgent.role && activeAgent.role.trim() !== '' ? 'text-white/20' : 'text-white/30 group-focus-within:text-indigo-400'
+               }`} />
              </div>
           </section>
 
@@ -141,6 +149,32 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                  </button>
                ))}
              </div>
+          </section>
+
+          {/* Roles Section */}
+          <section>
+            <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+               Роли
+            </label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-white">Копирайтер</span>
+                </div>
+                <button
+                  onClick={() => setRole(role === "copywriter" ? "" : "copywriter")}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                    role === "copywriter" ? "bg-indigo-500" : "bg-white/20"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+                      role === "copywriter" ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
           </section>
 
           {/* System Prompt Section */}

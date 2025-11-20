@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, FileText, Download, Calendar, Eye, Trash2, Settings } from 'lucide-react';
-import { UploadedFile } from '../types';
+import { UploadedFile, Agent } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ProjectDocumentsModalProps {
@@ -8,19 +8,31 @@ interface ProjectDocumentsModalProps {
   onClose: () => void;
   documents: UploadedFile[];
   onRemoveFile?: (fileId: string) => void;
+  agentRole?: string;
+  agents?: Agent[];
+  onAgentClick?: (agentId: string) => void;
+  onOpenAgentSettings?: (agentId: string) => void;
 }
 
 export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   isOpen,
   onClose,
   documents,
-  onRemoveFile
+  onRemoveFile,
+  agentRole,
+  agents = [],
+  onAgentClick,
+  onOpenAgentSettings
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const selectedFile = documents.find(doc => doc.id === selectedFileId);
+  
+  // Находим агентов DSL и Верстка по ролям
+  const dslAgent = agents.find(agent => agent.role === 'dsl');
+  const verstkaAgent = agents.find(agent => agent.role === 'verstka');
 
   const decodeContent = (base64: string) => {
     try {
@@ -158,38 +170,64 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     <h1 className="text-lg md:text-xl font-bold text-white mb-3 break-words leading-tight">{selectedFile.name}</h1>
                     <div className="flex items-center gap-6 text-sm text-white/40">
                         <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span> 
-                        <button 
-                            onClick={(e) => handleDownload(selectedFile, e)} 
-                            className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors"
-                        >
-                            <Download size={14} /> Download File
-                        </button>
-                        {onRemoveFile && (
-                          <button 
-                              onClick={(e) => handleDelete(selectedFile.id, e)} 
-                              className="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors"
-                          >
-                              <Trash2 size={14} /> Delete File
-                          </button>
+                        {agentRole === "copywriter" && (
+                          <>
+                            {dslAgent && (
+                              <div className="flex items-center gap-1.5">
+                                <button 
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (onAgentClick) {
+                                        onAgentClick(dslAgent.id);
+                                      }
+                                    }}
+                                    className="text-purple-400 hover:text-purple-300 transition-colors"
+                                >
+                                    DSL
+                                </button>
+                                <button 
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (onOpenAgentSettings) {
+                                        onOpenAgentSettings(dslAgent.id);
+                                      }
+                                    }}
+                                    className="p-1 text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10 rounded transition-colors"
+                                    title="Настройки агента DSL"
+                                >
+                                    <Settings size={14} />
+                                </button>
+                              </div>
+                            )}
+                            {verstkaAgent && (
+                              <div className="flex items-center gap-1.5">
+                                <button 
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (onAgentClick) {
+                                        onAgentClick(verstkaAgent.id);
+                                      }
+                                    }}
+                                    className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                                >
+                                    Верстка
+                                </button>
+                                <button 
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      if (onOpenAgentSettings) {
+                                        onOpenAgentSettings(verstkaAgent.id);
+                                      }
+                                    }}
+                                    className="p-1 text-cyan-400/60 hover:text-cyan-300 hover:bg-cyan-500/10 rounded transition-colors"
+                                    title="Настройки агента Верстка"
+                                >
+                                    <Settings size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
-                        <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              // TODO: DSL functionality
-                            }}
-                            className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300 transition-colors"
-                        >
-                            <Settings size={14} /> DSL
-                        </button>
-                        <button 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              // TODO: Верстка functionality
-                            }}
-                            className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors"
-                        >
-                            <Settings size={14} /> Верстка
-                        </button>
                     </div>
                  </div>
                  

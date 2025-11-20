@@ -40,6 +40,7 @@ export interface Agent {
   files: UploadedFile[];
   avatarColor?: string;
   model: LLMModel | string;
+  role?: string;
 }
 
 export interface User {
