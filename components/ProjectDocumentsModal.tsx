@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FileText, Download, Calendar, Eye } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Settings } from 'lucide-react';
 import { UploadedFile } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
@@ -7,12 +7,14 @@ interface ProjectDocumentsModalProps {
   isOpen: boolean;
   onClose: () => void;
   documents: UploadedFile[];
+  onRemoveFile?: (fileId: string) => void;
 }
 
 export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   isOpen,
   onClose,
-  documents
+  documents,
+  onRemoveFile
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
@@ -38,6 +40,19 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     document.body.removeChild(link);
   };
 
+  const handleDelete = async (fileId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onRemoveFile) return;
+    if (!confirm('Удалить этот документ?')) return;
+    
+    onRemoveFile(fileId);
+    
+    // Если удаляемый файл был выбран, сбросить выбор
+    if (selectedFileId === fileId) {
+      setSelectedFileId(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
       <div 
@@ -48,7 +63,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       <div className="relative w-full max-w-6xl h-[85vh] bg-black/40 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-300">
         
         {/* Sidebar List */}
-        <div className={`w-full md:w-1/3 border-r border-white/10 flex flex-col bg-white/5 ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-white/5 ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-6 border-b border-white/10 flex items-center justify-between">
             <h2 className="text-xl font-bold text-white flex items-center gap-3">
               <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
@@ -81,11 +96,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 >
                   {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
                   
-                  <div className={`p-2.5 rounded-xl ${selectedFileId === doc.id ? 'bg-amber-500/20 text-amber-300' : 'bg-white/5 text-white/40'}`}>
-                     <FileText size={18} />
-                  </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className={`text-sm font-semibold truncate ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
+                    <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
                       {doc.name}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
@@ -94,12 +106,23 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         </span>
                     </div>
                   </div>
-                  <div 
-                    onClick={(e) => handleDownload(doc, e)}
-                    className="p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                    title="Download"
-                  >
-                    <Download size={18} />
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <div 
+                      onClick={(e) => handleDownload(doc, e)}
+                      className="p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                      title="Download"
+                    >
+                      <Download size={18} />
+                    </div>
+                    {onRemoveFile && (
+                      <div 
+                        onClick={(e) => handleDelete(doc.id, e)}
+                        className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                        title="Delete"
+                      >
+                        <Trash2 size={18} />
+                      </div>
+                    )}
                   </div>
                 </button>
               ))
@@ -132,7 +155,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase mb-4">
                         Project File
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 break-words leading-tight">{selectedFile.name}</h1>
+                    <h1 className="text-lg md:text-xl font-bold text-white mb-3 break-words leading-tight">{selectedFile.name}</h1>
                     <div className="flex items-center gap-6 text-sm text-white/40">
                         <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span> 
                         <button 
@@ -140,6 +163,32 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                             className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 transition-colors"
                         >
                             <Download size={14} /> Download File
+                        </button>
+                        {onRemoveFile && (
+                          <button 
+                              onClick={(e) => handleDelete(selectedFile.id, e)} 
+                              className="flex items-center gap-1.5 text-red-400 hover:text-red-300 transition-colors"
+                          >
+                              <Trash2 size={14} /> Delete File
+                          </button>
+                        )}
+                        <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              // TODO: DSL functionality
+                            }}
+                            className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300 transition-colors"
+                        >
+                            <Settings size={14} /> DSL
+                        </button>
+                        <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              // TODO: Верстка functionality
+                            }}
+                            className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors"
+                        >
+                            <Settings size={14} /> Верстка
                         </button>
                     </div>
                  </div>

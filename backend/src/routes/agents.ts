@@ -157,7 +157,17 @@ router.post('/:agentId/messages', async (req, res) => {
     return res.json({ messages: [userMessage, modelMessage] });
   } catch (error) {
     console.error('OpenAI error', error);
-    return res.status(500).json({ error: 'Failed to get response from OpenAI' });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get response from OpenAI';
+    // Проверяем на специфические ошибки
+    let userFriendlyMessage = 'Ошибка генерации. Попробуйте позже.';
+    if (errorMessage.includes('API key')) {
+      userFriendlyMessage = 'Неверный API ключ OpenAI. Проверьте настройки сервера.';
+    } else if (errorMessage.includes('rate limit')) {
+      userFriendlyMessage = 'Превышен лимит запросов к OpenAI. Попробуйте позже.';
+    } else if (errorMessage.includes('model')) {
+      userFriendlyMessage = 'Ошибка модели OpenAI. Проверьте настройки агента.';
+    }
+    return res.status(500).json({ error: userFriendlyMessage, details: errorMessage });
   }
 });
 

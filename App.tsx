@@ -249,8 +249,10 @@ export default function App() {
         ...prev,
         [activeAgent.id]: [...(prev[activeAgent.id] ?? []), ...newMessages],
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error', error);
+      // Используем сообщение об ошибке от сервера, если оно есть
+      const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
       setChatHistories((prev) => ({
         ...prev,
         [activeAgent.id]: [
@@ -258,7 +260,7 @@ export default function App() {
           {
             id: `error-${Date.now()}`,
             role: Role.MODEL,
-            text: 'Ошибка генерации. Попробуйте позже.',
+            text: errorMessage,
             timestamp: new Date(),
             isError: true,
           },
@@ -570,6 +572,7 @@ export default function App() {
           isOpen={isDocsOpen}
           onClose={() => setIsDocsOpen(false)}
           documents={projectDocuments}
+          onRemoveFile={handleRemoveFile}
         />
       )}
 
