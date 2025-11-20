@@ -1,0 +1,227 @@
+import React from 'react';
+import { Agent, User } from '../types';
+import { Bot, FileText, PenTool, Hash, Briefcase, Plus, FolderOpen, Save, CheckCircle, Loader2, LogOut, User as UserIcon, Trash2 } from 'lucide-react';
+
+interface AgentSidebarProps {
+  projectName: string;
+  agents: Agent[];
+  activeAgentId: string;
+  onSelectAgent: (id: string) => void;
+  onAddAgent: () => void;
+  onDeleteAgent: (id: string) => void;
+  isOpen: boolean;
+  onCloseMobile: () => void;
+  onOpenDocs: () => void;
+  onGenerateSummary: () => void;
+  isGeneratingSummary: boolean;
+  summarySuccess: boolean;
+  currentUser: User | null;
+  onLogout: () => void;
+}
+
+export const AgentSidebar: React.FC<AgentSidebarProps> = ({
+  projectName,
+  agents,
+  activeAgentId,
+  onSelectAgent,
+  onAddAgent,
+  onDeleteAgent,
+  isOpen,
+  onCloseMobile,
+  onOpenDocs,
+  onGenerateSummary,
+  isGeneratingSummary,
+  summarySuccess,
+  currentUser,
+  onLogout
+}) => {
+  
+  const getIcon = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('резюм') || lower.includes('sum')) return <CheckCircle size={16} />;
+    if (lower.includes('документ') || lower.includes('document')) return <FileText size={16} />;
+    if (lower.includes('творч') || lower.includes('writer') || lower.includes('копирайтер')) return <PenTool size={16} />;
+    if (lower.includes('assist') || lower.includes('помощник')) return <Bot size={16} />;
+    return <Hash size={16} />;
+  };
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-md"
+          onClick={onCloseMobile}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <aside 
+        className={`fixed inset-y-2 left-2 z-40 w-64 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl transform transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:relative md:translate-x-0 md:inset-y-auto md:h-auto md:m-2 md:mr-0 flex flex-col ${
+          isOpen ? 'translate-x-0' : '-translate-x-[120%]'
+        }`}
+      >
+        {/* Project Header */}
+        <div className="p-4 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg shadow-[0_0_10px_rgba(99,102,241,0.3)]">
+               <Briefcase size={16} className="text-white" />
+            </div>
+            <div className="overflow-hidden">
+               <div className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest mb-0.5">Project</div>
+               <h1 className="font-bold text-white tracking-tight truncate text-xs leading-tight">{projectName}</h1>
+            </div>
+          </div>
+        </div>
+
+        {/* Agent List */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
+          <div className="px-2 py-2 mb-0.5">
+            <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
+              Agents
+            </span>
+          </div>
+          
+          {agents.map((agent) => {
+            const isActive = agent.id === activeAgentId;
+            return (
+              <div key={agent.id} className="relative group/item">
+                  <button
+                    onClick={() => {
+                      onSelectAgent(agent.id);
+                      onCloseMobile();
+                    }}
+                    className={`w-full flex items-center gap-3 p-2.5 pr-10 rounded-xl transition-all duration-300 group relative overflow-hidden ${
+                      isActive 
+                        ? 'bg-white/10 text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)] border border-white/10' 
+                        : 'hover:bg-white/5 text-white/50 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    {/* Active Glow Background */}
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-50" />
+                    )}
+
+                    <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-white/10 text-white shadow-inner' : 'bg-transparent'}`}>
+                      {getIcon(agent.name)}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0 relative z-10 text-left">
+                      <h3 className="font-medium text-xs truncate">
+                        {agent.name}
+                      </h3>
+                    </div>
+
+                    {isActive && <div className="w-1 h-1 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,1)] mr-1"></div>}
+                  </button>
+
+                  {/* Delete Action - visible on hover of the container */}
+                  {agents.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteAgent(agent.id);
+                      }}
+                      className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all z-20 ${
+                        isActive 
+                          ? 'text-white/30 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100' 
+                          : 'text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100'
+                      }`}
+                      title="Delete Agent"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+              </div>
+            );
+          })}
+
+          {/* Add Agent Button */}
+          <button
+            onClick={onAddAgent}
+            className="w-full flex items-center gap-3 p-2.5 mt-3 rounded-xl border border-white/10 border-dashed hover:border-indigo-400/50 hover:bg-indigo-500/10 text-white/40 hover:text-indigo-300 transition-all group"
+          >
+            <div className="p-1.5 rounded-lg bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
+               <Plus size={16} />
+            </div>
+            <span className="font-medium text-xs">Add Agent</span>
+          </button>
+        </div>
+
+        {/* Project Space & User Section */}
+        <div className="flex-shrink-0 flex flex-col gap-1 p-2 border-t border-white/5 bg-white/[0.02]">
+             
+             {/* Documents */}
+             <div className="relative group">
+               <button
+                 onClick={() => {
+                    onOpenDocs();
+                    onCloseMobile();
+                 }}
+                 className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5 transition-all group-hover:border-white/10"
+               >
+                 <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
+                    <FolderOpen size={16} />
+                 </div>
+                 <span className="font-medium text-xs">Documents</span>
+               </button>
+               
+               {/* Embedded Save Button */}
+               <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <button
+                     onClick={(e) => {
+                         e.stopPropagation();
+                         onGenerateSummary();
+                     }}
+                     disabled={isGeneratingSummary}
+                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all duration-300 border ${
+                        summarySuccess 
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : isGeneratingSummary
+                            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                            : 'bg-white/5 hover:bg-indigo-500 text-white/40 hover:text-white border-transparent hover:border-indigo-400/30'
+                     }`}
+                     title="Save Chat to Documents"
+                  >
+                     {summarySuccess ? (
+                        <CheckCircle size={12} />
+                     ) : isGeneratingSummary ? (
+                        <Loader2 size={12} className="animate-spin" />
+                     ) : (
+                        <Save size={12} />
+                     )}
+                     <span className="hidden sm:inline">
+                        {summarySuccess ? 'Saved' : isGeneratingSummary ? 'Saving...' : 'Save'}
+                     </span>
+                  </button>
+               </div>
+             </div>
+
+             {/* User Profile / Logout */}
+             {currentUser && (
+                <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between px-2 pb-1">
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-white shadow-lg text-xs font-bold">
+                       {currentUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-col flex">
+                       <span className="text-xs font-bold text-white truncate">{currentUser.name}</span>
+                       <span className="text-[9px] text-white/40 truncate">{currentUser.email}</span>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={onLogout}
+                    className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                    title="Sign Out"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
+             )}
+        </div>
+
+      </aside>
+    </>
+  );
+};

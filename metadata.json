@@ -1,0 +1,5 @@
+{
+  "name": "Bugrov Space",
+  "description": "Modern React chat workspace powered by OpenAI GPT‑4o models, featuring streaming responses and Markdown support.",
+  "requestFramePermissions": []
+}
