@@ -2,6 +2,7 @@
   "name": "bugrov-space",
   "private": true,
   "version": "0.0.0",
+  "homepage": "https://bugrov.space",
   "type": "module",
   "scripts": {
     "dev": "vite",
