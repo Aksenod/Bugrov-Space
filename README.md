@@ -31,9 +31,17 @@ Use `cp backend/env.example backend/.env` as a starting point and fill in your v
 
 ### Frontend (`.env.local`)
 
+Для локальной разработки:
 ```
 VITE_API_URL=http://localhost:4000/api
 ```
+
+Для продакшена (по умолчанию):
+```
+VITE_API_URL=https://bugrov-space.onrender.com/api
+```
+
+Примечание: По умолчанию фронтенд использует продакшен бэкенд на Render. Для локальной разработки создайте `.env.local` с `VITE_API_URL=http://localhost:4000/api`.
 
 ## Install dependencies
 

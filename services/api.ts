@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'https://bugrov-space.onrender.com/api').replace(/\/$/, '');
 const TOKEN_STORAGE_KEY = 'bugrov_space_token';
 
 let authToken: string | null =
