@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && cp CNAME dist/CNAME && npx gh-pages -d dist"
+    "deploy": "npm run build && cp CNAME dist/CNAME && cp 404.html dist/404.html && cp .nojekyll dist/.nojekyll && npx gh-pages -d dist"
   },
   "dependencies": {
     "lucide-react": "^0.554.0",
