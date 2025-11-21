@@ -9,7 +9,7 @@ This repo now contains:
 - **frontend** (Vite + React) — `/`
 - **backend API** (Express + Prisma + SQLite) — `/backend`
 
-Frontend talks to the backend for auth, chat history, files and GPT calls, so you need both to run locally.
+Frontend talks to the backend API on Render for auth, chat history, files and GPT calls.
 
 ## Prerequisites
 
@@ -29,19 +29,14 @@ JWT_SECRET=some_long_secret
 
 Use `cp backend/env.example backend/.env` as a starting point and fill in your values.
 
-### Frontend (`.env.local`)
+### Frontend
 
-Для локальной разработки:
-```
-VITE_API_URL=http://localhost:4000/api
-```
-
-Для продакшена (по умолчанию):
+Фронтенд использует продакшен бэкенд на Render по умолчанию:
 ```
 VITE_API_URL=https://bugrov-space.onrender.com/api
 ```
 
-Примечание: По умолчанию фронтенд использует продакшен бэкенд на Render. Для локальной разработки создайте `.env.local` с `VITE_API_URL=http://localhost:4000/api`.
+Это настроено в `services/api.ts` и не требует дополнительной конфигурации.
 
 ## Install dependencies
 
@@ -62,19 +57,18 @@ cd backend
 npx prisma migrate deploy
 ```
 
-## Development
+## Deploy
 
-Run backend first:
+### Backend (Render)
+
+Backend автоматически деплоится на Render при пуше в репозиторий.
+
+Сервис: `https://bugrov-space.onrender.com`
+
+### Frontend (GitHub Pages)
 
 ```bash
-cd backend
-npm run dev
+npm run deploy
 ```
 
-Then start the frontend in a second terminal:
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:5173` (or the port Vite prints) to use the app.
+Фронтенд доступен на: `https://bugrov.space`
