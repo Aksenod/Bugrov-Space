@@ -131,6 +131,7 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/reorder', async (req, res) => {
+  console.log('[POST /agents/reorder] Request received');
   const userId = req.userId!;
   const parsed = reorderSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -161,6 +162,7 @@ router.post('/reorder', async (req, res) => {
 
   await prisma.$transaction(updates);
 
+  console.log('[POST /agents/reorder] Successfully reordered agents');
   res.json({ success: true });
 });
 
