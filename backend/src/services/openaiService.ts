@@ -78,6 +78,11 @@ function processFileContent(file: AgentFile): string | null {
 function buildSystemPrompt(agent: AgentWithFiles) {
   const intro = `Ты выступаешь как агент "${agent.name}". ${agent.systemInstruction || ''}`.trim();
 
+  // Логирование для диагностики
+  console.log(`[buildSystemPrompt] Agent: ${agent.name} (${agent.id})`);
+  console.log(`[buildSystemPrompt] Total files: ${agent.files.length}`);
+  console.log(`[buildSystemPrompt] File names:`, agent.files.map(f => f.name));
+
   // Обрабатываем все файлы (теперь поддерживаются только текстовые .txt, .md)
   const processedFiles = agent.files
     .map((file) => {
@@ -85,6 +90,9 @@ function buildSystemPrompt(agent: AgentWithFiles) {
       return content !== null ? { file, content } : null;
     })
     .filter((item): item is { file: AgentFile; content: string } => item !== null);
+
+  console.log(`[buildSystemPrompt] Processed files: ${processedFiles.length}`);
+  console.log(`[buildSystemPrompt] Processed file names:`, processedFiles.map(f => f.file.name));
 
   const fileContext =
     processedFiles.length > 0

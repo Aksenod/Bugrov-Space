@@ -181,6 +181,41 @@ router.post('/:agentId/messages', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  // Загружаем ВСЕ файлы всех агентов пользователя (общие документы проекта)
+  // Используем те же файлы, что и в эндпоинте /files/summary для консистентности
+  const allProjectFiles = await prisma.file.findMany({
+    where: {
+      agent: { userId }
+    },
+    select: {
+      id: true,
+      name: true,
+      mimeType: true,
+      content: true,
+      agentId: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Используем ВСЕ файлы всех агентов пользователя без дубликатов
+  // Это гарантирует, что агент видит те же документы, что и в папке "Документы проекта"
+  const allFiles = allProjectFiles;
+
+  // Логирование для диагностики
+  console.log(`[POST /:agentId/messages] Agent: ${agent.name} (${agent.id})`);
+  console.log(`[POST /:agentId/messages] Agent's own files: ${agent.files.length}`);
+  console.log(`[POST /:agentId/messages] All project files (from all agents): ${allProjectFiles.length}`);
+  console.log(`[POST /:agentId/messages] Total files for prompt: ${allFiles.length}`);
+  console.log(`[POST /:agentId/messages] Project file names:`, allProjectFiles.map(f => f.name));
+  console.log(`[POST /:agentId/messages] File agentIds:`, allProjectFiles.map(f => ({ name: f.name, agentId: f.agentId })));
+
+  // Создаем объект агента со всеми файлами проекта
+  const agentWithAllFiles = {
+    ...agent,
+    files: allFiles,
+  };
+
   const history = await prisma.message.findMany({
     where: { agentId },
     orderBy: { createdAt: 'asc' },
@@ -203,7 +238,7 @@ router.post('/:agentId/messages', async (req, res) => {
 
   try {
     const responseText = await generateAgentResponse(
-      agent,
+      agentWithAllFiles,
       conversationHistory,
       parsed.data.text,
     );
@@ -271,6 +306,14 @@ router.post('/:agentId/files', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  console.log(`[POST /:agentId/files] Создание файла:`);
+  console.log(`  - Agent ID: ${agentId}`);
+  console.log(`  - Agent Name: ${agent.name}`);
+  console.log(`  - User ID: ${userId}`);
+  console.log(`  - File Name: ${parsed.data.name}`);
+  console.log(`  - MIME Type: ${parsed.data.mimeType}`);
+  console.log(`  - Content Length: ${parsed.data.content.length} chars`);
+
   const file = await prisma.file.create({
     data: {
       agentId,
@@ -279,6 +322,20 @@ router.post('/:agentId/files', async (req, res) => {
       content: parsed.data.content,
     },
   });
+
+  console.log(`[POST /:agentId/files] ✅ Файл создан:`);
+  console.log(`  - File ID: ${file.id}`);
+  console.log(`  - File Name: ${file.name}`);
+  console.log(`  - Agent ID: ${file.agentId}`);
+  console.log(`  - Created At: ${file.createdAt}`);
+
+  // Проверяем общее количество файлов для этого пользователя
+  const totalFiles = await prisma.file.count({
+    where: {
+      agent: { userId }
+    }
+  });
+  console.log(`[POST /:agentId/files] 📊 Всего файлов у пользователя: ${totalFiles}`);
 
   res.status(201).json({ file });
 });
@@ -295,45 +352,91 @@ router.get('/:agentId/files/summary', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
-  // Проверяем все файлы для этого агента
-  const allFiles = await prisma.file.findMany({
-    where: { agentId },
-    select: { id: true, name: true, createdAt: true },
-  });
-
-  const summaryFiles = await prisma.file.findMany({
+  // Загружаем ВСЕ файлы всех агентов пользователя (общие документы проекта)
+  const projectFiles = await prisma.file.findMany({
     where: {
-      agentId,
-      name: {
-        startsWith: 'Summary'
-      }
+      agent: { userId }
+    },
+    select: {
+      id: true,
+      name: true,
+      mimeType: true,
+      content: true,
+      agentId: true,
+      createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
   });
 
   // Логирование для диагностики
   console.log(`[Summary Files Debug] Agent: ${agentId}`);
-  console.log(`[Summary Files Debug] Total files: ${allFiles.length}`);
-  console.log(`[Summary Files Debug] Summary files: ${summaryFiles.length}`);
-  console.log(`[Summary Files Debug] All file names:`, allFiles.map(f => f.name));
-  console.log(`[Summary Files Debug] Summary file names:`, summaryFiles.map(f => f.name));
+  console.log(`[Summary Files Debug] All project documents (all files): ${projectFiles.length}`);
+  console.log(`[Summary Files Debug] Project file names:`, projectFiles.map(f => f.name));
 
-  res.json({ files: summaryFiles });
+  res.json({ files: projectFiles });
+});
+
+// ВАЖНО: Этот маршрут должен быть ВЫШЕ /:agentId/files/:fileId
+// чтобы Express не интерпретировал '/files' как ':agentId'
+router.delete('/files/:fileId', async (req, res) => {
+  const userId = req.userId!;
+  const { fileId } = req.params;
+
+  console.log(`[DELETE /files/:fileId] Удаление файла:`, { fileId, userId });
+
+  const file = await prisma.file.findFirst({
+    where: { id: fileId },
+    include: { agent: true },
+  });
+
+  if (!file) {
+    console.log(`[DELETE /files/:fileId] Файл не найден: ${fileId}`);
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  if (file.agent.userId !== userId) {
+    console.log(`[DELETE /files/:fileId] Доступ запрещен: файл принадлежит другому пользователю`);
+    return res.status(403).json({ error: 'Access denied. File belongs to different user.' });
+  }
+
+  await prisma.file.delete({ where: { id: fileId } });
+  console.log(`[DELETE /files/:fileId] ✅ Файл удален: ${file.name} (${fileId})`);
+
+  res.status(204).send();
 });
 
 router.delete('/:agentId/files/:fileId', async (req, res) => {
   const userId = req.userId!;
   const { agentId, fileId } = req.params;
 
+  // Проверяем, что агент существует и принадлежит пользователю (для валидации запроса)
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, userId },
+  });
+
+  if (!agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  // Находим файл с информацией о его агенте
   const file = await prisma.file.findFirst({
-    where: { id: fileId, agentId, agent: { userId } },
+    where: { id: fileId },
+    include: { agent: true },
   });
 
   if (!file) {
     return res.status(404).json({ error: 'File not found' });
   }
 
+  // Проверяем, что файл принадлежит любому агенту этого пользователя
+  // Если userId агента файла совпадает с userId запрашивающего агента - можно удалять
+  if (file.agent.userId !== userId) {
+    return res.status(403).json({ error: 'Access denied. File belongs to different user.' });
+  }
+
+  // Удаляем файл - теперь все проверки пройдены
   await prisma.file.delete({ where: { id: fileId } });
+  
   res.status(204).send();
 });
 
@@ -366,19 +469,44 @@ router.post('/:agentId/summary', async (req, res) => {
     .join('\n\n');
 
   try {
+    console.log(`[POST /:agentId/summary] Создание саммари:`);
+    console.log(`  - Agent ID: ${agentId}`);
+    console.log(`  - Agent Name: ${agent.name}`);
+    console.log(`  - User ID: ${userId}`);
+    console.log(`  - Messages count: ${messages.length}`);
+
     const summaryText = await generateSummaryContent(agent, transcript);
+    console.log(`[POST /:agentId/summary] Саммари сгенерирован, длина: ${summaryText.length} символов`);
+
+    const fileName = `Summary - ${agent.name} - ${new Date().toLocaleString()}`;
+    console.log(`[POST /:agentId/summary] Создание файла: "${fileName}"`);
+
     const file = await prisma.file.create({
       data: {
         agentId,
-        name: `Summary - ${agent.name} - ${new Date().toLocaleString()}`,
+        name: fileName,
         mimeType: 'text/markdown',
         content: Buffer.from(summaryText, 'utf-8').toString('base64'),
       },
     });
 
+    console.log(`[POST /:agentId/summary] ✅ Файл создан:`);
+    console.log(`  - File ID: ${file.id}`);
+    console.log(`  - File Name: ${file.name}`);
+    console.log(`  - Agent ID: ${file.agentId}`);
+    console.log(`  - Created At: ${file.createdAt}`);
+
+    // Проверяем общее количество файлов для этого пользователя
+    const totalFiles = await prisma.file.count({
+      where: {
+        agent: { userId }
+      }
+    });
+    console.log(`[POST /:agentId/summary] 📊 Всего файлов у пользователя: ${totalFiles}`);
+
     res.status(201).json({ file });
   } catch (error) {
-    console.error('Summary generation failed', error);
+    console.error('[POST /:agentId/summary] ❌ Summary generation failed:', error);
     res.status(500).json({ error: 'Failed to generate summary' });
   }
 });

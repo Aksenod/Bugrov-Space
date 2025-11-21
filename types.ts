@@ -29,6 +29,7 @@ export interface UploadedFile {
   name: string;
   type: string;
   data: string; // Base64 string
+  agentId?: string;
 }
 
 export interface Agent {

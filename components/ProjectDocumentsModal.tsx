@@ -8,7 +8,6 @@ interface ProjectDocumentsModalProps {
   onClose: () => void;
   documents: UploadedFile[];
   onRemoveFile?: (fileId: string) => void;
-  agentRole?: string;
   agents?: Agent[];
   onAgentClick?: (agentId: string) => void;
   onOpenAgentSettings?: (agentId: string) => void;
@@ -19,7 +18,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onClose,
   documents,
   onRemoveFile,
-  agentRole,
   agents = [],
   onAgentClick,
   onOpenAgentSettings
@@ -29,6 +27,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   if (!isOpen) return null;
 
   const selectedFile = documents.find(doc => doc.id === selectedFileId);
+  
+  // Находим агента-создателя документа
+  const documentCreatorAgent = selectedFile?.agentId 
+    ? agents.find(agent => agent.id === selectedFile.agentId)
+    : null;
+  
+  // Показывать кнопки только если документ создан агентом-копирайтером
+  const showDSLButtons = documentCreatorAgent?.role === "copywriter";
   
   // Находим агентов DSL и Верстка по ролям
   const dslAgent = agents.find(agent => agent.role === 'dsl');
@@ -170,7 +176,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     <h1 className="text-lg md:text-xl font-bold text-white mb-3 break-words leading-tight">{selectedFile.name}</h1>
                     <div className="flex items-center gap-6 text-sm text-white/40">
                         <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span> 
-                        {agentRole === "copywriter" && (
+                        {showDSLButtons && (
                           <>
                             {dslAgent && (
                               <div className="flex items-center gap-1.5">

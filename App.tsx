@@ -30,6 +30,7 @@ const mapFile = (file: ApiFile): UploadedFile => ({
   name: file.name,
   type: file.mimeType,
   data: file.content,
+  agentId: file.agentId,
 });
 
 const pickColor = (id: string) => {
@@ -90,7 +91,21 @@ export default function App() {
   }, [activeAgentId, agents]);
 
   const messages = activeAgent ? chatHistories[activeAgent.id] ?? [] : [];
-  const projectDocuments = activeAgent ? (summaryDocuments[activeAgent.id] ?? []) : [];
+  // Документы проекта общие для всех агентов - всегда используем ключ 'all'
+  const projectDocuments = summaryDocuments['all'] ?? [];
+  
+  // Логирование для диагностики
+  useEffect(() => {
+    if (activeAgent) {
+      console.log(`[Frontend] Active agent changed: ${activeAgent.name} (${activeAgent.id})`);
+      console.log(`[Frontend] Project documents count: ${projectDocuments.length}`);
+      console.log(`[Frontend] Project documents:`, projectDocuments.map(d => ({
+        id: d.id,
+        name: d.name,
+        agentId: d.agentId,
+      })));
+    }
+  }, [activeAgent?.id, projectDocuments.length]);
   const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT51;
   const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
@@ -188,54 +203,66 @@ export default function App() {
     async (agentId: string) => {
       if (!agentId) return;
       
-      // Если уже загружали или загружаем для этого агента - пропускаем
-      if (loadedSummaryRef.current.has(agentId)) {
-        return;
-      }
+      // Документы проекта общие для всех агентов - загружаем с ключом 'all'
+      const PROJECT_DOCS_KEY = 'all';
       
-      // Помечаем как загружаемый
-      loadedSummaryRef.current.add(agentId);
+      // УБИРАЕМ проверку кеша - всегда загружаем документы при переключении агента
+      // чтобы гарантировать, что видны ВСЕ документы всех агентов
+      // Проверка кеша блокировала перезагрузку при переключении агента
+      
+      // Помечаем как загружаемый (но не проверяем, был ли уже загружен)
+      loadedSummaryRef.current.add(PROJECT_DOCS_KEY);
       
       try {
+        // Используем agentId для запроса, но бэкенд вернет все файлы пользователя
+        console.log(`[Frontend] Loading project documents for agent: ${agentId}`);
         const { files } = await api.getSummaryFiles(agentId);
-        console.log(`[Frontend] Loaded summary files for agent ${agentId}:`, files.length, 'files');
-        console.log(`[Frontend] File names:`, files.map(f => f.name));
-        setSummaryDocuments((prev) => ({
-          ...prev,
-          [agentId]: files.map(mapFile),
-        }));
+        console.log(`[Frontend] ✅ Loaded project documents (ALL files from all agents):`, files.length, 'files');
+        console.log(`[Frontend] File details:`, files.map(f => ({
+          id: f.id,
+          name: f.name,
+          agentId: f.agentId,
+        })));
+        // Сохраняем под ключом 'all' для всех агентов - это ВСЕ документы всех агентов
+        setSummaryDocuments((prev) => {
+          const mapped = files.map(mapFile);
+          console.log(`[Frontend] Setting summaryDocuments['all'] with ${mapped.length} files`);
+          return {
+            ...prev,
+            [PROJECT_DOCS_KEY]: mapped,
+          };
+        });
       } catch (error: any) {
         // Если 404 - просто нет файлов, это нормально, устанавливаем пустой массив
         // Проверяем статус напрямую или по сообщению
         if (error?.status === 404 || error?.message?.includes('404') || error?.message?.includes('Not Found')) {
-          console.log(`[Frontend] No summary files found for agent ${agentId} (404 is normal if no files exist)`);
+          console.log(`[Frontend] No project documents found (404 is normal if no files exist)`);
           setSummaryDocuments((prev) => ({
             ...prev,
-            [agentId]: [],
+            [PROJECT_DOCS_KEY]: [],
           }));
           // Оставляем в кеше, чтобы не повторять запрос
           return;
         }
         // Для других ошибок убираем из кеша, чтобы можно было повторить
-        loadedSummaryRef.current.delete(agentId);
-        console.error('[Frontend] Failed to load summary files:', error);
+        loadedSummaryRef.current.delete(PROJECT_DOCS_KEY);
+        console.error('[Frontend] Failed to load project documents:', error);
       }
     },
     [],
   );
 
-  // Загружаем документы после завершения bootstrap и при смене активного агента
+  // Загружаем документы проекта после завершения bootstrap и при каждом переключении агента
   useEffect(() => {
     // Не загружаем во время bootstrap
     if (isBootstrapping || !activeAgent?.id) {
       return;
     }
 
-    // Проверяем, не загружали ли уже для этого агента
-    if (loadedSummaryRef.current.has(activeAgent.id)) {
-      return;
-    }
-
+    // Документы проекта общие для всех агентов - ВСЕГДА загружаем при переключении агента
+    // Сбрасываем кеш, чтобы гарантировать загрузку всех документов всех агентов
+    loadedSummaryRef.current.delete('all');
+    console.log(`[Frontend] useEffect: Переключение на агента ${activeAgent.id}, сброс кеша и загрузка документов`);
     ensureSummaryLoaded(activeAgent.id);
   }, [isBootstrapping, activeAgent?.id, ensureSummaryLoaded]);
 
@@ -408,20 +435,45 @@ export default function App() {
     if (!activeAgent || messages.length < 1) return;
     setIsGeneratingSummary(true);
     try {
+      console.log('[Frontend] handleGenerateSummary called:', {
+        agentId: activeAgent.id,
+        agentName: activeAgent.name,
+        messagesCount: messages.length,
+      });
+      
       const { file } = await api.generateSummary(activeAgent.id);
+      
+      console.log('[Frontend] Summary generated successfully:', {
+        fileId: file.id,
+        fileName: file.name,
+        agentId: file.agentId,
+      });
+      
       const uploaded = mapFile(file);
-      // Добавляем созданный файл напрямую в summaryDocuments (не делаем повторный запрос)
-      setSummaryDocuments((prev) => ({
-        ...prev,
-        [activeAgent.id]: [uploaded, ...(prev[activeAgent.id] ?? [])],
-      }));
+      // Добавляем созданный файл напрямую в summaryDocuments (документы проекта общие для всех агентов)
+      setSummaryDocuments((prev) => {
+        const updated = {
+          ...prev,
+          'all': [uploaded, ...(prev['all'] ?? [])],
+        };
+        console.log('[Frontend] Updated summaryDocuments:', {
+          totalFiles: updated['all'].length,
+          newFile: uploaded.name,
+        });
+        return updated;
+      });
       // Очищаем кеш загрузки для этого агента, чтобы при следующем переключении файлы перезагрузились
       // Но не очищаем сейчас, так как мы уже добавили файл вручную
       setSummarySuccess(true);
       setTimeout(() => setSummarySuccess(false), 3000);
-    } catch (error) {
-      console.error('Summary generation failed', error);
-      alert('Не удалось создать саммари. Попробуйте позже.');
+    } catch (error: any) {
+      console.error('[Frontend] Summary generation failed:', error);
+      console.error('[Frontend] Error details:', {
+        message: error?.message,
+        status: error?.status,
+        stack: error?.stack,
+      });
+      alert(`Не удалось создать саммари: ${error?.message || 'Неизвестная ошибка'}`);
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -544,6 +596,11 @@ export default function App() {
           agent.id === activeAgent.id ? { ...agent, files: [...uploads, ...agent.files] } : agent,
         ),
       );
+      // Добавляем загруженные файлы в документы проекта
+      setSummaryDocuments((prev) => ({
+        ...prev,
+        'all': [...uploads, ...(prev['all'] ?? [])],
+      }));
       alert(`Успешно загружено файлов: ${uploads.length}`);
     } else if (errors.length === 0) {
       alert('Не удалось загрузить файлы');
@@ -554,38 +611,64 @@ export default function App() {
     if (!activeAgent) return;
     
     // Находим файл для отображения имени в подтверждении
-    const fileToRemove = activeAgent.files.find(f => f.id === fileId) || 
-                        (summaryDocuments[activeAgent.id] ?? []).find(f => f.id === fileId);
+    // Проверяем во всех возможных местах, где может быть файл
+    const fileToRemove = 
+      activeAgent.files.find(f => f.id === fileId) || 
+      (summaryDocuments['all'] ?? []).find(f => f.id === fileId);
     
-    if (!fileToRemove) return;
+    console.log('[Frontend] handleRemoveFile called:', { fileId, activeAgentId: activeAgent.id, fileToRemove });
+    
+    if (!fileToRemove) {
+      console.error('[Frontend] File not found in state:', { fileId, activeAgentId: activeAgent.id });
+      return;
+    }
     
     // Показываем окно подтверждения
     const confirmed = confirm(`Удалить файл "${fileToRemove.name}"?\n\nЭто действие нельзя отменить.`);
     if (!confirmed) return;
     
+    // Используем agentId файла, если он есть, иначе используем activeAgent.id
+    const agentIdForDelete = fileToRemove.agentId || activeAgent.id;
+    
+    console.log('[Frontend] Calling api.deleteProjectFile:', { fileId, agentIdForDelete });
+    
     try {
-      await api.deleteFile(activeAgent.id, fileId);
+      await api.deleteProjectFile(fileId);
+      console.log('[Frontend] File deleted successfully');
       
-      // Проверяем, является ли файл summary (по имени начинается с "Summary")
-      if (fileToRemove.name.startsWith('Summary')) {
-        // Удаляем из summaryDocuments
-        setSummaryDocuments((prev) => ({
-          ...prev,
-          [activeAgent.id]: (prev[activeAgent.id] ?? []).filter((file) => file.id !== fileId),
-        }));
-      } else {
-        // Удаляем из agent.files (обычные файлы)
-        setAgents((prev) =>
-          prev.map((agent) =>
-            agent.id === activeAgent.id
+      // Удаляем из summaryDocuments (все документы проекта теперь общие)
+      setSummaryDocuments((prev) => {
+        const updated = { ...prev };
+        if (updated['all']) {
+          updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+        }
+        return updated;
+      });
+      
+      // Удаляем из agent.files на фронтенде - из того агента, которому принадлежит файл
+      setAgents((prev) =>
+        prev.map((agent) => {
+          // Если у файла есть agentId, удаляем из соответствующего агента
+          // Иначе удаляем из всех агентов (на всякий случай)
+          if (fileToRemove.agentId) {
+            return agent.id === fileToRemove.agentId
               ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
-              : agent,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error('Failed to remove file', error);
-      alert('Не удалось удалить файл. Попробуйте позже.');
+              : agent;
+          } else {
+            // Если agentId нет, удаляем из всех агентов (fallback)
+            return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+          }
+        }),
+      );
+    } catch (error: any) {
+      console.error('[Frontend] Failed to remove file:', error);
+      console.error('[Frontend] Error details:', { 
+        message: error?.message, 
+        status: error?.status,
+        agentId: agentIdForDelete,
+        fileId 
+      });
+      alert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`);
     }
   };
 
@@ -753,7 +836,6 @@ export default function App() {
           onClose={() => setIsDocsOpen(false)}
           documents={projectDocuments}
           onRemoveFile={handleRemoveFile}
-          agentRole={activeAgent.role}
           agents={agents}
           onAgentClick={(agentId) => {
             // TODO: Запуск агента с документом

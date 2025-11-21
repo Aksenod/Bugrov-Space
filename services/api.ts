@@ -55,6 +55,7 @@ export interface ApiFile {
   name: string;
   mimeType: string;
   content: string;
+  agentId: string;
   createdAt: string;
 }
 
@@ -165,6 +166,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  async deleteProjectFile(fileId: string) {
+    return request<void>(`/agents/files/${fileId}`, { method: 'DELETE' });
   },
 
   async deleteFile(agentId: string, fileId: string) {
