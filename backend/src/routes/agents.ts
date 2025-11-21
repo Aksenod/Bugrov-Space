@@ -20,7 +20,15 @@ router.get('/', async (req, res) => {
   let agents = await prisma.agent.findMany({
     where: { userId },
     include: {
-      files: true,
+      files: {
+        where: {
+          name: {
+            not: {
+              startsWith: 'Summary'
+            }
+          }
+        }
+      }
     },
     orderBy: { createdAt: 'asc' },
   });
@@ -56,7 +64,15 @@ router.get('/', async (req, res) => {
     agents = await prisma.agent.findMany({
       where: { userId },
       include: {
-        files: true,
+        files: {
+          where: {
+            name: {
+              not: {
+                startsWith: 'Summary'
+              }
+            }
+          }
+        }
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -265,6 +281,44 @@ router.post('/:agentId/files', async (req, res) => {
   });
 
   res.status(201).json({ file });
+});
+
+router.get('/:agentId/files/summary', async (req, res) => {
+  const userId = req.userId!;
+  const { agentId } = req.params;
+
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, userId },
+  });
+
+  if (!agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  // Проверяем все файлы для этого агента
+  const allFiles = await prisma.file.findMany({
+    where: { agentId },
+    select: { id: true, name: true, createdAt: true },
+  });
+
+  const summaryFiles = await prisma.file.findMany({
+    where: {
+      agentId,
+      name: {
+        startsWith: 'Summary'
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Логирование для диагностики
+  console.log(`[Summary Files Debug] Agent: ${agentId}`);
+  console.log(`[Summary Files Debug] Total files: ${allFiles.length}`);
+  console.log(`[Summary Files Debug] Summary files: ${summaryFiles.length}`);
+  console.log(`[Summary Files Debug] All file names:`, allFiles.map(f => f.name));
+  console.log(`[Summary Files Debug] Summary file names:`, summaryFiles.map(f => f.name));
+
+  res.json({ files: summaryFiles });
 });
 
 router.delete('/:agentId/files/:fileId', async (req, res) => {

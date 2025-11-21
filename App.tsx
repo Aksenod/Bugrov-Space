@@ -43,7 +43,7 @@ const mapAgent = (agent: ApiAgent): Agent => ({
   description: agent.description,
   systemInstruction: agent.systemInstruction,
   summaryInstruction: agent.summaryInstruction,
-  files: (agent.files ?? []).map(mapFile),
+  files: (agent.files ?? []).filter(file => !file.name.startsWith('Summary')).map(mapFile),
   avatarColor: pickColor(agent.id),
   model: (agent.model as LLMModel) || LLMModel.GPT51,
   role: agent.role,
@@ -76,9 +76,11 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [summaryDocuments, setSummaryDocuments] = useState<Record<string, UploadedFile[]>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
+  const loadedSummaryRef = useRef(new Set<string>());
 
   const activeAgent = useMemo(() => {
     if (!activeAgentId) {
@@ -88,7 +90,7 @@ export default function App() {
   }, [activeAgentId, agents]);
 
   const messages = activeAgent ? chatHistories[activeAgent.id] ?? [] : [];
-  const projectDocuments = activeAgent?.files ?? [];
+  const projectDocuments = activeAgent ? (summaryDocuments[activeAgent.id] ?? []) : [];
   const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT51;
   const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
@@ -113,6 +115,8 @@ export default function App() {
     setActiveAgentId(null);
     setChatHistories({});
     loadedAgentsRef.current.clear();
+    loadedSummaryRef.current.clear();
+    setSummaryDocuments({});
   }, []);
 
   const bootstrap = useCallback(async () => {
@@ -136,7 +140,9 @@ export default function App() {
         return mappedAgents[0]?.id ?? null;
       });
       loadedAgentsRef.current.clear();
+      loadedSummaryRef.current.clear();
       setChatHistories({});
+      setSummaryDocuments({});
     } catch (error) {
       console.error('Bootstrap failed', error);
       handleLogout();
@@ -178,6 +184,61 @@ export default function App() {
     }
   }, [activeAgent, ensureMessagesLoaded]);
 
+  const ensureSummaryLoaded = useCallback(
+    async (agentId: string) => {
+      if (!agentId) return;
+      
+      // Если уже загружали или загружаем для этого агента - пропускаем
+      if (loadedSummaryRef.current.has(agentId)) {
+        return;
+      }
+      
+      // Помечаем как загружаемый
+      loadedSummaryRef.current.add(agentId);
+      
+      try {
+        const { files } = await api.getSummaryFiles(agentId);
+        console.log(`[Frontend] Loaded summary files for agent ${agentId}:`, files.length, 'files');
+        console.log(`[Frontend] File names:`, files.map(f => f.name));
+        setSummaryDocuments((prev) => ({
+          ...prev,
+          [agentId]: files.map(mapFile),
+        }));
+      } catch (error: any) {
+        // Если 404 - просто нет файлов, это нормально, устанавливаем пустой массив
+        // Проверяем статус напрямую или по сообщению
+        if (error?.status === 404 || error?.message?.includes('404') || error?.message?.includes('Not Found')) {
+          console.log(`[Frontend] No summary files found for agent ${agentId} (404 is normal if no files exist)`);
+          setSummaryDocuments((prev) => ({
+            ...prev,
+            [agentId]: [],
+          }));
+          // Оставляем в кеше, чтобы не повторять запрос
+          return;
+        }
+        // Для других ошибок убираем из кеша, чтобы можно было повторить
+        loadedSummaryRef.current.delete(agentId);
+        console.error('[Frontend] Failed to load summary files:', error);
+      }
+    },
+    [],
+  );
+
+  // Загружаем документы после завершения bootstrap и при смене активного агента
+  useEffect(() => {
+    // Не загружаем во время bootstrap
+    if (isBootstrapping || !activeAgent?.id) {
+      return;
+    }
+
+    // Проверяем, не загружали ли уже для этого агента
+    if (loadedSummaryRef.current.has(activeAgent.id)) {
+      return;
+    }
+
+    ensureSummaryLoaded(activeAgent.id);
+  }, [isBootstrapping, activeAgent?.id, ensureSummaryLoaded]);
+
   const handleLogin = async (email: string, password: string) => {
     setAuthError(null);
     const payload = {
@@ -211,7 +272,9 @@ export default function App() {
       setAgents(mappedAgents);
       setActiveAgentId(mappedAgents[0]?.id ?? null);
       loadedAgentsRef.current.clear();
+      loadedSummaryRef.current.clear();
       setChatHistories({});
+      setSummaryDocuments({});
     } catch (error: any) {
       setAuthError(error.message || 'Не удалось создать аккаунт');
       throw error;
@@ -243,30 +306,86 @@ export default function App() {
     setIsLoading(true);
     setSummarySuccess(false);
 
+    // Создаем временное сообщение пользователя (показываем сразу)
+    const tempUserMessageId = `temp-user-${Date.now()}`;
+    const tempUserMessage: Message = {
+      id: tempUserMessageId,
+      role: Role.USER,
+      text: text.trim(),
+      timestamp: new Date(),
+    };
+
+    // Создаем временное сообщение агента с индикатором загрузки
+    const loadingMessageId = `loading-${Date.now()}`;
+    const loadingMessage: Message = {
+      id: loadingMessageId,
+      role: Role.MODEL,
+      text: '',
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+
+    // Добавляем оба временных сообщения сразу после отправки
+    setChatHistories((prev) => ({
+      ...prev,
+      [activeAgent.id]: [
+        ...(prev[activeAgent.id] ?? []),
+        tempUserMessage,
+        loadingMessage,
+      ],
+    }));
+
+    // Прокручиваем к индикатору загрузки
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     try {
       const response = await api.sendMessage(activeAgent.id, text.trim());
       const newMessages = response.messages.map(mapMessage);
-      setChatHistories((prev) => ({
-        ...prev,
-        [activeAgent.id]: [...(prev[activeAgent.id] ?? []), ...newMessages],
-      }));
+      
+      // Заменяем временные сообщения на реальные сообщения из API
+      setChatHistories((prev) => {
+        const currentMessages = prev[activeAgent.id] ?? [];
+        // Удаляем временные сообщения (пользователя и загрузки)
+        const messagesWithoutTemp = currentMessages.filter(
+          (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
+        );
+        
+        // Добавляем реальные сообщения из API (они содержат корректные ID из базы данных)
+        return {
+          ...prev,
+          [activeAgent.id]: [...messagesWithoutTemp, ...newMessages],
+        };
+      });
     } catch (error: any) {
       console.error('Chat error', error);
-      // Используем сообщение об ошибке от сервера, если оно есть
-      const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
-      setChatHistories((prev) => ({
-        ...prev,
-        [activeAgent.id]: [
-          ...(prev[activeAgent.id] ?? []),
-          {
-            id: `error-${Date.now()}`,
-            role: Role.MODEL,
-            text: errorMessage,
-            timestamp: new Date(),
-            isError: true,
-          },
-        ],
-      }));
+      
+      // Удаляем временное сообщение загрузки и добавляем сообщение об ошибке
+      // Сообщение пользователя оставляем как есть
+      setChatHistories((prev) => {
+        const currentMessages = prev[activeAgent.id] ?? [];
+        // Удаляем только временное сообщение загрузки, сообщение пользователя оставляем
+        const messagesWithoutLoading = currentMessages.filter(
+          (msg) => msg.id !== loadingMessageId
+        );
+        
+        const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
+        
+        return {
+          ...prev,
+          [activeAgent.id]: [
+            ...messagesWithoutLoading,
+            {
+              id: `error-${Date.now()}`,
+              role: Role.MODEL,
+              text: errorMessage,
+              timestamp: new Date(),
+              isError: true,
+            },
+          ],
+        };
+      });
     } finally {
       setIsLoading(false);
     }
@@ -291,11 +410,13 @@ export default function App() {
     try {
       const { file } = await api.generateSummary(activeAgent.id);
       const uploaded = mapFile(file);
-      setAgents((prev) =>
-        prev.map((agent) =>
-          agent.id === activeAgent.id ? { ...agent, files: [uploaded, ...agent.files] } : agent,
-        ),
-      );
+      // Добавляем созданный файл напрямую в summaryDocuments (не делаем повторный запрос)
+      setSummaryDocuments((prev) => ({
+        ...prev,
+        [activeAgent.id]: [uploaded, ...(prev[activeAgent.id] ?? [])],
+      }));
+      // Очищаем кеш загрузки для этого агента, чтобы при следующем переключении файлы перезагрузились
+      // Но не очищаем сейчас, так как мы уже добавили файл вручную
       setSummarySuccess(true);
       setTimeout(() => setSummarySuccess(false), 3000);
     } catch (error) {
@@ -375,24 +496,46 @@ export default function App() {
   const handleFileUpload = async (fileList: FileList) => {
     if (!activeAgent || !fileList.length) return;
     const uploads: UploadedFile[] = [];
+    const errors: string[] = [];
+
+    // Разрешенные расширения файлов
+    const allowedExtensions = ['.txt', '.md'];
+    const allowedMimeTypes = ['text/plain', 'text/markdown'];
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
-      if (file.size > FILE_SIZE_LIMIT) {
-        alert(`Файл ${file.name} слишком большой (>2MB). Пропущен.`);
+      
+      // Проверка типа файла
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      const isValidExtension = allowedExtensions.includes(fileExtension);
+      const isValidMimeType = !file.type || allowedMimeTypes.includes(file.type);
+      
+      if (!isValidExtension && !isValidMimeType) {
+        errors.push(`Файл ${file.name} не поддерживается. Разрешены только .txt и .md файлы.`);
         continue;
       }
+      
+      if (file.size > FILE_SIZE_LIMIT) {
+        errors.push(`Файл ${file.name} слишком большой (>2MB)`);
+        continue;
+      }
+      
       try {
         const base64 = await readFileToBase64(file);
         const { file: uploaded } = await api.uploadFile(activeAgent.id, {
           name: file.name,
-          mimeType: file.type || 'application/octet-stream',
+          mimeType: file.type || 'text/plain',
           content: base64,
         });
         uploads.push(mapFile(uploaded));
-      } catch (error) {
+      } catch (error: any) {
         console.error('File upload failed', error);
+        errors.push(`Не удалось загрузить ${file.name}: ${error?.message || 'Неизвестная ошибка'}`);
       }
+    }
+
+    if (errors.length > 0) {
+      alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
     }
 
     if (uploads.length > 0) {
@@ -401,22 +544,48 @@ export default function App() {
           agent.id === activeAgent.id ? { ...agent, files: [...uploads, ...agent.files] } : agent,
         ),
       );
+      alert(`Успешно загружено файлов: ${uploads.length}`);
+    } else if (errors.length === 0) {
+      alert('Не удалось загрузить файлы');
     }
   };
 
   const handleRemoveFile = async (fileId: string) => {
     if (!activeAgent) return;
+    
+    // Находим файл для отображения имени в подтверждении
+    const fileToRemove = activeAgent.files.find(f => f.id === fileId) || 
+                        (summaryDocuments[activeAgent.id] ?? []).find(f => f.id === fileId);
+    
+    if (!fileToRemove) return;
+    
+    // Показываем окно подтверждения
+    const confirmed = confirm(`Удалить файл "${fileToRemove.name}"?\n\nЭто действие нельзя отменить.`);
+    if (!confirmed) return;
+    
     try {
       await api.deleteFile(activeAgent.id, fileId);
-      setAgents((prev) =>
-        prev.map((agent) =>
-          agent.id === activeAgent.id
-            ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
-            : agent,
-        ),
-      );
+      
+      // Проверяем, является ли файл summary (по имени начинается с "Summary")
+      if (fileToRemove.name.startsWith('Summary')) {
+        // Удаляем из summaryDocuments
+        setSummaryDocuments((prev) => ({
+          ...prev,
+          [activeAgent.id]: (prev[activeAgent.id] ?? []).filter((file) => file.id !== fileId),
+        }));
+      } else {
+        // Удаляем из agent.files (обычные файлы)
+        setAgents((prev) =>
+          prev.map((agent) =>
+            agent.id === activeAgent.id
+              ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
+              : agent,
+          ),
+        );
+      }
     } catch (error) {
       console.error('Failed to remove file', error);
+      alert('Не удалось удалить файл. Попробуйте позже.');
     }
   };
 
@@ -487,6 +656,7 @@ export default function App() {
         summarySuccess={summarySuccess}
         currentUser={currentUser}
         onLogout={handleLogout}
+        documentsCount={projectDocuments.length}
       />
 
       <main className="flex-1 flex flex-col relative h-full w-full overflow-hidden transition-all duration-300">

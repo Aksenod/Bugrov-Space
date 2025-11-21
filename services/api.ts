@@ -32,7 +32,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const message = await parseError(response);
-    throw new Error(message || 'Request failed');
+    const error = new Error(message || 'Request failed') as Error & { status?: number };
+    error.status = response.status; // Добавляем HTTP статус к ошибке
+    throw error;
   }
 
   if (response.status === 204) {
@@ -171,6 +173,10 @@ export const api = {
 
   async generateSummary(agentId: string) {
     return request<{ file: ApiFile }>(`/agents/${agentId}/summary`, { method: 'POST' });
+  },
+
+  async getSummaryFiles(agentId: string) {
+    return request<{ files: ApiFile[] }>(`/agents/${agentId}/files/summary`);
   },
 };
 

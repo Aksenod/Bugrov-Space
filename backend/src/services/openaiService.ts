@@ -1,8 +1,11 @@
 import { fetch } from 'undici';
+import { Buffer } from 'node:buffer';
 import { env } from '../env';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-5.1';
+// Максимальный размер содержимого файла для включения в промпт (в символах)
+const MAX_FILE_CONTENT_SIZE = 50000; // ~50KB текста
 
 export type ConversationMessage = {
   role: 'USER' | 'MODEL';
@@ -36,15 +39,59 @@ function ensureApiKey() {
   return env.openAiApiKey;
 }
 
+/**
+ * Декодирует base64 строку в текст.
+ * Обрабатывает ошибки и возвращает исходную строку, если декодирование не удалось.
+ */
+function decodeBase64ToText(base64String: string): string {
+  try {
+    const buffer = Buffer.from(base64String, 'base64');
+    return buffer.toString('utf-8');
+  } catch (error) {
+    console.warn('Failed to decode base64 content:', error);
+    return base64String;
+  }
+}
+
+/**
+ * Обрабатывает содержимое файла для использования в системном промпте.
+ * Декодирует base64 в текст и ограничивает размер содержимого.
+ * Теперь поддерживаются только текстовые файлы (.txt, .md).
+ */
+function processFileContent(file: AgentFile): string | null {
+  try {
+    const decodedContent = decodeBase64ToText(file.content);
+    
+    // Ограничиваем размер содержимого
+    if (decodedContent.length > MAX_FILE_CONTENT_SIZE) {
+      return decodedContent.substring(0, MAX_FILE_CONTENT_SIZE) + 
+             `\n\n[Содержимое обрезано. Файл слишком большой (${decodedContent.length} символов). Показаны первые ${MAX_FILE_CONTENT_SIZE} символов.]`;
+    }
+    
+    return decodedContent;
+  } catch (error) {
+    console.warn(`Failed to process file ${file.name}:`, error);
+    return `[Ошибка обработки файла ${file.name}]`;
+  }
+}
+
 function buildSystemPrompt(agent: AgentWithFiles) {
   const intro = `Ты выступаешь как агент "${agent.name}". ${agent.systemInstruction || ''}`.trim();
 
+  // Обрабатываем все файлы (теперь поддерживаются только текстовые .txt, .md)
+  const processedFiles = agent.files
+    .map((file) => {
+      const content = processFileContent(file);
+      return content !== null ? { file, content } : null;
+    })
+    .filter((item): item is { file: AgentFile; content: string } => item !== null);
+
   const fileContext =
-    agent.files.length > 0
-      ? `Вот контекст из документов проекта:\n${agent.files
+    processedFiles.length > 0
+      ? `Вот контекст из документов проекта:\n${processedFiles
           .map(
-            (file: AgentFile) =>
-              `---\nНазвание: ${file.name}\nТип: ${file.mimeType}\nСодержимое:\n${file.content}\n---`,
+            ({ file, content }) =>
+              `---\nНазвание: ${file.name}\nТип: ${file.mimeType}\nСодержимое:\n${content}\n---`,
           )
           .join('\n')}`
       : 'Контекстных документов нет. Отвечай, исходя из своей инструкции.';

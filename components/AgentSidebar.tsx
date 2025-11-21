@@ -17,6 +17,7 @@ interface AgentSidebarProps {
   summarySuccess: boolean;
   currentUser: User | null;
   onLogout: () => void;
+  documentsCount?: number;
 }
 
 export const AgentSidebar: React.FC<AgentSidebarProps> = ({
@@ -33,7 +34,8 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   isGeneratingSummary,
   summarySuccess,
   currentUser,
-  onLogout
+  onLogout,
+  documentsCount = 0
 }) => {
   
   const getIcon = (name: string) => {
@@ -160,8 +162,13 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                  }}
                  className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5 transition-all group-hover:border-white/10"
                >
-                 <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
+                 <div className="relative p-1.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
                     <FolderOpen size={16} />
+                    {documentsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center px-1 bg-amber-500 text-white text-[10px] font-bold rounded-full border-2 border-black/60 shadow-lg">
+                        {documentsCount > 99 ? '99+' : documentsCount}
+                      </span>
+                    )}
                  </div>
                  <span className="font-medium text-xs">Documents</span>
                </button>

@@ -62,6 +62,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFileUpload(e.dataTransfer.files);
+    }
+  };
+
   const handleSave = () => {
     onUpdateAgent({
       ...activeAgent,
@@ -216,11 +229,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest">
                 Knowledge Base
               </label>
-              <span className="px-1.5 py-0.5 bg-white/10 rounded-full text-[9px] text-white/60">{activeAgent.files.length} files</span>
+              <span className="px-1.5 py-0.5 bg-white/10 rounded-full text-[9px] text-white/60">{activeAgent.files.filter(file => !file.name.startsWith('Summary')).length} files</span>
             </div>
             
             <div 
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
               className="border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/5 bg-white/5 rounded-xl p-6 text-center cursor-pointer transition-all group mb-3"
             >
               <Upload className="mx-auto h-6 w-6 text-white/30 group-hover:text-indigo-400 mb-1.5 transition-colors duration-300" />
@@ -233,34 +248,37 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onChange={handleFileChange}
                 className="hidden" 
                 multiple
-                accept=".pdf,.txt,.md,.csv,image/*"
+                accept=".txt,.md"
               />
             </div>
 
             {/* File List */}
-            {activeAgent.files.length > 0 && (
-              <div className="space-y-1.5">
-                {activeAgent.files.map((file) => (
-                  <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
-                    <div className="flex items-center gap-2.5 overflow-hidden">
-                      <div className="bg-indigo-500/20 p-1.5 rounded text-indigo-300">
-                        <FileText size={14} />
+            {(() => {
+              const knowledgeBaseFiles = activeAgent.files.filter(file => !file.name.startsWith('Summary'));
+              return knowledgeBaseFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  {knowledgeBaseFiles.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="bg-indigo-500/20 p-1.5 rounded text-indigo-300">
+                          <FileText size={14} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-white truncate">{file.name}</p>
+                          <p className="text-[9px] text-white/40 uppercase tracking-wider">{file.type.split('/')[1] || 'FILE'}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-white truncate">{file.name}</p>
-                        <p className="text-[9px] text-white/40 uppercase tracking-wider">{file.type.split('/')[1] || 'FILE'}</p>
-                      </div>
+                      <button 
+                        onClick={() => onRemoveFile(file.id)}
+                        className="p-1.5 text-white/30 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => onRemoveFile(file.id)}
-                      className="p-1.5 text-white/30 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </section>
 
         </div>
