@@ -130,6 +130,40 @@ router.post('/', async (req, res) => {
   res.status(201).json({ agent });
 });
 
+router.post('/reorder', async (req, res) => {
+  const userId = req.userId!;
+  const parsed = reorderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const orders = parsed.data.orders;
+  const agentIds = orders.map((order) => order.id);
+
+  const ownedAgents = await prisma.agent.findMany({
+    where: {
+      userId,
+      id: { in: agentIds },
+    },
+    select: { id: true },
+  });
+
+  if (ownedAgents.length !== agentIds.length) {
+    return res.status(403).json({ error: 'One or more agents do not belong to the user' });
+  }
+
+  const updates = orders.map(({ id, order }) =>
+    prisma.agent.update({
+      where: { id },
+      data: { order },
+    })
+  );
+
+  await prisma.$transaction(updates);
+
+  res.json({ success: true });
+});
+
 router.put('/:agentId', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
@@ -339,40 +373,6 @@ router.delete('/:agentId/messages', async (req, res) => {
   });
 
   res.status(204).send();
-});
-
-router.post('/reorder', async (req, res) => {
-  const userId = req.userId!;
-  const parsed = reorderSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  const orders = parsed.data.orders;
-  const agentIds = orders.map((order) => order.id);
-
-  const ownedAgents = await prisma.agent.findMany({
-    where: {
-      userId,
-      id: { in: agentIds },
-    },
-    select: { id: true },
-  });
-
-  if (ownedAgents.length !== agentIds.length) {
-    return res.status(403).json({ error: 'One or more agents do not belong to the user' });
-  }
-
-  const updates = orders.map(({ id, order }) =>
-    prisma.agent.update({
-      where: { id },
-      data: { order },
-    })
-  );
-
-  await prisma.$transaction(updates);
-
-  res.json({ success: true });
 });
 
 const fileSchema = z.object({
