@@ -24,6 +24,20 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
+  const getAgentName = (doc: UploadedFile) => {
+    if (!doc.agentId) return 'Документ';
+    return agents.find(agent => agent.id === doc.agentId)?.name ?? 'Документ';
+  };
+
+  const extractTimestamp = (doc: UploadedFile) => {
+    const parts = doc.name.split(' - ');
+    return parts.length > 1 ? parts[parts.length - 1].trim() : doc.name;
+  };
+
+  const getDocumentDisplayName = (doc: UploadedFile) => {
+    return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
+  };
+
   if (!isOpen) return null;
 
   const selectedFile = documents.find(doc => doc.id === selectedFileId);
@@ -116,7 +130,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                   
                   <div className="min-w-0 flex-1">
                     <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
-                      {doc.name}
+                      {getDocumentDisplayName(doc)}
                     </h4>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">
@@ -156,7 +170,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
             <button onClick={() => setSelectedFileId(null)} className="text-white/60 hover:text-white">
                ← Back
             </button>
-            <span className="font-medium truncate text-white">{selectedFile?.name}</span>
+            <span className="font-medium truncate text-white">
+              {selectedFile ? getDocumentDisplayName(selectedFile) : ''}
+            </span>
           </div>
 
           {/* Desktop Close Button */}
@@ -173,7 +189,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase mb-4">
                         Project File
                     </div>
-                    <h1 className="text-lg md:text-xl font-bold text-white mb-3 break-words leading-tight">{selectedFile.name}</h1>
+                   <h1 className="text-lg md:text-xl font-bold text-white mb-3 break-words leading-tight">
+                      {getDocumentDisplayName(selectedFile)}
+                   </h1>
                     <div className="flex items-center gap-6 text-sm text-white/40">
                         <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span> 
                         {showDSLButtons && (

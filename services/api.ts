@@ -67,6 +67,7 @@ export interface ApiAgent {
   summaryInstruction: string;
   model: string;
   role?: string;
+  order?: number;
   files: ApiFile[];
 }
 
@@ -139,6 +140,13 @@ export const api = {
     return request<{ agent: ApiAgent }>(`/agents/${agentId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    });
+  },
+
+  async reorderAgents(orders: { id: string; order: number }[]) {
+    return request<{ success: boolean }>(`/agents/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ orders }),
     });
   },
 

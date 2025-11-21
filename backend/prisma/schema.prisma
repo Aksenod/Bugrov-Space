@@ -32,6 +32,7 @@ model Agent {
   summaryInstruction String   @default("")
   model              String   @default("gpt-5.1")
   role               String?  @default("")
+  order              Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

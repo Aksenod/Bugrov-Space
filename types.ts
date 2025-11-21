@@ -42,6 +42,7 @@ export interface Agent {
   avatarColor?: string;
   model: LLMModel | string;
   role?: string;
+  order: number;
 }
 
 export interface User {

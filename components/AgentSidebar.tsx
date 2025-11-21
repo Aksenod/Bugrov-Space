@@ -1,4 +1,20 @@
 import React from 'react';
+import {
+  DndContext,
+  closestCorners,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Agent, User } from '../types';
 import { Bot, FileText, PenTool, Hash, Briefcase, Plus, FolderOpen, Save, CheckCircle, Loader2, LogOut, User as UserIcon, Trash2 } from 'lucide-react';
 
@@ -9,6 +25,7 @@ interface AgentSidebarProps {
   onSelectAgent: (id: string) => void;
   onAddAgent: () => void;
   onDeleteAgent: (id: string) => void;
+  onReorderAgents: (agentIds: string[]) => void;
   isOpen: boolean;
   onCloseMobile: () => void;
   onOpenDocs: () => void;
@@ -27,6 +44,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   onSelectAgent,
   onAddAgent,
   onDeleteAgent,
+  onReorderAgents,
   isOpen,
   onCloseMobile,
   onOpenDocs,
@@ -45,6 +63,23 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
     if (lower.includes('творч') || lower.includes('writer') || lower.includes('копирайтер')) return <PenTool size={16} />;
     if (lower.includes('assist') || lower.includes('помощник')) return <Bot size={16} />;
     return <Hash size={16} />;
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = agents.findIndex((agent) => agent.id === active.id);
+    const newIndex = agents.findIndex((agent) => agent.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(agents, oldIndex, newIndex).map((agent) => agent.id);
+    onReorderAgents(newOrder);
   };
 
   return (
@@ -84,59 +119,24 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
             </span>
           </div>
           
-          {agents.map((agent) => {
-            const isActive = agent.id === activeAgentId;
-            return (
-              <div key={agent.id} className="relative group/item">
-                  <button
-                    onClick={() => {
-                      onSelectAgent(agent.id);
-                      onCloseMobile();
-                    }}
-                    className={`w-full flex items-center gap-3 p-2.5 pr-10 rounded-xl transition-all duration-300 group relative overflow-hidden ${
-                      isActive 
-                        ? 'bg-white/10 text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)] border border-white/10' 
-                        : 'hover:bg-white/5 text-white/50 hover:text-white border border-transparent'
-                    }`}
-                  >
-                    {/* Active Glow Background */}
-                    {isActive && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-50" />
-                    )}
-
-                    <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-white/10 text-white shadow-inner' : 'bg-transparent'}`}>
-                      {getIcon(agent.name)}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0 relative z-10 text-left">
-                      <h3 className="font-medium text-xs truncate">
-                        {agent.name}
-                      </h3>
-                    </div>
-
-                    {isActive && <div className="w-1 h-1 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,1)] mr-1"></div>}
-                  </button>
-
-                  {/* Delete Action - visible on hover of the container */}
-                  {agents.length > 1 && (!agent.role || agent.role.trim() === '') && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteAgent(agent.id);
-                      }}
-                      className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all z-20 ${
-                        isActive 
-                          ? 'text-white/30 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100' 
-                          : 'text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100'
-                      }`}
-                      title="Delete Agent"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-              </div>
-            );
-          })}
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+            <SortableContext items={agents.map(agent => agent.id)} strategy={verticalListSortingStrategy}>
+              {agents.map((agent) => (
+                <SortableAgentItem
+                  key={agent.id}
+                  agent={agent}
+                  isActive={agent.id === activeAgentId}
+                  canDelete={agents.length > 1 && (!agent.role || agent.role.trim() === '')}
+                  onSelectAgent={() => {
+                    onSelectAgent(agent.id);
+                    onCloseMobile();
+                  }}
+                  onDeleteAgent={() => onDeleteAgent(agent.id)}
+                  getIcon={getIcon}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
 
           {/* Add Agent Button */}
           <button
@@ -230,5 +230,82 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
       </aside>
     </>
+  );
+};
+
+interface SortableAgentItemProps {
+  agent: Agent;
+  isActive: boolean;
+  canDelete: boolean;
+  onSelectAgent: () => void;
+  onDeleteAgent: () => void;
+  getIcon: (name: string) => React.ReactNode;
+}
+
+const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
+  agent,
+  isActive,
+  canDelete,
+  onSelectAgent,
+  onDeleteAgent,
+  getIcon,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: 'grab',
+  } as React.CSSProperties;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group/item ${isDragging ? 'z-20' : ''}`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        onClick={onSelectAgent}
+        className={`w-full flex items-center gap-3 p-2.5 pr-10 rounded-xl transition-all duration-300 group relative overflow-hidden ${
+          isActive
+            ? 'bg-white/10 text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)] border border-white/10'
+            : 'hover:bg-white/5 text-white/50 hover:text-white border border-transparent'
+        } ${isDragging ? 'opacity-80' : ''}`}
+      >
+        {isActive && (
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-50" />
+        )}
+
+        <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-white/10 text-white shadow-inner' : 'bg-transparent'}`}>
+          {getIcon(agent.name)}
+        </div>
+
+        <div className="flex-1 min-w-0 relative z-10 text-left">
+          <h3 className="font-medium text-xs truncate">
+            {agent.name}
+          </h3>
+        </div>
+
+        {isActive && <div className="w-1 h-1 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,1)] mr-1"></div>}
+      </button>
+
+      {canDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteAgent();
+          }}
+          className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all z-20 ${
+            isActive
+              ? 'text-white/30 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100'
+              : 'text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100'
+          }`}
+          title="Delete Agent"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+    </div>
   );
 };

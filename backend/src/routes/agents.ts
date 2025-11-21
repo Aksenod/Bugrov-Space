@@ -15,6 +15,22 @@ const agentSchema = z.object({
   role: z.string().optional(),
 });
 
+const reorderSchema = z.object({
+  orders: z.array(z.object({
+    id: z.string().min(1),
+    order: z.number().int(),
+  })).min(1),
+});
+
+const getNextOrderValue = async (userId: string) => {
+  const lastAgent = await prisma.agent.findFirst({
+    where: { userId },
+    orderBy: { order: 'desc' },
+    select: { order: true },
+  });
+  return (lastAgent?.order ?? -1) + 1;
+};
+
 router.get('/', async (req, res) => {
   const userId = req.userId!;
   let agents = await prisma.agent.findMany({
@@ -30,13 +46,17 @@ router.get('/', async (req, res) => {
         }
       }
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [
+      { order: 'asc' },
+      { createdAt: 'asc' },
+    ],
   });
 
   // Проверяем и создаем недостающих агентов с ролями для существующих пользователей
   const agentsByRole = new Map(agents.map(agent => [agent.role || '', agent]));
   const requiredRoles = ['copywriter', 'dsl', 'verstka'];
   const agentsToCreate = [];
+  let nextOrder = await getNextOrderValue(userId);
 
   for (const role of requiredRoles) {
     if (!agentsByRole.has(role)) {
@@ -50,6 +70,7 @@ router.get('/', async (req, res) => {
           summaryInstruction: defaultAgent.summaryInstruction,
           model: defaultAgent.model,
           role: defaultAgent.role || '',
+          order: nextOrder++,
         });
       }
     }
@@ -74,7 +95,10 @@ router.get('/', async (req, res) => {
           }
         }
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ],
     });
   }
 
@@ -88,6 +112,8 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  const nextOrder = await getNextOrderValue(userId);
+
   const agent = await prisma.agent.create({
     data: {
       userId,
@@ -97,6 +123,7 @@ router.post('/', async (req, res) => {
       summaryInstruction: parsed.data.summaryInstruction ?? '',
       model: parsed.data.model ?? 'gpt-5.1',
       role: parsed.data.role ?? '',
+      order: nextOrder,
     },
   });
 
@@ -128,17 +155,44 @@ router.delete('/:agentId', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
 
-  const existing = await prisma.agent.findFirst({ where: { id: agentId, userId } });
+  console.log(`[DELETE /:agentId] Попытка удаления агента:`, { agentId, userId });
+
+  // Проверяем, существует ли агент с таким ID у пользователя
+  const existing = await prisma.agent.findFirst({ 
+    where: { id: agentId, userId },
+    include: { user: { select: { id: true, email: true } } }
+  });
+
+  console.log(`[DELETE /:agentId] Результат поиска агента:`, existing ? {
+    id: existing.id,
+    name: existing.name,
+    userId: existing.userId,
+    userEmail: existing.user.email
+  } : 'не найден');
+
   if (!existing) {
+    // Проверяем, может быть агент существует, но принадлежит другому пользователю
+    const agentExists = await prisma.agent.findFirst({ where: { id: agentId } });
+    if (agentExists) {
+      console.log(`[DELETE /:agentId] Агент найден, но принадлежит другому пользователю:`, {
+        agentId,
+        agentUserId: agentExists.userId,
+        currentUserId: userId
+      });
+      return res.status(403).json({ error: 'Access denied. Agent belongs to different user.' });
+    }
     return res.status(404).json({ error: 'Agent not found' });
   }
 
   // Запрещаем удаление агентов с ролью
   if (existing.role && existing.role.trim() !== '') {
+    console.log(`[DELETE /:agentId] Попытка удалить агента с ролью:`, { agentId, role: existing.role });
     return res.status(400).json({ error: 'Cannot delete agent with assigned role' });
   }
 
   await prisma.agent.delete({ where: { id: agentId } });
+  console.log(`[DELETE /:agentId] ✅ Агент успешно удален:`, { agentId, name: existing.name });
+  
   res.status(204).send();
 });
 
@@ -285,6 +339,40 @@ router.delete('/:agentId/messages', async (req, res) => {
   });
 
   res.status(204).send();
+});
+
+router.post('/reorder', async (req, res) => {
+  const userId = req.userId!;
+  const parsed = reorderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const orders = parsed.data.orders;
+  const agentIds = orders.map((order) => order.id);
+
+  const ownedAgents = await prisma.agent.findMany({
+    where: {
+      userId,
+      id: { in: agentIds },
+    },
+    select: { id: true },
+  });
+
+  if (ownedAgents.length !== agentIds.length) {
+    return res.status(403).json({ error: 'One or more agents do not belong to the user' });
+  }
+
+  const updates = orders.map(({ id, order }) =>
+    prisma.agent.update({
+      where: { id },
+      data: { order },
+    })
+  );
+
+  await prisma.$transaction(updates);
+
+  res.json({ success: true });
 });
 
 const fileSchema = z.object({

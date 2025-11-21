@@ -48,7 +48,16 @@ const mapAgent = (agent: ApiAgent): Agent => ({
   avatarColor: pickColor(agent.id),
   model: (agent.model as LLMModel) || LLMModel.GPT51,
   role: agent.role,
+  order: agent.order ?? 0,
 });
+
+const sortAgents = (agentList: Agent[]) =>
+  [...agentList].sort((a, b) => {
+    if (a.order === b.order) {
+      return a.name.localeCompare(b.name);
+    }
+    return a.order - b.order;
+  });
 
 const mapMessage = (message: ApiMessage): Message => ({
   id: message.id,
@@ -82,6 +91,7 @@ export default function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
   const loadedSummaryRef = useRef(new Set<string>());
+  const previousAgentsRef = useRef<Agent[] | null>(null);
 
   const activeAgent = useMemo(() => {
     if (!activeAgentId) {
@@ -146,7 +156,7 @@ export default function App() {
     try {
       const [{ user }, { agents: apiAgents }] = await Promise.all([api.getCurrentUser(), api.getAgents()]);
       setCurrentUser(mapUser(user));
-      const mappedAgents = apiAgents.map(mapAgent);
+      const mappedAgents = sortAgents(apiAgents.map(mapAgent));
       setAgents(mappedAgents);
       setActiveAgentId((prev) => {
         if (prev && mappedAgents.some((agent) => agent.id === prev)) {
@@ -160,11 +170,19 @@ export default function App() {
       setSummaryDocuments({});
     } catch (error) {
       console.error('Bootstrap failed', error);
-      handleLogout();
+      api.clearToken();
+      setAuthToken(null);
+      setCurrentUser(null);
+      setAgents([]);
+      setActiveAgentId(null);
+      setChatHistories({});
+      loadedAgentsRef.current.clear();
+      loadedSummaryRef.current.clear();
+      setSummaryDocuments({});
     } finally {
       setIsBootstrapping(false);
     }
-  }, [handleLogout]);
+  }, []);
 
   useEffect(() => {
     if (authToken) {
@@ -295,7 +313,7 @@ export default function App() {
       api.setToken(response.token);
       setAuthToken(response.token);
       setCurrentUser(mapUser(response.user));
-      const mappedAgents = response.agents.map(mapAgent);
+      const mappedAgents = sortAgents(response.agents.map(mapAgent));
       setAgents(mappedAgents);
       setActiveAgentId(mappedAgents[0]?.id ?? null);
       loadedAgentsRef.current.clear();
@@ -326,6 +344,37 @@ export default function App() {
     const guestEmail = `guest+${timestamp}@demo.local`;
     await handleRegister('Гость', guestEmail, `Guest-${timestamp}`);
   };
+
+  const handleReorderAgents = useCallback(async (newOrderIds: string[]) => {
+    setAgents((prev) => {
+      if (prev.length !== newOrderIds.length) {
+        return prev;
+      }
+      previousAgentsRef.current = prev;
+      const map = new Map(prev.map((agent) => [agent.id, agent]));
+      const reordered: Agent[] = [];
+      for (const id of newOrderIds) {
+        const agent = map.get(id);
+        if (!agent) {
+          return prev;
+        }
+        reordered.push(agent);
+      }
+      return reordered.map((agent, index) => ({
+        ...agent,
+        order: index,
+      }));
+    });
+
+    try {
+      await api.reorderAgents(newOrderIds.map((id, index) => ({ id, order: index })));
+    } catch (error) {
+      console.error('Не удалось сохранить порядок агентов', error);
+      if (previousAgentsRef.current) {
+        setAgents(previousAgentsRef.current);
+      }
+    }
+  }, []);
 
   const handleSendMessage = async (text: string) => {
     if (!activeAgent || !text.trim() || isLoading) return;
@@ -490,7 +539,7 @@ export default function App() {
         role: '',
       });
       const mapped = mapAgent(response.agent);
-      setAgents((prev) => [...prev, mapped]);
+      setAgents((prev) => sortAgents([...prev, mapped]));
       setActiveAgentId(mapped.id);
       setIsSidebarOpen(false);
     } catch (error) {
@@ -509,7 +558,7 @@ export default function App() {
         role: agent.role,
       });
       const mapped = mapAgent(response.agent);
-      setAgents((prev) => prev.map((item) => (item.id === mapped.id ? mapped : item)));
+      setAgents((prev) => sortAgents(prev.map((item) => (item.id === mapped.id ? mapped : item))));
     } catch (error) {
       console.error('Failed to update agent', error);
     }
@@ -725,12 +774,11 @@ export default function App() {
       <AgentSidebar 
         projectName={PROJECT_NAME}
         agents={agents}
-        activeAgentId={activeAgent?.id ?? null}
+        activeAgentId={activeAgent?.id ?? ''}
         onSelectAgent={setActiveAgentId}
-        onAddAgent={() => {
-          handleAddAgent();
-        }}
+        onAddAgent={handleAddAgent}
         onDeleteAgent={handleDeleteAgent}
+        onReorderAgents={handleReorderAgents}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
         onOpenDocs={() => setIsDocsOpen(true)}

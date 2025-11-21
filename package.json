@@ -11,6 +11,10 @@
     "deploy": "npm run build && cp CNAME dist/CNAME && cp 404.html dist/404.html && cp .nojekyll dist/.nojekyll && npx gh-pages -d dist"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.0.8",
+    "@dnd-kit/modifiers": "^6.0.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.1",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
