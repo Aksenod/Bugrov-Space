@@ -287,15 +287,9 @@ router.delete('/:agentId', async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete agent with assigned role' });
     }
 
-    // Включаем внешние ключи для SQLite (на всякий случай)
-    await prisma.$executeRaw`PRAGMA foreign_keys = ON`;
-
-    // Сначала удаляем все связанные сообщения и файлы вручную (на случай, если каскад не работает)
-    // Это гарантирует, что удаление пройдет успешно
-    await prisma.message.deleteMany({ where: { agentId } });
-    await prisma.file.deleteMany({ where: { agentId } });
-
-    // Теперь удаляем агента
+    // Удаляем агента - каскадное удаление автоматически удалит связанные messages и files
+    // благодаря onDelete: Cascade в схеме Prisma и включенным foreign keys в SQLite
+    // Foreign keys включены при инициализации Prisma Client в db/prisma.ts
     await prisma.agent.delete({ where: { id: agentId } });
     console.log(`[DELETE /:agentId] ✅ Агент успешно удален:`, { agentId, name: existing.name });
     
