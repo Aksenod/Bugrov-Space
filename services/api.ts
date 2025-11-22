@@ -51,23 +51,34 @@ const parseError = async (response: Response) => {
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: getHeaders(init.headers as Record<string, string>),
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: getHeaders(init.headers as Record<string, string>),
+    });
 
-  if (!response.ok) {
-    const message = await parseError(response);
-    const error = new Error(message || 'Request failed') as Error & { status?: number };
-    error.status = response.status; // Добавляем HTTP статус к ошибке
+    if (!response.ok) {
+      const message = await parseError(response);
+      const error = new Error(message || 'Request failed') as Error & { status?: number };
+      error.status = response.status; // Добавляем HTTP статус к ошибке
+      throw error;
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  } catch (error: any) {
+    // Если это ошибка сети (Failed to fetch), добавляем более понятное сообщение
+    if (error?.message === 'Failed to fetch' || error?.name === 'TypeError') {
+      const networkError = new Error('Не удалось подключиться к серверу. Проверьте подключение к интернету или попробуйте позже.') as Error & { status?: number; originalError?: any };
+      networkError.status = 0;
+      networkError.originalError = error;
+      throw networkError;
+    }
     throw error;
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
 }
 
 export interface ApiUser {
