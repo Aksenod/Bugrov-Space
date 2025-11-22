@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, Calendar, Eye, Trash2, Settings, Loader2 } from 'lucide-react';
 import { UploadedFile, Agent } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { SettingsPanel } from './SettingsPanel';
 import { api } from '../services/api';
+
+const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
+
+const readFileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 interface ProjectDocumentsModalProps {
   isOpen: boolean;
@@ -13,6 +27,10 @@ interface ProjectDocumentsModalProps {
   onAgentClick?: (agentId: string) => void;
   onOpenAgentSettings?: (agentId: string) => void;
   onDocumentUpdate?: (file: UploadedFile) => void;
+  onUpdateAgent?: (updatedAgent: Agent) => void;
+  onFileUpload?: (files: FileList) => void;
+  onRemoveAgentFile?: (fileId: string) => void;
+  onAgentFilesUpdate?: (agentId: string, files: UploadedFile[]) => void;
 }
 
 export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
@@ -23,13 +41,18 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   agents = [],
   onAgentClick,
   onOpenAgentSettings,
-  onDocumentUpdate
+  onDocumentUpdate,
+  onUpdateAgent,
+  onFileUpload,
+  onRemoveAgentFile,
+  onAgentFilesUpdate
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka'>('text');
   const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
   const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
+  const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null);
 
   // Сбрасываем таб при смене документа
   useEffect(() => {
@@ -38,12 +61,28 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   }, [selectedFileId]);
 
-  // Синхронизируем локальное состояние с documents prop
+  // Синхронизируем локальное состояние с documents prop при смене файла
+  // Не перезаписываем если локальный файл уже имеет результаты генерации
   useEffect(() => {
     if (selectedFileId) {
       const fileFromProps = documents.find(doc => doc.id === selectedFileId);
       if (fileFromProps) {
-        setLocalSelectedFile(fileFromProps);
+        setLocalSelectedFile(prev => {
+          // Если локальный файл уже существует и имеет dslContent или verstkaContent - сохраняем его
+          if (prev && prev.id === selectedFileId) {
+            const hasLocalContent = (prev.dslContent && prev.dslContent.length > 0) || 
+                                    (prev.verstkaContent && prev.verstkaContent.length > 0);
+            const hasPropContent = (fileFromProps.dslContent && fileFromProps.dslContent.length > 0) || 
+                                   (fileFromProps.verstkaContent && fileFromProps.verstkaContent.length > 0);
+            
+            // Если локальный файл имеет контент, который есть и в prop - берем prop (он новее)
+            // Если локальный файл имеет контент, которого нет в prop - оставляем локальный
+            if (hasLocalContent && !hasPropContent) {
+              return prev;
+            }
+          }
+          return fileFromProps;
+        });
       }
     } else {
       setLocalSelectedFile(null);
@@ -147,6 +186,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         verstkaContent: file.verstkaContent,
       };
 
+      console.log('[ProjectDocumentsModal] Generated result:', {
+        role,
+        hasDSL: !!updatedFile.dslContent,
+        hasVerstka: !!updatedFile.verstkaContent,
+        dslLength: updatedFile.dslContent?.length || 0,
+        verstkaLength: updatedFile.verstkaContent?.length || 0,
+      });
+
       // Сразу обновляем локальное состояние для мгновенного отображения
       setLocalSelectedFile(updatedFile);
 
@@ -155,8 +202,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         onDocumentUpdate(updatedFile);
       }
 
-      // Переключаемся на соответствующий таб
-      setActiveTab(role);
+      // Переключаемся на соответствующий таб после небольшой задержки
+      // чтобы состояние успело обновиться
+      setTimeout(() => {
+        setActiveTab(role);
+      }, 100);
     } catch (error: any) {
       console.error('Failed to generate result:', error);
       alert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
@@ -173,9 +223,23 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (activeTab === 'text') {
       return selectedFile.data;
     } else if (activeTab === 'dsl') {
-      return selectedFile.dslContent || null;
+      const content = selectedFile.dslContent || null;
+      console.log('[ProjectDocumentsModal] getDisplayContent DSL:', {
+        hasContent: !!content,
+        contentLength: content?.length || 0,
+        selectedFileId: selectedFile.id,
+        isLocalSelected: localSelectedFile?.id === selectedFile.id,
+      });
+      return content;
     } else if (activeTab === 'verstka') {
-      return selectedFile.verstkaContent || null;
+      const content = selectedFile.verstkaContent || null;
+      console.log('[ProjectDocumentsModal] getDisplayContent Verstka:', {
+        hasContent: !!content,
+        contentLength: content?.length || 0,
+        selectedFileId: selectedFile.id,
+        isLocalSelected: localSelectedFile?.id === selectedFile.id,
+      });
+      return content;
     }
     return null;
   };
@@ -307,9 +371,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                 <button 
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      if (onOpenAgentSettings) {
-                                        onOpenAgentSettings(dslAgent.id);
-                                      }
+                                      e.stopPropagation();
+                                      setSettingsAgentId(dslAgent.id);
                                     }}
                                     className="p-1 text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10 rounded transition-colors"
                                     title="Настройки агента DSL"
@@ -334,9 +397,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                 <button 
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      if (onOpenAgentSettings) {
-                                        onOpenAgentSettings(verstkaAgent.id);
-                                      }
+                                      e.stopPropagation();
+                                      setSettingsAgentId(verstkaAgent.id);
                                     }}
                                     className="p-1 text-cyan-400/60 hover:text-cyan-300 hover:bg-cyan-500/10 rounded transition-colors"
                                     title="Настройки агента Верстка"
@@ -433,6 +495,93 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         </div>
 
       </div>
+
+      {/* Agent Settings Panel - открывается поверх модального окна */}
+      {settingsAgentId && (() => {
+        const settingsAgent = agents.find(a => a.id === settingsAgentId);
+        if (!settingsAgent || !onUpdateAgent || !onRemoveAgentFile) return null;
+        
+        // Локальная функция для загрузки файлов с правильным agentId
+        const handleFileUploadForAgent = async (fileList: FileList) => {
+          if (!fileList.length) return;
+          
+          const uploads: UploadedFile[] = [];
+          const errors: string[] = [];
+          
+          const allowedExtensions = ['.txt', '.md'];
+          const allowedMimeTypes = ['text/plain', 'text/markdown'];
+          
+          for (let i = 0; i < fileList.length; i++) {
+            const file = fileList[i];
+            
+            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+            const isValidExtension = allowedExtensions.includes(fileExtension);
+            const isValidMimeType = !file.type || allowedMimeTypes.includes(file.type);
+            
+            if (!isValidExtension && !isValidMimeType) {
+              errors.push(`Файл ${file.name} не поддерживается. Разрешены только .txt и .md файлы.`);
+              continue;
+            }
+            
+            if (file.size > FILE_SIZE_LIMIT) {
+              errors.push(`Файл ${file.name} слишком большой (>2MB)`);
+              continue;
+            }
+            
+            try {
+              const base64 = await readFileToBase64(file);
+              const { file: uploaded } = await api.uploadFile(settingsAgentId, {
+                name: file.name,
+                mimeType: file.type || 'text/plain',
+                content: base64,
+                isKnowledgeBase: true,
+              });
+              
+              uploads.push({
+                id: uploaded.id,
+                name: uploaded.name,
+                type: uploaded.mimeType,
+                data: uploaded.content,
+                agentId: uploaded.agentId,
+                dslContent: uploaded.dslContent,
+                verstkaContent: uploaded.verstkaContent,
+              });
+            } catch (error: any) {
+              console.error('File upload failed', error);
+              errors.push(`Не удалось загрузить ${file.name}: ${error?.message || 'Неизвестная ошибка'}`);
+            }
+          }
+          
+          if (errors.length > 0) {
+            alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
+          }
+          
+          if (uploads.length > 0) {
+            // Обновляем файлы агента через callback
+            if (onAgentFilesUpdate) {
+              const updatedAgent = agents.find(a => a.id === settingsAgentId);
+              if (updatedAgent) {
+                onAgentFilesUpdate(settingsAgentId, [...updatedAgent.files, ...uploads]);
+              }
+            }
+            alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
+          } else if (errors.length === 0) {
+            alert('Не удалось загрузить файлы');
+          }
+        };
+        
+        return (
+          <SettingsPanel
+            isOpen={!!settingsAgentId}
+            onClose={() => setSettingsAgentId(null)}
+            activeAgent={settingsAgent}
+            onUpdateAgent={onUpdateAgent}
+            onFileUpload={handleFileUploadForAgent}
+            onRemoveFile={onRemoveAgentFile}
+            onApplyChanges={() => {}}
+          />
+        );
+      })()}
     </div>
   );
 };
