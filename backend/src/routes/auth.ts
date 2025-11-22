@@ -23,40 +23,51 @@ const registerSchema = z.object({
 }));
 
 authRouter.post('/register', authRateLimiter, async (req, res) => {
-  const parsed = registerSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map((err) => {
-      if (err.path.length > 0) {
-        return `${err.path.join('.')}: ${err.message}`;
-      }
-      return err.message;
-    }).join(', ');
-    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+  try {
+    console.log('[Register] Request body:', JSON.stringify(req.body));
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      console.log('[Register] Validation failed:', parsed.error.issues);
+      const errorMessages = parsed.error.issues.map((err) => {
+        if (err.path.length > 0) {
+          return `${err.path.join('.')}: ${err.message}`;
+        }
+        return err.message;
+      }).join(', ');
+      return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+    }
+
+    const { username, password } = parsed.data;
+    console.log('[Register] Normalized username:', username);
+    
+    const existing = await prisma.user.findUnique({ where: { username } });
+    if (existing) {
+      console.log('[Register] Username already exists:', username);
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+
+    const passwordHash = await hashPassword(password.trim());
+    const user = await prisma.user.create({
+      data: {
+        username,
+        passwordHash,
+      },
+    });
+
+    console.log('[Register] User created:', user.id);
+    const token = signToken(user.id);
+    return res.status(201).json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+      },
+      agents: [],
+    });
+  } catch (error: any) {
+    console.error('[Register] Error:', error);
+    return res.status(500).json({ error: error?.message || 'Internal server error' });
   }
-
-  const { username, password } = parsed.data;
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing) {
-    return res.status(409).json({ error: 'Username already taken' });
-  }
-
-  const passwordHash = await hashPassword(password.trim());
-  const user = await prisma.user.create({
-    data: {
-      username,
-      passwordHash,
-    },
-  });
-
-  const token = signToken(user.id);
-  return res.status(201).json({
-    token,
-    user: {
-      id: user.id,
-      username: user.username,
-    },
-    agents: [],
-  });
 });
 
 const loginSchema = z.object({
