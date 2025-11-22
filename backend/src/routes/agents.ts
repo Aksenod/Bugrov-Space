@@ -253,43 +253,73 @@ router.delete('/:agentId', async (req, res) => {
 
   console.log(`[DELETE /:agentId] Попытка удаления агента:`, { agentId, userId });
 
-  // Проверяем, существует ли агент с таким ID у пользователя
-  const existing = await prisma.agent.findFirst({ 
-    where: { id: agentId, userId },
-    include: { user: { select: { id: true, email: true } } }
-  });
+  try {
+    // Проверяем, существует ли агент с таким ID у пользователя
+    const existing = await prisma.agent.findFirst({ 
+      where: { id: agentId, userId },
+      include: { user: { select: { id: true, email: true } } }
+    });
 
-  console.log(`[DELETE /:agentId] Результат поиска агента:`, existing ? {
-    id: existing.id,
-    name: existing.name,
-    userId: existing.userId,
-    userEmail: existing.user.email
-  } : 'не найден');
+    console.log(`[DELETE /:agentId] Результат поиска агента:`, existing ? {
+      id: existing.id,
+      name: existing.name,
+      userId: existing.userId,
+      userEmail: existing.user.email
+    } : 'не найден');
 
-  if (!existing) {
-    // Проверяем, может быть агент существует, но принадлежит другому пользователю
-    const agentExists = await prisma.agent.findFirst({ where: { id: agentId } });
-    if (agentExists) {
-      console.log(`[DELETE /:agentId] Агент найден, но принадлежит другому пользователю:`, {
-        agentId,
-        agentUserId: agentExists.userId,
-        currentUserId: userId
-      });
-      return res.status(403).json({ error: 'Access denied. Agent belongs to different user.' });
+    if (!existing) {
+      // Проверяем, может быть агент существует, но принадлежит другому пользователю
+      const agentExists = await prisma.agent.findFirst({ where: { id: agentId } });
+      if (agentExists) {
+        console.log(`[DELETE /:agentId] Агент найден, но принадлежит другому пользователю:`, {
+          agentId,
+          agentUserId: agentExists.userId,
+          currentUserId: userId
+        });
+        return res.status(403).json({ error: 'Access denied. Agent belongs to different user.' });
+      }
+      return res.status(404).json({ error: 'Agent not found' });
     }
-    return res.status(404).json({ error: 'Agent not found' });
-  }
 
-  // Запрещаем удаление агентов с ролью
-  if (existing.role && existing.role.trim() !== '') {
-    console.log(`[DELETE /:agentId] Попытка удалить агента с ролью:`, { agentId, role: existing.role });
-    return res.status(400).json({ error: 'Cannot delete agent with assigned role' });
-  }
+    // Запрещаем удаление агентов с ролью
+    if (existing.role && existing.role.trim() !== '') {
+      console.log(`[DELETE /:agentId] Попытка удалить агента с ролью:`, { agentId, role: existing.role });
+      return res.status(400).json({ error: 'Cannot delete agent with assigned role' });
+    }
 
-  await prisma.agent.delete({ where: { id: agentId } });
-  console.log(`[DELETE /:agentId] ✅ Агент успешно удален:`, { agentId, name: existing.name });
-  
-  res.status(204).send();
+    // Включаем внешние ключи для SQLite (на всякий случай)
+    await prisma.$executeRaw`PRAGMA foreign_keys = ON`;
+
+    // Сначала удаляем все связанные сообщения и файлы вручную (на случай, если каскад не работает)
+    // Это гарантирует, что удаление пройдет успешно
+    await prisma.message.deleteMany({ where: { agentId } });
+    await prisma.file.deleteMany({ where: { agentId } });
+
+    // Теперь удаляем агента
+    await prisma.agent.delete({ where: { id: agentId } });
+    console.log(`[DELETE /:agentId] ✅ Агент успешно удален:`, { agentId, name: existing.name });
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error(`[DELETE /:agentId] ❌ Ошибка при удалении агента:`, {
+      agentId,
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    
+    // Если это ошибка Prisma о внешних ключах, возвращаем понятное сообщение
+    if (error instanceof Error && error.message.includes('Foreign key constraint')) {
+      return res.status(500).json({ 
+        error: 'Failed to delete agent due to database constraints. Please try again.' 
+      });
+    }
+    
+    return res.status(500).json({ 
+      error: 'Failed to delete agent',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 router.get('/:agentId/messages', async (req, res) => {

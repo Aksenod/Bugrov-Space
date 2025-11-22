@@ -57,7 +57,7 @@ const sortAgents = (agentList: Agent[]) =>
       return a.name.localeCompare(b.name);
     }
     return a.order - b.order;
-  });
+});
 
 const mapMessage = (message: ApiMessage): Message => ({
   id: message.id,
@@ -542,6 +542,7 @@ export default function App() {
       setAgents((prev) => sortAgents([...prev, mapped]));
       setActiveAgentId(mapped.id);
       setIsSidebarOpen(false);
+      setIsSettingsOpen(true);
     } catch (error) {
       console.error('Failed to create agent', error);
     }
@@ -623,10 +624,12 @@ export default function App() {
       
       try {
         const base64 = await readFileToBase64(file);
+        // Файлы, загруженные через SettingsPanel, помечаются как база знаний агента
         const { file: uploaded } = await api.uploadFile(activeAgent.id, {
           name: file.name,
           mimeType: file.type || 'text/plain',
           content: base64,
+          isKnowledgeBase: true,  // Помечаем как базу знаний
         });
         uploads.push(mapFile(uploaded));
       } catch (error: any) {
@@ -645,12 +648,8 @@ export default function App() {
           agent.id === activeAgent.id ? { ...agent, files: [...uploads, ...agent.files] } : agent,
         ),
       );
-      // Добавляем загруженные файлы в документы проекта
-      setSummaryDocuments((prev) => ({
-        ...prev,
-        'all': [...uploads, ...(prev['all'] ?? [])],
-      }));
-      alert(`Успешно загружено файлов: ${uploads.length}`);
+      // НЕ добавляем в summaryDocuments - это база знаний агента, не документ проекта
+      alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
     } else if (errors.length === 0) {
       alert('Не удалось загрузить файлы');
     }

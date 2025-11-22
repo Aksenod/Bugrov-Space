@@ -128,9 +128,9 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                   isActive={agent.id === activeAgentId}
                   canDelete={agents.length > 1 && (!agent.role || agent.role.trim() === '')}
                   onSelectAgent={() => {
-                    onSelectAgent(agent.id);
-                    onCloseMobile();
-                  }}
+                      onSelectAgent(agent.id);
+                      onCloseMobile();
+                    }}
                   onDeleteAgent={() => onDeleteAgent(agent.id)}
                   getIcon={getIcon}
                 />

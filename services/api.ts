@@ -56,6 +56,7 @@ export interface ApiFile {
   mimeType: string;
   content: string;
   agentId: string;
+  isKnowledgeBase?: boolean;
   createdAt: string;
 }
 
@@ -169,7 +170,7 @@ export const api = {
     });
   },
 
-  async uploadFile(agentId: string, payload: { name: string; mimeType: string; content: string }) {
+  async uploadFile(agentId: string, payload: { name: string; mimeType: string; content: string; isKnowledgeBase?: boolean }) {
     return request<{ file: ApiFile }>(`/agents/${agentId}/files`, {
       method: 'POST',
       body: JSON.stringify(payload),
