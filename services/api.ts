@@ -50,35 +50,53 @@ const parseError = async (response: Response) => {
   }
 };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers: getHeaders(init.headers as Record<string, string>),
-    });
+async function request<T>(path: string, init: RequestInit = {}, retries = 1): Promise<T> {
+  const maxRetries = 2; // Максимум 2 попытки (3 запроса всего)
+  const retryDelay = 3000; // 3 секунды между попытками
 
-    if (!response.ok) {
-      const message = await parseError(response);
-      const error = new Error(message || 'Request failed') as Error & { status?: number };
-      error.status = response.status; // Добавляем HTTP статус к ошибке
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers: getHeaders(init.headers as Record<string, string>),
+      });
+
+      if (!response.ok) {
+        const message = await parseError(response);
+        const error = new Error(message || 'Request failed') as Error & { status?: number };
+        error.status = response.status; // Добавляем HTTP статус к ошибке
+        throw error;
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      return (await response.json()) as T;
+    } catch (error: any) {
+      // Если это ошибка сети и еще есть попытки
+      const isNetworkError = error?.message === 'Failed to fetch' || error?.name === 'TypeError' || error?.message?.includes('network');
+      
+      if (isNetworkError && attempt < retries) {
+        // Ждем перед повтором (сервер Render может просыпаться)
+        console.log(`[API] Network error, retrying in ${retryDelay}ms... (attempt ${attempt + 1}/${retries + 1})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
+      // Если это ошибка сети (Failed to fetch), добавляем более понятное сообщение
+      if (isNetworkError) {
+        const networkError = new Error('Не удалось подключиться к серверу. Сервер может быть неактивен, попробуйте еще раз через несколько секунд.') as Error & { status?: number; originalError?: any };
+        networkError.status = 0;
+        networkError.originalError = error;
+        throw networkError;
+      }
+      
       throw error;
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
-  } catch (error: any) {
-    // Если это ошибка сети (Failed to fetch), добавляем более понятное сообщение
-    if (error?.message === 'Failed to fetch' || error?.name === 'TypeError') {
-      const networkError = new Error('Не удалось подключиться к серверу. Проверьте подключение к интернету или попробуйте позже.') as Error & { status?: number; originalError?: any };
-      networkError.status = 0;
-      networkError.originalError = error;
-      throw networkError;
-    }
-    throw error;
   }
+
+  throw new Error('Request failed after retries');
 }
 
 export interface ApiUser {
