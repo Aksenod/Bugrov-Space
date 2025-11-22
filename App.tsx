@@ -475,8 +475,9 @@ export default function App() {
       setChatHistories((prev) => ({ ...prev, [activeAgent.id]: [] }));
       loadedAgentsRef.current.delete(activeAgent.id);
       setSummarySuccess(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to clear chat', error);
+      alert(`Не удалось очистить чат: ${error?.message || 'Неизвестная ошибка'}`);
     }
   };
 
