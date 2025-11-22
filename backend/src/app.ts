@@ -27,18 +27,15 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: env.corsOrigin === '*' ? true : env.corsOrigin,
+    origin: env.corsOrigin === '*' 
+      ? (_origin, callback) => callback(null, true) 
+      : env.corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     optionsSuccessStatus: 200, // Для старых браузеров
   }),
 );
-
-// Обработка preflight OPTIONS запросов
-app.options('*', (req, res) => {
-  res.sendStatus(200);
-});
 
 app.use(express.json({ limit: '5mb' }));
 
