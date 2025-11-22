@@ -54,12 +54,13 @@ model Message {
 }
 
 model File {
-  id        String   @id @default(cuid())
-  agentId   String
-  name      String
-  mimeType  String
-  content   String   // Base64 or text content
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  agentId        String
+  name           String
+  mimeType       String
+  content        String   // Base64 or text content
+  isKnowledgeBase Boolean @default(false)  // true = база знаний агента, false = документ проекта
+  createdAt      DateTime @default(now())
 
   agent Agent @relation(fields: [agentId], references: [id])
 }

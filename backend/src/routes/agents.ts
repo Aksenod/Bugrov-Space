@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { generateAgentResponse, generateSummaryContent } from '../services/openaiService';
-import { DEFAULT_AGENTS } from '../constants/defaultAgents';
 
 const router = Router();
 
@@ -33,11 +32,13 @@ const getNextOrderValue = async (userId: string) => {
 
 router.get('/', async (req, res) => {
   const userId = req.userId!;
-  let agents = await prisma.agent.findMany({
+  
+  const agents = await prisma.agent.findMany({
     where: { userId },
     include: {
       files: {
         where: {
+          isKnowledgeBase: true,  // Только база знаний
           name: {
             not: {
               startsWith: 'Summary'
@@ -52,55 +53,14 @@ router.get('/', async (req, res) => {
     ],
   });
 
-  // Проверяем и создаем недостающих агентов с ролями для существующих пользователей
-  const agentsByRole = new Map(agents.map(agent => [agent.role || '', agent]));
-  const requiredRoles = ['copywriter', 'dsl', 'verstka'];
-  const agentsToCreate = [];
-  let nextOrder = await getNextOrderValue(userId);
-
-  for (const role of requiredRoles) {
-    if (!agentsByRole.has(role)) {
-      const defaultAgent = DEFAULT_AGENTS.find(agent => agent.role === role);
-      if (defaultAgent) {
-        agentsToCreate.push({
-          userId,
-          name: defaultAgent.name,
-          description: defaultAgent.description,
-          systemInstruction: defaultAgent.systemInstruction,
-          summaryInstruction: defaultAgent.summaryInstruction,
-          model: defaultAgent.model,
-          role: defaultAgent.role || '',
-          order: nextOrder++,
-        });
-      }
-    }
-  }
-
-  if (agentsToCreate.length > 0) {
-    const created = await prisma.agent.createMany({
-      data: agentsToCreate,
-    });
-    
-    // Получаем обновленный список агентов
-    agents = await prisma.agent.findMany({
-      where: { userId },
-      include: {
-        files: {
-          where: {
-            name: {
-              not: {
-                startsWith: 'Summary'
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { order: 'asc' },
-        { createdAt: 'asc' },
-      ],
-    });
-  }
+  console.log(`[GET /agents] Загружено агентов для пользователя ${userId}:`, agents.length);
+  console.log(`[GET /agents] Список агентов:`, agents.map(a => ({
+    id: a.id,
+    name: a.name,
+    role: a.role || '(нет роли)',
+    systemInstructionLength: a.systemInstruction?.length || 0,
+    filesCount: a.files.length,
+  })));
 
   res.json({ agents });
 });
@@ -169,22 +129,122 @@ router.post('/reorder', async (req, res) => {
 router.put('/:agentId', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
+  
+  console.log(`[PUT /:agentId] Обновление агента:`, { 
+    agentId, 
+    userId, 
+    updatingFields: Object.keys(req.body) 
+  });
+
   const parsed = agentSchema.partial().safeParse(req.body);
   if (!parsed.success) {
+    console.error(`[PUT /:agentId] Ошибка валидации данных:`, parsed.error.flatten());
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const existing = await prisma.agent.findFirst({ where: { id: agentId, userId } });
-  if (!existing) {
-    return res.status(404).json({ error: 'Agent not found' });
+  try {
+    const existing = await prisma.agent.findFirst({ where: { id: agentId, userId } });
+    if (!existing) {
+      console.error(`[PUT /:agentId] Агент не найден:`, { agentId, userId });
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    console.log(`[PUT /:agentId] Текущее состояние агента:`, {
+      id: existing.id,
+      name: existing.name,
+      role: existing.role || '(нет роли)',
+      systemInstructionLength: existing.systemInstruction?.length || 0,
+      summaryInstructionLength: existing.summaryInstruction?.length || 0,
+      model: existing.model,
+      updatedAt: existing.updatedAt,
+    });
+
+    const updated = await prisma.agent.update({
+      where: { id: agentId },
+      data: parsed.data,
+    });
+
+    console.log(`[PUT /:agentId] ✅ Обновление выполнено через Prisma:`, {
+      id: updated.id,
+      name: updated.name,
+      role: updated.role || '(нет роли)',
+      systemInstructionLength: updated.systemInstruction?.length || 0,
+      summaryInstructionLength: updated.summaryInstruction?.length || 0,
+      model: updated.model,
+      updatedAt: updated.updatedAt,
+    });
+
+    // Проверяем сохранность данных - повторно запрашиваем из БД
+    const verify = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        systemInstruction: true,
+        summaryInstruction: true,
+        model: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!verify) {
+      console.error(`[PUT /:agentId] ❌ КРИТИЧЕСКАЯ ОШИБКА: Агент не найден после обновления!`);
+      return res.status(500).json({ 
+        error: 'Agent update verification failed - agent not found after update' 
+      });
+    }
+
+    // Проверяем, что критичные поля действительно сохранились
+    const criticalFieldsMatch = 
+      verify.name === updated.name &&
+      verify.systemInstruction === updated.systemInstruction &&
+      verify.summaryInstruction === updated.summaryInstruction &&
+      verify.model === updated.model;
+
+    if (!criticalFieldsMatch) {
+      console.error(`[PUT /:agentId] ❌ КРИТИЧЕСКАЯ ОШИБКА: Данные не совпадают после проверки сохранности!`, {
+        expected: {
+          name: updated.name,
+          systemInstructionLength: updated.systemInstruction?.length,
+          summaryInstructionLength: updated.summaryInstruction?.length,
+          model: updated.model,
+        },
+        actual: {
+          name: verify.name,
+          systemInstructionLength: verify.systemInstruction?.length,
+          summaryInstructionLength: verify.summaryInstruction?.length,
+          model: verify.model,
+        },
+      });
+      return res.status(500).json({ 
+        error: 'Agent update verification failed - data mismatch' 
+      });
+    }
+
+    console.log(`[PUT /:agentId] ✅ Проверка сохранности успешна:`, {
+      id: verify.id,
+      name: verify.name,
+      role: verify.role || '(нет роли)',
+      systemInstructionLength: verify.systemInstruction?.length || 0,
+      summaryInstructionLength: verify.summaryInstruction?.length || 0,
+      model: verify.model,
+      updatedAt: verify.updatedAt,
+    });
+
+    res.json({ agent: updated });
+  } catch (error) {
+    console.error(`[PUT /:agentId] ❌ Ошибка при обновлении агента:`, {
+      agentId,
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return res.status(500).json({ 
+      error: 'Failed to update agent',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
-
-  const updated = await prisma.agent.update({
-    where: { id: agentId },
-    data: parsed.data,
-  });
-
-  res.json({ agent: updated });
 });
 
 router.delete('/:agentId', async (req, res) => {
@@ -271,11 +331,12 @@ router.post('/:agentId/messages', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
-  // Загружаем ВСЕ файлы всех агентов пользователя (общие документы проекта)
+  // Загружаем только документы проекта (НЕ базу знаний агентов)
   // Используем те же файлы, что и в эндпоинте /files/summary для консистентности
   const allProjectFiles = await prisma.file.findMany({
     where: {
-      agent: { userId }
+      agent: { userId },
+      isKnowledgeBase: false,  // Исключаем базу знаний
     },
     select: {
       id: true,
@@ -283,12 +344,13 @@ router.post('/:agentId/messages', async (req, res) => {
       mimeType: true,
       content: true,
       agentId: true,
+      isKnowledgeBase: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  // Используем ВСЕ файлы всех агентов пользователя без дубликатов
+  // Используем только документы проекта (без базы знаний)
   // Это гарантирует, что агент видит те же документы, что и в папке "Документы проекта"
   const allFiles = allProjectFiles;
 
@@ -381,6 +443,7 @@ const fileSchema = z.object({
   name: z.string().min(1),
   mimeType: z.string().min(1),
   content: z.string().min(1),
+  isKnowledgeBase: z.boolean().optional().default(false),
 });
 
 router.post('/:agentId/files', async (req, res) => {
@@ -403,6 +466,7 @@ router.post('/:agentId/files', async (req, res) => {
   console.log(`  - File Name: ${parsed.data.name}`);
   console.log(`  - MIME Type: ${parsed.data.mimeType}`);
   console.log(`  - Content Length: ${parsed.data.content.length} chars`);
+  console.log(`  - Is Knowledge Base: ${parsed.data.isKnowledgeBase}`);
 
   const file = await prisma.file.create({
     data: {
@@ -410,6 +474,7 @@ router.post('/:agentId/files', async (req, res) => {
       name: parsed.data.name,
       mimeType: parsed.data.mimeType,
       content: parsed.data.content,
+      isKnowledgeBase: parsed.data.isKnowledgeBase ?? false,
     },
   });
 
@@ -442,10 +507,11 @@ router.get('/:agentId/files/summary', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
-  // Загружаем ВСЕ файлы всех агентов пользователя (общие документы проекта)
+  // Загружаем только документы проекта (НЕ базу знаний агентов)
   const projectFiles = await prisma.file.findMany({
     where: {
-      agent: { userId }
+      agent: { userId },
+      isKnowledgeBase: false,  // Исключаем базу знаний
     },
     select: {
       id: true,
@@ -453,6 +519,7 @@ router.get('/:agentId/files/summary', async (req, res) => {
       mimeType: true,
       content: true,
       agentId: true,
+      isKnowledgeBase: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
@@ -460,7 +527,7 @@ router.get('/:agentId/files/summary', async (req, res) => {
 
   // Логирование для диагностики
   console.log(`[Summary Files Debug] Agent: ${agentId}`);
-  console.log(`[Summary Files Debug] All project documents (all files): ${projectFiles.length}`);
+  console.log(`[Summary Files Debug] Project documents (excluding knowledge base): ${projectFiles.length}`);
   console.log(`[Summary Files Debug] Project file names:`, projectFiles.map(f => f.name));
 
   res.json({ files: projectFiles });
@@ -577,6 +644,7 @@ router.post('/:agentId/summary', async (req, res) => {
         name: fileName,
         mimeType: 'text/markdown',
         content: Buffer.from(summaryText, 'utf-8').toString('base64'),
+        isKnowledgeBase: false,  // Summary файлы - это документы проекта, не база знаний
       },
     });
 

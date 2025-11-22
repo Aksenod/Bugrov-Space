@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { signToken } from '../utils/token';
-import { DEFAULT_AGENTS } from '../constants/defaultAgents';
 import { authMiddleware } from '../middleware/authMiddleware';
 
 const authRouter = Router();
@@ -32,18 +31,7 @@ authRouter.post('/register', async (req, res) => {
       name,
       email,
       passwordHash,
-      agents: {
-        create: DEFAULT_AGENTS.map((agent) => ({
-          name: agent.name,
-          description: agent.description,
-          systemInstruction: agent.systemInstruction,
-          summaryInstruction: agent.summaryInstruction,
-          model: agent.model,
-          role: agent.role || '',
-        })),
-      },
     },
-    include: { agents: true },
   });
 
   const token = signToken(user.id);
@@ -54,7 +42,7 @@ authRouter.post('/register', async (req, res) => {
       name: user.name,
       email: user.email,
     },
-    agents: user.agents,
+    agents: [],
   });
 });
 
