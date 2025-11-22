@@ -8,6 +8,8 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
 import { AuthPage } from './components/AuthPage';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { AlertDialog } from './components/AlertDialog';
 import { api, ApiAgent, ApiFile, ApiMessage, ApiUser } from './services/api';
 
 const PROJECT_NAME = 'Bugrov Space';
@@ -88,6 +90,27 @@ export default function App() {
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [summaryDocuments, setSummaryDocuments] = useState<Record<string, UploadedFile[]>>({});
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    variant?: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    isOpen: false,
+    message: '',
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
@@ -358,6 +381,44 @@ export default function App() {
     return message;
   };
 
+  // Helper functions for dialogs
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    variant: 'danger' | 'warning' | 'info' = 'danger'
+  ) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      variant,
+    });
+  };
+
+  const showAlert = (
+    message: string,
+    title?: string,
+    variant: 'success' | 'error' | 'info' | 'warning' = 'info',
+    duration: number = 0
+  ) => {
+    setAlertDialog({
+      isOpen: true,
+      message,
+      title,
+      variant,
+    });
+    if (duration > 0) {
+      setTimeout(() => {
+        setAlertDialog(prev => ({ ...prev, isOpen: false }));
+      }, duration);
+    }
+  };
+
   const handleLogin = async (username: string, password: string) => {
     setAuthError(null);
     const payload = {
@@ -542,16 +603,23 @@ export default function App() {
 
   const handleClearChat = async () => {
     if (!activeAgent) return;
-    if (!confirm('Очистить историю чата?')) return;
-    try {
-      await api.clearMessages(activeAgent.id);
-      setChatHistories((prev) => ({ ...prev, [activeAgent.id]: [] }));
-      loadedAgentsRef.current.delete(activeAgent.id);
-      setSummarySuccess(false);
-    } catch (error: any) {
-      console.error('Failed to clear chat', error);
-      alert(`Не удалось очистить чат: ${error?.message || 'Неизвестная ошибка'}`);
-    }
+    showConfirm(
+      'Очистить историю чата?',
+      'Все сообщения в этом чате будут удалены.\nЭто действие нельзя отменить.',
+      async () => {
+        try {
+          await api.clearMessages(activeAgent.id);
+          setChatHistories((prev) => ({ ...prev, [activeAgent.id]: [] }));
+          loadedAgentsRef.current.delete(activeAgent.id);
+          setSummarySuccess(false);
+          showAlert('История чата успешно очищена', undefined, 'success', 3000);
+        } catch (error: any) {
+          console.error('Failed to clear chat', error);
+          showAlert(`Не удалось очистить чат: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
+        }
+      },
+      'warning'
+    );
   };
 
   const handleGenerateSummary = async () => {
@@ -596,7 +664,7 @@ export default function App() {
         status: error?.status,
         stack: error?.stack,
       });
-      alert(`Не удалось создать саммари: ${error?.message || 'Неизвестная ошибка'}`);
+      showAlert(`Не удалось создать саммари: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -643,30 +711,37 @@ export default function App() {
     const agent = agents.find((a) => a.id === agentId);
     // Запрещаем удаление агентов с ролью
     if (agent && agent.role && agent.role.trim() !== '') {
-      alert('Нельзя удалить агента с назначенной ролью.');
+      showAlert('Нельзя удалить агента с назначенной ролью.', 'Ошибка', 'error', 5000);
       return;
     }
     if (agents.length <= 1) {
-      alert('Нельзя удалить последнего агента.');
+      showAlert('Нельзя удалить последнего агента.', 'Ошибка', 'error', 5000);
       return;
     }
-    if (!confirm('Удалить агента и его историю?')) return;
-    try {
-      await api.deleteAgent(agentId);
-      setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
-      setChatHistories((prev) => {
-        const next = { ...prev };
-        delete next[agentId];
-        return next;
-      });
-      if (activeAgentId === agentId) {
-        const remaining = agents.filter((agent) => agent.id !== agentId);
-        setActiveAgentId(remaining[0]?.id ?? null);
-      }
-    } catch (error: any) {
-      console.error('Failed to delete agent', error);
-      alert(error?.message || 'Не удалось удалить агента.');
-    }
+    showConfirm(
+      'Удалить агента?',
+      `Агент "${agent?.name || 'Без имени'}" и вся его история будут удалены.\n\nЭто действие нельзя отменить.`,
+      async () => {
+        try {
+          await api.deleteAgent(agentId);
+          setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
+          setChatHistories((prev) => {
+            const next = { ...prev };
+            delete next[agentId];
+            return next;
+          });
+          if (activeAgentId === agentId) {
+            const remaining = agents.filter((agent) => agent.id !== agentId);
+            setActiveAgentId(remaining[0]?.id ?? null);
+          }
+          showAlert('Агент успешно удален', undefined, 'success', 3000);
+        } catch (error: any) {
+          console.error('Failed to delete agent', error);
+          showAlert(error?.message || 'Не удалось удалить агента.', 'Ошибка', 'error', 5000);
+        }
+      },
+      'danger'
+    );
   };
 
   const handleFileUpload = async (fileList: FileList) => {
@@ -713,7 +788,7 @@ export default function App() {
     }
 
     if (errors.length > 0) {
-      alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
+      showAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error', 5000);
     }
 
     if (uploads.length > 0) {
@@ -723,9 +798,9 @@ export default function App() {
         ),
       );
       // НЕ добавляем в summaryDocuments - это база знаний агента, не документ проекта
-      alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
+      showAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success', 3000);
     } else if (errors.length === 0) {
-      alert('Не удалось загрузить файлы');
+      showAlert('Не удалось загрузить файлы', 'Ошибка', 'error', 5000);
     }
   };
 
@@ -746,52 +821,57 @@ export default function App() {
     }
     
     // Показываем окно подтверждения
-    const confirmed = confirm(`Удалить файл "${fileToRemove.name}"?\n\nЭто действие нельзя отменить.`);
-    if (!confirmed) return;
-    
-    // Используем agentId файла, если он есть, иначе используем activeAgent.id
-    const agentIdForDelete = fileToRemove.agentId || activeAgent.id;
-    
-    console.log('[Frontend] Calling api.deleteProjectFile:', { fileId, agentIdForDelete });
-    
-    try {
-      await api.deleteProjectFile(fileId);
-      console.log('[Frontend] File deleted successfully');
-      
-      // Удаляем из summaryDocuments (все документы проекта теперь общие)
-      setSummaryDocuments((prev) => {
-        const updated = { ...prev };
-        if (updated['all']) {
-          updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+    showConfirm(
+      'Удалить файл?',
+      `Файл "${fileToRemove.name}" будет удален.\n\nЭто действие нельзя отменить.`,
+      async () => {
+        // Используем agentId файла, если он есть, иначе используем activeAgent.id
+        const agentIdForDelete = fileToRemove.agentId || activeAgent.id;
+        
+        console.log('[Frontend] Calling api.deleteProjectFile:', { fileId, agentIdForDelete });
+        
+        try {
+          await api.deleteProjectFile(fileId);
+          console.log('[Frontend] File deleted successfully');
+          
+          // Удаляем из summaryDocuments (все документы проекта теперь общие)
+          setSummaryDocuments((prev) => {
+            const updated = { ...prev };
+            if (updated['all']) {
+              updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+            }
+            return updated;
+          });
+          
+          // Удаляем из agent.files на фронтенде - из того агента, которому принадлежит файл
+          setAgents((prev) =>
+            prev.map((agent) => {
+              // Если у файла есть agentId, удаляем из соответствующего агента
+              // Иначе удаляем из всех агентов (на всякий случай)
+              if (fileToRemove.agentId) {
+                return agent.id === fileToRemove.agentId
+                  ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
+                  : agent;
+              } else {
+                // Если agentId нет, удаляем из всех агентов (fallback)
+                return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+              }
+            }),
+          );
+          showAlert('Файл успешно удален', undefined, 'success', 3000);
+        } catch (error: any) {
+          console.error('[Frontend] Failed to remove file:', error);
+          console.error('[Frontend] Error details:', { 
+            message: error?.message, 
+            status: error?.status,
+            agentId: agentIdForDelete,
+            fileId 
+          });
+          showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
         }
-        return updated;
-      });
-      
-      // Удаляем из agent.files на фронтенде - из того агента, которому принадлежит файл
-      setAgents((prev) =>
-        prev.map((agent) => {
-          // Если у файла есть agentId, удаляем из соответствующего агента
-          // Иначе удаляем из всех агентов (на всякий случай)
-          if (fileToRemove.agentId) {
-            return agent.id === fileToRemove.agentId
-              ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
-              : agent;
-          } else {
-            // Если agentId нет, удаляем из всех агентов (fallback)
-            return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
-          }
-        }),
-      );
-    } catch (error: any) {
-      console.error('[Frontend] Failed to remove file:', error);
-      console.error('[Frontend] Error details:', { 
-        message: error?.message, 
-        status: error?.status,
-        agentId: agentIdForDelete,
-        fileId 
-      });
-      alert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`);
-    }
+      },
+      'danger'
+    );
   };
 
   const renderAuthOrLoader = () => {
@@ -996,25 +1076,50 @@ export default function App() {
           
           if (!fileToRemove) return;
           
-          const confirmed = confirm(`Удалить файл "${fileToRemove.name}" из базы знаний?`);
-          if (!confirmed) return;
-          
-          try {
-            await api.deleteProjectFile(fileId);
-            // Обновляем агентов, удаляя файл из того агента, которому он принадлежит
-            setAgents((prev) =>
-              prev.map((agent) => {
-                if (fileToRemove.agentId && agent.id === fileToRemove.agentId) {
-                  return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
-                }
-                return agent;
-              })
-            );
-          } catch (error: any) {
-            console.error('Failed to remove agent file:', error);
-            alert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`);
-          }
+          showConfirm(
+            'Удалить файл из базы знаний?',
+            `Файл "${fileToRemove.name}" будет удален из базы знаний.\n\nЭто действие нельзя отменить.`,
+            async () => {
+              try {
+                await api.deleteProjectFile(fileId);
+                // Обновляем агентов, удаляя файл из того агента, которому он принадлежит
+                setAgents((prev) =>
+                  prev.map((agent) => {
+                    if (fileToRemove.agentId && agent.id === fileToRemove.agentId) {
+                      return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+                    }
+                    return agent;
+                  })
+                );
+                showAlert('Файл успешно удален из базы знаний', undefined, 'success', 3000);
+              } catch (error: any) {
+                console.error('Failed to remove agent file:', error);
+                showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
+              }
+            },
+            'danger'
+          );
         }}
+        onShowConfirm={showConfirm}
+        onShowAlert={showAlert}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        variant={alertDialog.variant}
+        duration={alertDialog.variant === 'success' ? 3000 : alertDialog.variant === 'error' ? 5000 : 4000}
       />
 
     </div>

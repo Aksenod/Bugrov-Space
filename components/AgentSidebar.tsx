@@ -146,7 +146,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
             <div className="p-1.5 rounded-lg bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
                <Plus size={16} />
             </div>
-            <span className="font-medium text-xs">Add Agent</span>
+            <span className="font-medium text-xs">Добавить агента</span>
           </button>
         </div>
 
@@ -219,7 +219,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                   <button 
                     onClick={onLogout}
                     className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                    title="Sign Out"
+                    title="Выйти"
                   >
                     <LogOut size={16} />
                   </button>
@@ -300,7 +300,7 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
               ? 'text-white/30 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100'
               : 'text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100'
           }`}
-          title="Delete Agent"
+          title="Удалить агента"
         >
           <Trash2 size={14} />
         </button>
