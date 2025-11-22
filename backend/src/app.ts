@@ -27,8 +27,10 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: env.corsOrigin,
+    origin: env.corsOrigin === '*' ? true : env.corsOrigin,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
 app.use(express.json({ limit: '5mb' }));
