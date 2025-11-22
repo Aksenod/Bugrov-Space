@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { X, Upload, FileText, Trash2, Save, Info, Edit3, FileCheck, Cpu, Zap, Brain } from 'lucide-react';
+import { X, Upload, FileText, Trash2, Save, Info, Edit3, FileCheck, Cpu, Zap, Brain, PenTool, Code2, Layout } from 'lucide-react';
 import { Agent, MODELS, LLMModel } from '../types';
 
 interface SettingsPanelProps {
@@ -28,6 +28,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [instruction, setInstruction] = useState(activeAgent.systemInstruction);
   const [summaryInst, setSummaryInst] = useState(activeAgent.summaryInstruction || "");
   const [role, setRole] = useState(activeAgent.role || "");
+  
+  // Get current role value for select (supports old format with comma-separated)
+  const getCurrentRole = (): string => {
+    if (!role) return '';
+    const roles = role.split(',').map(r => r.trim());
+    // Return first valid role from copywriter, dsl, verstka
+    if (roles.includes('copywriter')) return 'copywriter';
+    if (roles.includes('dsl')) return 'dsl';
+    if (roles.includes('verstka')) return 'verstka';
+    return '';
+  };
+  
   const resolveModel = (value: Agent['model']): LLMModel => {
     if (value === LLMModel.GPT51) return LLMModel.GPT51;
     if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
@@ -42,6 +54,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       return <Brain size={14} className="text-emerald-300" />;
     }
     return <Cpu size={14} className="text-pink-400" />;
+  };
+
+  // Render icon for role
+  const renderRoleIcon = (roleName: string) => {
+    if (roleName === 'copywriter') {
+      return <PenTool size={14} className="text-indigo-400" />;
+    }
+    if (roleName === 'dsl') {
+      return <Code2 size={14} className="text-purple-400" />;
+    }
+    if (roleName === 'verstka') {
+      return <Layout size={14} className="text-cyan-400" />;
+    }
+    return null;
+  };
+
+  // Get role label
+  const getRoleLabel = (roleName: string): string => {
+    if (roleName === 'copywriter') return 'Копирайтер';
+    if (roleName === 'dsl') return 'DSL';
+    if (roleName === 'verstka') return 'Верстка';
+    return 'Выключено';
   };
 
   const [model, setModel] = useState<LLMModel>(resolveModel(activeAgent.model));
@@ -167,26 +201,41 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           {/* Roles Section */}
           <section>
             <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-               Роли
+               Роль
             </label>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-white">Копирайтер</span>
-                </div>
-                <button
-                  onClick={() => setRole(role === "copywriter" ? "" : "copywriter")}
-                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                    role === "copywriter" ? "bg-indigo-500" : "bg-white/20"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                      role === "copywriter" ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+            <div className="relative">
+              <select
+                value={getCurrentRole()}
+                onChange={(e) => {
+                  setRole(e.target.value || '');
+                }}
+                className="w-full appearance-none bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner cursor-pointer hover:bg-black/40"
+              >
+                <option value="">Выключено</option>
+                <option value="copywriter">Копирайтер</option>
+                <option value="dsl">DSL</option>
+                <option value="verstka">Верстка</option>
+              </select>
+              {/* Role Icon */}
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                {getCurrentRole() ? (
+                  renderRoleIcon(getCurrentRole())
+                ) : (
+                  <div className="w-3.5 h-3.5 rounded-full border border-white/20" />
+                )}
               </div>
+              {/* Dropdown Arrow */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              {/* Selected role indicator */}
+              {getCurrentRole() && (
+                <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(129,140,248,1)]"></div>
+                </div>
+              )}
             </div>
           </section>
 

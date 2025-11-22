@@ -1,7 +1,20 @@
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../utils/logger';
 
 export const prisma = new PrismaClient({
-  log: ['error', 'warn'],
+  log: [
+    { level: 'error', emit: 'event' },
+    { level: 'warn', emit: 'event' },
+  ],
+});
+
+// Логируем события Prisma
+prisma.$on('error' as never, (e: any) => {
+  logger.error({ prisma: 'error' }, e.message);
+});
+
+prisma.$on('warn' as never, (e: any) => {
+  logger.warn({ prisma: 'warn' }, e.message);
 });
 
 // Включаем поддержку внешних ключей для SQLite
@@ -13,20 +26,22 @@ export const prisma = new PrismaClient({
     const dbUrl = process.env.DATABASE_URL || '';
     if (dbUrl.includes('sqlite') || dbUrl.includes('.db')) {
       await prisma.$queryRawUnsafe('PRAGMA foreign_keys = ON');
-      console.log('[Prisma] ✅ Foreign keys enabled for SQLite');
+      logger.info('Foreign keys enabled for SQLite');
     }
   } catch (error) {
     // Игнорируем ошибку, если это не SQLite или если foreign keys уже включены
-    console.warn('[Prisma] Could not enable foreign keys (may not be SQLite or already enabled)');
+    logger.warn('Could not enable foreign keys (may not be SQLite or already enabled)');
   }
 })();
 
 // Логируем путь к базе данных при старте (только если доступен)
 if (process.env.DATABASE_URL) {
-  console.log(`[Prisma] Используется база данных: ${process.env.DATABASE_URL}`);
-  console.log(`[Prisma] Тип базы: SQLite (файловая база, данные сохраняются на диск)`);
+  logger.info({
+    databaseUrl: process.env.DATABASE_URL,
+    databaseType: 'SQLite',
+  }, 'Database connection configured');
 } else {
-  console.warn(`[Prisma] DATABASE_URL не установлен, используется значение по умолчанию из schema.prisma`);
+  logger.warn('DATABASE_URL not set, using default from schema.prisma');
 }
 
 

@@ -8,5 +8,10 @@ declare global {
   }
 }
 
+// Тип для аутентифицированных запросов (после authMiddleware)
+export interface AuthenticatedRequest extends Express.Request {
+  userId: string;
+}
+
 export {};
 

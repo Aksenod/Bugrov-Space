@@ -1,7 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/token';
+import { AuthenticatedRequest } from '../types/express';
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header) {
     return res.status(401).json({ error: 'Unauthorized' });

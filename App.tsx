@@ -31,6 +31,8 @@ const mapFile = (file: ApiFile): UploadedFile => ({
   type: file.mimeType,
   data: file.content,
   agentId: file.agentId,
+  dslContent: file.dslContent,
+  verstkaContent: file.verstkaContent,
 });
 
 const pickColor = (id: string) => {
@@ -68,8 +70,7 @@ const mapMessage = (message: ApiMessage): Message => ({
 
 const mapUser = (user: ApiUser): User => ({
   id: user.id,
-  name: user.name,
-  email: user.email,
+  username: user.username,
 });
 
 export default function App() {
@@ -284,10 +285,10 @@ export default function App() {
     ensureSummaryLoaded(activeAgent.id);
   }, [isBootstrapping, activeAgent?.id, ensureSummaryLoaded]);
 
-  const handleLogin = async (email: string, password: string) => {
+  const handleLogin = async (username: string, password: string) => {
     setAuthError(null);
     const payload = {
-      email: email.trim().toLowerCase(),
+      username: username.trim().toLowerCase(),
       password: password.trim(),
     };
     try {
@@ -302,12 +303,11 @@ export default function App() {
     }
   };
 
-  const handleRegister = async (name: string, email: string, password: string) => {
+  const handleRegister = async (username: string, password: string) => {
     setAuthError(null);
     try {
       const response = await api.register({
-        name: name.trim() || 'User',
-        email: email.trim().toLowerCase(),
+        username: username.trim().toLowerCase(),
         password: password.trim(),
       });
       api.setToken(response.token);
@@ -326,11 +326,11 @@ export default function App() {
     }
   };
 
-  const handleResetPassword = async (email: string, newPassword: string) => {
+  const handleResetPassword = async (username: string, newPassword: string) => {
     setAuthError(null);
     try {
       await api.resetPassword({
-        email: email.trim().toLowerCase(),
+        username: username.trim().toLowerCase(),
         newPassword: newPassword.trim(),
       });
     } catch (error: any) {
@@ -341,8 +341,8 @@ export default function App() {
 
   const handleGuestLogin = async () => {
     const timestamp = Date.now();
-    const guestEmail = `guest+${timestamp}@demo.local`;
-    await handleRegister('Гость', guestEmail, `Guest-${timestamp}`);
+    const guestUsername = `guest_${timestamp}`;
+    await handleRegister(guestUsername, `Guest-${timestamp}`);
   };
 
   const handleReorderAgents = useCallback(async (newOrderIds: string[]) => {
@@ -878,31 +878,72 @@ export default function App() {
         />
       )}
 
-      {activeAgent && (
-        <ProjectDocumentsModal 
-          isOpen={isDocsOpen}
-          onClose={() => setIsDocsOpen(false)}
-          documents={projectDocuments}
-          onRemoveFile={handleRemoveFile}
-          agents={agents}
-          onAgentClick={(agentId) => {
-            // TODO: Запуск агента с документом
-            console.log('Agent click:', agentId);
-            // Переключимся на этого агента
-            setActiveAgentId(agentId);
-            setIsDocsOpen(false);
-          }}
-          onOpenAgentSettings={(agentId) => {
-            // Открываем настройки выбранного агента
-            const agent = agents.find(a => a.id === agentId);
-            if (agent) {
-              setActiveAgentId(agentId);
-              setIsSettingsOpen(true);
-              setIsDocsOpen(false);
-            }
-          }}
-        />
-      )}
+      <ProjectDocumentsModal 
+        isOpen={isDocsOpen}
+        onClose={() => setIsDocsOpen(false)}
+        documents={projectDocuments}
+        onRemoveFile={handleRemoveFile}
+        agents={agents}
+        onAgentClick={(agentId) => {
+          // Переключаемся на выбранного агента
+          setActiveAgentId(agentId);
+          setIsDocsOpen(false);
+        }}
+        onOpenAgentSettings={(agentId) => {
+          // Этот обработчик больше не используется напрямую в модальном окне,
+          // но оставляем для обратной совместимости
+        }}
+        onDocumentUpdate={(updatedFile) => {
+          // Обновляем документ в списке
+          setSummaryDocuments((prev) => {
+            const currentDocs = prev['all'] ?? [];
+            const updatedDocs = currentDocs.map(doc => 
+              doc.id === updatedFile.id ? updatedFile : doc
+            );
+            return {
+              ...prev,
+              'all': updatedDocs,
+            };
+          });
+        }}
+        onUpdateAgent={handleUpdateAgent}
+        onFileUpload={handleFileUpload}
+        onAgentFilesUpdate={(agentId: string, files: UploadedFile[]) => {
+          // Обновляем файлы агента в списке
+          setAgents((prev) =>
+            prev.map((agent) =>
+              agent.id === agentId ? { ...agent, files } : agent
+            )
+          );
+        }}
+        onRemoveAgentFile={async (fileId: string) => {
+          // Для удаления файлов из базы знаний агента
+          const fileToRemove = agents
+            .flatMap(agent => agent.files)
+            .find(f => f.id === fileId);
+          
+          if (!fileToRemove) return;
+          
+          const confirmed = confirm(`Удалить файл "${fileToRemove.name}" из базы знаний?`);
+          if (!confirmed) return;
+          
+          try {
+            await api.deleteProjectFile(fileId);
+            // Обновляем агентов, удаляя файл из того агента, которому он принадлежит
+            setAgents((prev) =>
+              prev.map((agent) => {
+                if (fileToRemove.agentId && agent.id === fileToRemove.agentId) {
+                  return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+                }
+                return agent;
+              })
+            );
+          } catch (error: any) {
+            console.error('Failed to remove agent file:', error);
+            alert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`);
+          }
+        }}
+      />
 
     </div>
   );

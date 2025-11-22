@@ -12,8 +12,7 @@ datasource db {
 
 model User {
   id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
+  username     String   @unique
   passwordHash String
   avatarColor  String?  @default("indigo")
   createdAt    DateTime @default(now())
@@ -60,6 +59,8 @@ model File {
   mimeType       String
   content        String   // Base64 or text content
   isKnowledgeBase Boolean @default(false)  // true = база знаний агента, false = документ проекта
+  dslContent     String?  // Результат работы агента DSL
+  verstkaContent String?  // Результат работы агента Верстка
   createdAt      DateTime @default(now())
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)

@@ -209,11 +209,10 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                 <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between px-2 pb-1">
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-white shadow-lg text-xs font-bold">
-                       {currentUser.name.charAt(0).toUpperCase()}
+                       {currentUser.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-col flex">
-                       <span className="text-xs font-bold text-white truncate">{currentUser.name}</span>
-                       <span className="text-[9px] text-white/40 truncate">{currentUser.email}</span>
+                       <span className="text-xs font-bold text-white truncate">{currentUser.username}</span>
                     </div>
                   </div>
                   

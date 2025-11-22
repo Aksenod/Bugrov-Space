@@ -264,7 +264,7 @@ router.delete('/:agentId', async (req, res) => {
     // Проверяем, существует ли агент с таким ID у пользователя
     const existing = await prisma.agent.findFirst({ 
       where: { id: agentId, userId },
-      include: { user: { select: { id: true, email: true } } }
+      include: { user: { select: { id: true, username: true } } }
     });
 
     logger.debug({
@@ -272,7 +272,6 @@ router.delete('/:agentId', async (req, res) => {
       agentId: existing?.id,
       name: existing?.name,
       userId: existing?.userId,
-      userEmail: existing?.user.email,
     }, 'Agent search result');
 
     if (!existing) {
@@ -778,14 +777,23 @@ router.post('/:agentId/files/:fileId/generate-result', async (req, res) => {
 
   const { role } = parsed.data;
 
+  // Helper function to check if agent has role
+  const hasRoleInDB = (agentRole: string | null | undefined, roleName: string): boolean => {
+    if (!agentRole) return false;
+    const roles = agentRole.split(',').map(r => r.trim());
+    return roles.includes(roleName);
+  };
+
   // Находим агента, который будет генерировать результат (DSL или Верстка)
-  const targetAgent = await prisma.agent.findFirst({
-    where: {
-      userId,
-      role: role === 'dsl' ? 'dsl' : 'verstka',
-    },
+  // Ищем агента, у которого есть нужная роль (может быть частью множественных ролей)
+  const allAgents = await prisma.agent.findMany({
+    where: { userId },
     include: { files: true },
   });
+
+  const targetAgent = allAgents.find(agent => 
+    hasRoleInDB(agent.role, role === 'dsl' ? 'dsl' : 'verstka')
+  );
 
   if (!targetAgent) {
     return res.status(404).json({ error: `${role === 'dsl' ? 'DSL' : 'Verstka'} agent not found` });
@@ -808,7 +816,14 @@ router.post('/:agentId/files/:fileId/generate-result', async (req, res) => {
     where: { id: sourceFile.agentId, userId },
   });
 
-  if (!sourceAgent || sourceAgent.role !== 'copywriter') {
+  // Helper function to check if agent has role
+  const hasRole = (agentRole: string | null | undefined, roleName: string): boolean => {
+    if (!agentRole) return false;
+    const roles = agentRole.split(',').map(r => r.trim());
+    return roles.includes(roleName);
+  };
+
+  if (!sourceAgent || !hasRole(sourceAgent.role, 'copywriter')) {
     return res.status(400).json({ error: 'File must be created by copywriter agent' });
   }
 

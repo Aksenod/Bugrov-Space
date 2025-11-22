@@ -46,8 +46,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export interface ApiUser {
   id: string;
-  name: string;
-  email: string;
+  username: string;
 }
 
 export interface ApiFile {
@@ -96,21 +95,21 @@ export const api = {
   setToken,
   clearToken: () => setToken(null),
 
-  async register(payload: { name: string; email: string; password: string }) {
+  async register(payload: { username: string; password: string }) {
     return request<{ token: string; user: ApiUser; agents: ApiAgent[] }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
 
-  async login(payload: { email: string; password: string }) {
+  async login(payload: { username: string; password: string }) {
     return request<{ token: string; user: ApiUser }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
 
-  async resetPassword(payload: { email: string; newPassword: string }) {
+  async resetPassword(payload: { username: string; newPassword: string }) {
     return request<{ success: boolean }>('/auth/reset', {
       method: 'POST',
       body: JSON.stringify(payload),

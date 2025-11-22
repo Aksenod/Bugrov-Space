@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, Calendar, Eye, Trash2, Settings, Loader2 } from 'lucide-react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { SettingsPanel } from './SettingsPanel';
@@ -48,17 +50,35 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onAgentFilesUpdate
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka' | 'code' | 'preview'>('text');
   const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
   const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
   const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null);
 
+  // Helper function to check if agent has role
+  const hasRole = (agentRole: string | undefined, roleName: string): boolean => {
+    if (!agentRole) return false;
+    const roles = agentRole.split(',').map(r => r.trim().toLowerCase());
+    return roles.includes(roleName.toLowerCase());
+  };
+
   // Сбрасываем таб при смене документа
   useEffect(() => {
     if (selectedFileId) {
-      setActiveTab('text');
+      const file = documents.find(doc => doc.id === selectedFileId);
+      if (file) {
+        const creatorAgent = file.agentId ? agents.find(agent => agent.id === file.agentId) : null;
+        const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "verstka");
+        
+        if (hasVerstkaRole) {
+          setActiveTab('preview');
+        } else {
+          setActiveTab('text');
+        }
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFileId]);
 
   // Синхронизируем локальное состояние с documents prop при смене файла
@@ -99,6 +119,25 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     return parts.length > 1 ? parts[parts.length - 1].trim() : doc.name;
   };
 
+  const formatTime24h = (doc: UploadedFile) => {
+    const timestamp = extractTimestamp(doc);
+    try {
+      // Парсим дату в формате "11/22/2025, 6:53:14 PM"
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        // Если не удалось распарсить, возвращаем исходную строку
+        return timestamp;
+      }
+      // Форматируем только время в 24-часовом формате
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    } catch (e) {
+      return timestamp;
+    }
+  };
+
   const getDocumentDisplayName = (doc: UploadedFile) => {
     return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
   };
@@ -113,11 +152,20 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     : null;
   
   // Показывать кнопки только если документ создан агентом-копирайтером
-  const showDSLButtons = documentCreatorAgent?.role === "copywriter";
+  const showDSLButtons = documentCreatorAgent && hasRole(documentCreatorAgent.role, "copywriter");
   
-  // Находим агентов DSL и Верстка по ролям
-  const dslAgent = agents.find(agent => agent.role === 'dsl');
-  const verstkaAgent = agents.find(agent => agent.role === 'verstka');
+  // Показывать подтабы только если документ создан агентом-верстальщиком
+  const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "verstka");
+  
+  // Находим агентов DSL и Верстка по ролям (могут быть отдельными агентами или частью копирайтера)
+  const dslAgent = agents.find(agent => {
+    const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
+    return roles.includes('dsl');
+  });
+  const verstkaAgent = agents.find(agent => {
+    const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
+    return roles.includes('verstka');
+  });
 
   const decodeContent = (base64: string) => {
     try {
@@ -153,9 +201,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const handleGenerateResult = async (role: 'dsl' | 'verstka') => {
     if (!selectedFile || !documentCreatorAgent) return;
 
-    const targetAgent = role === 'dsl' 
-      ? agents.find(agent => agent.role === 'dsl')
-      : agents.find(agent => agent.role === 'verstka');
+    // Ищем агента с нужной ролью (может быть отдельным агентом или частью копирайтера)
+    const targetAgent = agents.find(agent => {
+      return hasRole(agent.role, role === 'dsl' ? 'dsl' : 'verstka');
+    });
 
     if (!targetAgent) {
       alert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
@@ -218,28 +267,50 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   // Получаем контент для отображения в зависимости от активного таба
   const getDisplayContent = () => {
-    if (!selectedFile) return null;
+    // Используем localSelectedFile если он есть (может содержать обновленные данные), иначе selectedFile
+    const fileToUse = localSelectedFile || selectedFile;
+    if (!fileToUse) return null;
 
     if (activeTab === 'text') {
-      return selectedFile.data;
+      return fileToUse.data;
     } else if (activeTab === 'dsl') {
-      const content = selectedFile.dslContent || null;
+      const content = fileToUse.dslContent || null;
       console.log('[ProjectDocumentsModal] getDisplayContent DSL:', {
         hasContent: !!content,
         contentLength: content?.length || 0,
-        selectedFileId: selectedFile.id,
-        isLocalSelected: localSelectedFile?.id === selectedFile.id,
+        selectedFileId: fileToUse.id,
+        isLocalSelected: localSelectedFile?.id === fileToUse.id,
       });
       return content;
     } else if (activeTab === 'verstka') {
-      const content = selectedFile.verstkaContent || null;
+      const content = fileToUse.verstkaContent || null;
       console.log('[ProjectDocumentsModal] getDisplayContent Verstka:', {
         hasContent: !!content,
         contentLength: content?.length || 0,
-        selectedFileId: selectedFile.id,
-        isLocalSelected: localSelectedFile?.id === selectedFile.id,
+        selectedFileId: fileToUse.id,
+        isLocalSelected: localSelectedFile?.id === fileToUse.id,
       });
       return content;
+    } else if (activeTab === 'code') {
+      // Для таба "Код" показываем verstkaContent (сгенерированный HTML код верстки)
+      const codeContent = fileToUse.verstkaContent || null;
+      console.log('[ProjectDocumentsModal] getDisplayContent Code:', {
+        hasVerstkaContent: !!fileToUse.verstkaContent,
+        codeContent: !!codeContent,
+        verstkaContentLength: fileToUse.verstkaContent?.length || 0,
+      });
+      return codeContent;
+    } else if (activeTab === 'preview') {
+      // Для таба "Превью" показываем verstkaContent (HTML код верстки)
+      const previewContent = fileToUse.verstkaContent || null;
+      console.log('[ProjectDocumentsModal] getDisplayContent Preview:', {
+        hasVerstkaContent: !!fileToUse.verstkaContent,
+        previewContent: !!previewContent,
+        verstkaContentLength: fileToUse.verstkaContent?.length || 0,
+        fileId: fileToUse.id,
+        isLocalSelected: !!localSelectedFile,
+      });
+      return previewContent;
     }
     return null;
   };
@@ -297,24 +368,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <div 
-                      onClick={(e) => handleDownload(doc, e)}
-                      className="p-2 text-white/30 hover:text-white hover:bg-white/10 rounded-lg transition-all"
-                      title="Download"
-                    >
-                      <Download size={18} />
-                    </div>
-                    {onRemoveFile && (
-                      <div 
-                        onClick={(e) => handleDelete(doc.id, e)}
-                        className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </div>
-                    )}
-                  </div>
                 </button>
               ))
             )}
@@ -342,77 +395,129 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className="flex-1 overflow-y-auto p-8 md:p-12 scrollbar-thin">
-              <div className="max-w-4xl mx-auto">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
+              <div className="max-w-4xl mx-auto w-full">
                  <div className="mb-8 pb-6 border-b border-white/10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase mb-4">
-                        Project File
-                    </div>
-                   <h1 className="text-lg md:text-xl font-bold text-white mb-3 break-words leading-tight">
-                      {getDocumentDisplayName(selectedFile)}
-                   </h1>
-                    <div className="flex items-center gap-6 text-sm text-white/40">
-                        <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span> 
-                        {showDSLButtons && (
-                          <>
-                            {dslAgent && (
-                              <div className="flex items-center gap-1.5">
-                                <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleGenerateResult('dsl');
-                                    }}
-                                    disabled={isGeneratingDSL}
-                                    className="text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                >
-                                    {isGeneratingDSL && <Loader2 size={14} className="animate-spin" />}
-                                    DSL
-                                </button>
-                                <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setSettingsAgentId(dslAgent.id);
-                                    }}
-                                    className="p-1 text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10 rounded transition-colors"
-                                    title="Настройки агента DSL"
-                                >
-                                    <Settings size={14} />
-                                </button>
-                              </div>
-                            )}
-                            {verstkaAgent && (
-                              <div className="flex items-center gap-1.5">
-                                <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleGenerateResult('verstka');
-                                    }}
-                                    disabled={isGeneratingVerstka}
-                                    className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                >
-                                    {isGeneratingVerstka && <Loader2 size={14} className="animate-spin" />}
-                                    Верстка
-                                </button>
-                                <button 
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setSettingsAgentId(verstkaAgent.id);
-                                    }}
-                                    className="p-1 text-cyan-400/60 hover:text-cyan-300 hover:bg-cyan-500/10 rounded transition-colors"
-                                    title="Настройки агента Верстка"
-                                >
-                                    <Settings size={14} />
-                                </button>
-                              </div>
-                            )}
-                          </>
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
+                            {selectedFile ? getAgentName(selectedFile) : 'Документ'}
+                        </div>
+                        {selectedFile && (
+                            <span className="text-sm text-white/60">
+                                {formatTime24h(selectedFile)}
+                            </span>
                         )}
+                    </div>
+                    <div className="flex items-center justify-between gap-6 text-sm text-white/40">
+                        <div className="flex items-center gap-6">
+                            <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span>
+                            
+                            {/* Tabs for Verstka documents */}
+                            {showVerstkaSubTabs && (
+                              <div className="flex items-center gap-2 border-b border-white/10 -mb-[1px]">
+                                <button
+                                  onClick={() => setActiveTab('preview')}
+                                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                                    activeTab === 'preview'
+                                      ? 'text-cyan-400 border-cyan-400/40'
+                                      : 'text-white/50 border-transparent hover:text-white/70'
+                                  }`}
+                                >
+                                  Превью
+                                </button>
+                                <button
+                                  onClick={() => setActiveTab('code')}
+                                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                                    activeTab === 'code'
+                                      ? 'text-cyan-400 border-cyan-400/40'
+                                      : 'text-white/50 border-transparent hover:text-white/70'
+                                  }`}
+                                >
+                                  Код
+                                </button>
+                              </div>
+                            )}
+                            
+                            {showDSLButtons && (
+                              <>
+                                {dslAgent && (
+                                  <div className="flex items-center gap-1.5">
+                                    <button 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleGenerateResult('dsl');
+                                        }}
+                                        disabled={isGeneratingDSL}
+                                        className="text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                    >
+                                        {isGeneratingDSL && <Loader2 size={14} className="animate-spin" />}
+                                        DSL
+                                    </button>
+                                    <button 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSettingsAgentId(dslAgent.id);
+                                        }}
+                                        className="p-1 text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10 rounded transition-colors"
+                                        title="Настройки агента DSL"
+                                    >
+                                        <Settings size={14} />
+                                    </button>
+                                  </div>
+                                )}
+                                {verstkaAgent && (
+                                  <div className="flex items-center gap-1.5">
+                                    <button 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleGenerateResult('verstka');
+                                        }}
+                                        disabled={isGeneratingVerstka}
+                                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                    >
+                                        {isGeneratingVerstka && <Loader2 size={14} className="animate-spin" />}
+                                        Верстка
+                                    </button>
+                                    <button 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSettingsAgentId(verstkaAgent.id);
+                                        }}
+                                        className="p-1 text-cyan-400/60 hover:text-cyan-300 hover:bg-cyan-500/10 rounded transition-colors"
+                                        title="Настройки агента Верстка"
+                                    >
+                                        <Settings size={14} />
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={(e) => handleDownload(selectedFile, e)}
+                            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                            title="Скачать"
+                          >
+                            <Download size={16} />
+                          </button>
+                          {onRemoveFile && (
+                            <button 
+                              onClick={(e) => handleDelete(selectedFile.id, e)}
+                              className="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                              title="Удалить"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
                     </div>
                  </div>
 
-                 {/* Tabs */}
+                 {/* Tabs for copywriter documents */}
                  {showDSLButtons && (
                    <div className="mb-6 flex items-center gap-2 border-b border-white/10">
                      <button
@@ -448,7 +553,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                    </div>
                  )}
                  
-                 <div className="bg-white/5 rounded-[2rem] border border-white/5 p-8 min-h-[50vh] shadow-inner">
+                 <div className={`bg-white/5 rounded-[2rem] border border-white/5 min-h-[50vh] shadow-inner overflow-x-auto ${activeTab === 'preview' ? 'p-0' : 'p-8'}`}>
                     {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                     ) : (
@@ -461,6 +566,72 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                            );
                          }
                          const content = getDisplayContent();
+                         
+                         // Специальная обработка для табов верстальщика (Код и Превью)
+                         if (activeTab === 'code' || activeTab === 'preview') {
+                           const fileToUse = localSelectedFile || selectedFile;
+                           
+                           if (activeTab === 'code') {
+                             // Таб "Код" - показываем HTML с подсветкой синтаксиса
+                             if (content) {
+                               const decodedHtml = decodeContent(content);
+                               return (
+                                 <div className="overflow-auto max-h-[70vh]">
+                                   <SyntaxHighlighter
+                                     style={vscDarkPlus}
+                                     language="html"
+                                     PreTag="div"
+                                     customStyle={{
+                                       margin: 0,
+                                       borderRadius: '1rem',
+                                       padding: '1.5rem',
+                                     }}
+                                   >
+                                     {decodedHtml}
+                                   </SyntaxHighlighter>
+                                 </div>
+                               );
+                             } else {
+                               // Если verstkaContent нет, показываем сообщение
+                               return (
+                                 <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+                                   <p className="text-base font-medium mb-2">HTML код еще не сгенерирован</p>
+                                   <p className="text-sm text-white/20">
+                                     Код верстки будет отображен здесь после генерации
+                                   </p>
+                                 </div>
+                               );
+                             }
+                           } else if (activeTab === 'preview') {
+                             // Таб "Превью" - показываем HTML в iframe
+                             // Используем content из getDisplayContent(), который уже проверил verstkaContent
+                             if (content) {
+                               const decodedHtml = decodeContent(content);
+                               return (
+                                 <div className="w-full h-[70vh] rounded-xl overflow-hidden border-0">
+                                   <iframe
+                                     srcDoc={decodedHtml}
+                                     className="w-full h-full border-0"
+                                     title="HTML Preview"
+                                     sandbox="allow-same-origin allow-scripts"
+                                   />
+                                 </div>
+                               );
+                             } else {
+                               // Если контента нет, показываем сообщение
+                               return (
+                                 <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+                                   <p className="text-base font-medium mb-2">HTML верстка еще не сгенерирована</p>
+                                   <p className="text-sm text-white/20">
+                                     Результат верстки будет отображен здесь после генерации
+                                   </p>
+                                 </div>
+                               );
+                             }
+                           }
+                         }
+                         
+                         // Проверка на пустое состояние для других табов
                          if (content === null) {
                            // Пустое состояние для DSL или Верстка
                            const roleName = activeTab === 'dsl' ? 'DSL' : 'Верстка';
@@ -474,8 +645,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                              </div>
                            );
                          }
+                         
+                         // Обычный рендер для других табов
                          return (
-                           <div className="prose prose-invert prose-lg max-w-none">
+                           <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words">
                              <MarkdownRenderer content={decodeContent(content)} />
                            </div>
                          );

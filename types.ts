@@ -49,8 +49,7 @@ export interface Agent {
 
 export interface User {
   id: string;
-  email: string;
-  name: string;
+  username: string;
 }
 
 export const MODELS: ModelConfig[] = [

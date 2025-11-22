@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { User, Mail, Lock, ArrowRight, Sparkles, AlertCircle, UserCircle2, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
 
 interface AuthPageProps {
-  onLogin: (email: string, password: string) => Promise<void>;
-  onRegister: (name: string, email: string, password: string) => Promise<void>;
+  onLogin: (username: string, password: string) => Promise<void>;
+  onRegister: (username: string, password: string) => Promise<void>;
   onGuestLogin: () => Promise<void>;
-  onResetPassword: (email: string, newPass: string) => Promise<void>;
+  onResetPassword: (username: string, newPass: string) => Promise<void>;
   error: string | null;
 }
 
@@ -17,8 +17,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuest
   const [resetSuccess, setResetSuccess] = useState(false);
   
   // Form State
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
@@ -31,12 +30,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuest
 
     try {
       if (mode === 'forgot') {
-        await onResetPassword(email, newPassword);
+        await onResetPassword(username, newPassword);
         setResetSuccess(true);
       } else if (mode === 'signin') {
-        await onLogin(email, password);
+        await onLogin(username, password);
       } else {
-        await onRegister(name, email, password);
+        await onRegister(username, password);
       }
     } catch (err) {
       // Error handled by parent via props
@@ -113,7 +112,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuest
                 </div>
                 <h3 className="text-white font-bold text-lg mb-2">Password Updated</h3>
                 <p className="text-white/50 text-sm mb-6">
-                  Your password has been successfully changed for <span className="text-white">{email}</span>
+                  Your password has been successfully changed for <span className="text-white">{username}</span>
                 </p>
                 <button
                   onClick={() => switchMode('signin')}
@@ -125,38 +124,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuest
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 
-                {mode === 'signup' && (
-                  <div className="space-y-1.5 group/input">
-                    <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Full Name</label>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within/input:text-indigo-400 transition-colors">
-                        <User size={18} />
-                      </div>
-                      <input
-                        type="text"
-                        required={mode === 'signup'}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all"
-                        placeholder="John Doe"
-                      />
-                    </div>
-                  </div>
-                )}
-
                 <div className="space-y-1.5 group/input">
-                  <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Email Address</label>
+                  <label className="text-xs font-bold text-white/40 uppercase tracking-wider ml-1">Username</label>
                   <div className="relative">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within/input:text-indigo-400 transition-colors">
-                      <Mail size={18} />
+                      <User size={18} />
                     </div>
                     <input
-                      type="email"
+                      type="text"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       className="w-full bg-black/20 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all"
-                      placeholder="name@example.com"
+                      placeholder="johndoe"
                     />
                   </div>
                 </div>
