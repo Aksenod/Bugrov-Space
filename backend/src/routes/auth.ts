@@ -25,7 +25,13 @@ const registerSchema = z.object({
 authRouter.post('/register', authRateLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    const errorMessages = parsed.error.issues.map((err) => {
+      if (err.path.length > 0) {
+        return `${err.path.join('.')}: ${err.message}`;
+      }
+      return err.message;
+    }).join(', ');
+    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
   }
 
   const { username, password } = parsed.data;
@@ -64,7 +70,13 @@ const loginSchema = z.object({
 authRouter.post('/login', authRateLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    const errorMessages = parsed.error.issues.map((err) => {
+      if (err.path.length > 0) {
+        return `${err.path.join('.')}: ${err.message}`;
+      }
+      return err.message;
+    }).join(', ');
+    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
   }
 
   const { username, password } = parsed.data;
@@ -99,7 +111,13 @@ const resetSchema = z.object({
 authRouter.post('/reset', authRateLimiter, async (req, res) => {
   const parsed = resetSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
+    const errorMessages = parsed.error.issues.map((err) => {
+      if (err.path.length > 0) {
+        return `${err.path.join('.')}: ${err.message}`;
+      }
+      return err.message;
+    }).join(', ');
+    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
   }
 
   const { username, newPassword } = parsed.data;
@@ -118,9 +136,14 @@ authRouter.post('/reset', authRateLimiter, async (req, res) => {
   return res.json({ success: true });
 });
 
-authRouter.get('/me', authMiddleware, async (req: AuthenticatedRequest, res) => {
+authRouter.get('/me', authMiddleware, async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
+  if (!authReq.userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const user = await prisma.user.findUnique({
-    where: { id: req.userId },
+    where: { id: authReq.userId },
     select: {
       id: true,
       username: true,

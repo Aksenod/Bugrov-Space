@@ -1,8 +1,8 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/token';
 import { AuthenticatedRequest } from '../types/express';
 
-export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -11,7 +11,7 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
   const token = header.replace('Bearer ', '');
   try {
     const payload = verifyToken(token);
-    req.userId = payload.userId;
+    (req as AuthenticatedRequest).userId = payload.userId;
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
