@@ -14,9 +14,9 @@ for (const key of required) {
 const getCorsOrigin = (): string | string[] => {
   const corsOrigin = process.env.CORS_ORIGIN;
   if (!corsOrigin) {
-    // В dev режиме разрешаем localhost, в prod нужно указать явно
+    // В dev режиме разрешаем localhost, в prod разрешаем GitHub Pages
     return process.env.NODE_ENV === 'production' 
-      ? [] 
+      ? ['https://bugrov.space', 'https://aksenod.github.io'] 
       : ['http://localhost:3000', 'http://localhost:5173'];
   }
   return corsOrigin.split(',').map(origin => origin.trim());
