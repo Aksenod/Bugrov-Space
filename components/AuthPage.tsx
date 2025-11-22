@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, ArrowRight, Sparkles, AlertCircle, UserCircle2, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, Sparkles, AlertCircle, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
 
 interface AuthPageProps {
   onLogin: (username: string, password: string) => Promise<void>;
   onRegister: (username: string, password: string) => Promise<void>;
-  onGuestLogin: () => Promise<void>;
   onResetPassword: (username: string, newPass: string) => Promise<void>;
   error: string | null;
 }
 
+const formatError = (error: string | null): string => {
+  if (!error) return '';
+  if (typeof error !== 'string') {
+    // Если это объект, пытаемся извлечь сообщение
+    if (error && typeof error === 'object') {
+      if ('message' in error && typeof error.message === 'string') {
+        return error.message;
+      }
+      if ('error' in error && typeof error.error === 'string') {
+        return error.error;
+      }
+      return 'Произошла неизвестная ошибка';
+    }
+    return 'Произошла неизвестная ошибка';
+  }
+  return error;
+};
+
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuestLogin, onResetPassword, error }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onResetPassword, error }) => {
   const [mode, setMode] = useState<AuthMode>('signin');
   const [isLoading, setIsLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -100,7 +117,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuest
             {error && !resetSuccess && (
               <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm animate-in slide-in-from-top-2">
                 <AlertCircle size={16} />
-                {error}
+                <span>{formatError(error)}</span>
               </div>
             )}
 
@@ -211,18 +228,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onGuest
                   )}
                 </button>
               </form>
-            )}
-
-            {/* Guest Login Button */}
-            {!resetSuccess && mode === 'signin' && (
-              <button
-                type="button"
-                onClick={onGuestLogin}
-                className="w-full mt-3 py-2 flex items-center justify-center gap-2 text-xs font-bold text-white/40 hover:text-white transition-colors uppercase tracking-widest group"
-              >
-                <UserCircle2 size={14} className="group-hover:text-indigo-400 transition-colors" />
-                Гостевой вход
-              </button>
             )}
 
           </div>

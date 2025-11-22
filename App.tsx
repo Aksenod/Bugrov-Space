@@ -285,6 +285,79 @@ export default function App() {
     ensureSummaryLoaded(activeAgent.id);
   }, [isBootstrapping, activeAgent?.id, ensureSummaryLoaded]);
 
+  const getErrorMessage = (error: any): string => {
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (error?.message && typeof error.message === 'string') {
+      return error.message;
+    }
+    if (error?.error && typeof error.error === 'string') {
+      return error.error;
+    }
+    if (typeof error === 'object' && error !== null) {
+      // Если это объект валидации Zod с issues
+      if (error.issues && Array.isArray(error.issues)) {
+        return error.issues.map((err: any) => {
+          if (err.path && err.path.length > 0) {
+            return `${err.path.join('.')}: ${err.message}`;
+          }
+          return err.message;
+        }).join(', ');
+      }
+      // Если это объект с _errors (Zod flatten)
+      if (error._errors && Array.isArray(error._errors)) {
+        return error._errors.join(', ');
+      }
+      // Пытаемся найти строковое сообщение в объекте
+      const message = JSON.stringify(error);
+      if (message !== '{}' && message.length < 200) {
+        return message;
+      }
+    }
+    return 'Произошла неизвестная ошибка';
+  };
+
+  const translateErrorMessage = (message: string): string => {
+    const translations: Record<string, string> = {
+      'Invalid credentials': 'Неверное имя пользователя или пароль',
+      'Username already taken': 'Имя пользователя уже занято',
+      'User not found': 'Пользователь не найден',
+      'Validation error:': 'Ошибка валидации:',
+      'username: String must contain at least 1 character(s)': 'Имя пользователя не может быть пустым',
+      'password: String must contain at least 6 character(s)': 'Пароль должен содержать минимум 6 символов',
+      'newPassword: String must contain at least 6 character(s)': 'Новый пароль должен содержать минимум 6 символов',
+    };
+
+    // Проверяем точные совпадения
+    if (translations[message]) {
+      return translations[message];
+    }
+
+    // Обрабатываем ошибки валидации с несколькими полями
+    if (message.includes('Validation error:')) {
+      let translated = message.replace('Validation error:', 'Ошибка валидации:');
+      translated = translated.replace(/username: String must contain at least 1 character\(s\)/g, 'Имя пользователя не может быть пустым');
+      translated = translated.replace(/password: String must contain at least 6 character\(s\)/g, 'Пароль должен содержать минимум 6 символов');
+      translated = translated.replace(/newPassword: String must contain at least 6 character\(s\)/g, 'Новый пароль должен содержать минимум 6 символов');
+      return translated;
+    }
+
+    // Проверяем частичные совпадения
+    for (const [key, value] of Object.entries(translations)) {
+      if (message.includes(key)) {
+        return message.replace(key, value);
+      }
+    }
+
+    // Если сообщение содержит только техническую информацию, возвращаем понятное сообщение
+    if (message.includes('Request failed') || message.includes('Network')) {
+      return 'Ошибка соединения. Проверьте подключение к интернету.';
+    }
+
+    return message;
+  };
+
   const handleLogin = async (username: string, password: string) => {
     setAuthError(null);
     const payload = {
@@ -298,7 +371,9 @@ export default function App() {
       setCurrentUser(mapUser(response.user));
       await bootstrap();
     } catch (error: any) {
-      setAuthError(error.message || 'Не удалось войти');
+      const errorMessage = getErrorMessage(error);
+      const translatedMessage = translateErrorMessage(errorMessage);
+      setAuthError(translatedMessage);
       throw error;
     }
   };
@@ -321,7 +396,9 @@ export default function App() {
       setChatHistories({});
       setSummaryDocuments({});
     } catch (error: any) {
-      setAuthError(error.message || 'Не удалось создать аккаунт');
+      const errorMessage = getErrorMessage(error);
+      const translatedMessage = translateErrorMessage(errorMessage);
+      setAuthError(translatedMessage);
       throw error;
     }
   };
@@ -334,15 +411,11 @@ export default function App() {
         newPassword: newPassword.trim(),
       });
     } catch (error: any) {
-      setAuthError(error.message || 'Не удалось обновить пароль');
+      const errorMessage = getErrorMessage(error);
+      const translatedMessage = translateErrorMessage(errorMessage);
+      setAuthError(translatedMessage);
       throw error;
     }
-  };
-
-  const handleGuestLogin = async () => {
-    const timestamp = Date.now();
-    const guestUsername = `guest_${timestamp}`;
-    await handleRegister(guestUsername, `Guest-${timestamp}`);
   };
 
   const handleReorderAgents = useCallback(async (newOrderIds: string[]) => {
@@ -738,7 +811,6 @@ export default function App() {
         <AuthPage
           onLogin={handleLogin}
           onRegister={handleRegister}
-          onGuestLogin={handleGuestLogin}
           onResetPassword={handleResetPassword}
           error={authError}
         />

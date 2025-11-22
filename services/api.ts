@@ -18,7 +18,33 @@ const getHeaders = (custom: Record<string, string> = {}) => {
 const parseError = async (response: Response) => {
   try {
     const data = await response.json();
-    return data?.error ?? response.statusText;
+    // Если error - это объект, извлекаем строку из него
+    if (data?.error) {
+      if (typeof data.error === 'string') {
+        return data.error;
+      }
+      if (typeof data.error === 'object') {
+        // Если это объект с полями, пытаемся извлечь сообщение
+        if (data.error.message) {
+          return data.error.message;
+        }
+        if (data.error._errors && Array.isArray(data.error._errors)) {
+          return data.error._errors.join(', ');
+        }
+        // Если это объект валидации Zod
+        if (data.error.issues && Array.isArray(data.error.issues)) {
+          return data.error.issues.map((err: any) => {
+            if (err.path && err.path.length > 0) {
+              return `${err.path.join('.')}: ${err.message}`;
+            }
+            return err.message;
+          }).join(', ');
+        }
+        // В крайнем случае - JSON строка
+        return JSON.stringify(data.error);
+      }
+    }
+    return response.statusText || 'Request failed';
   } catch {
     return response.statusText || 'Request failed';
   }
