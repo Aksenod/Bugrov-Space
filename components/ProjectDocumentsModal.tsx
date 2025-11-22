@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Settings, Loader2 } from 'lucide-react';
 import { UploadedFile, Agent } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { api } from '../services/api';
 
 interface ProjectDocumentsModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface ProjectDocumentsModalProps {
   agents?: Agent[];
   onAgentClick?: (agentId: string) => void;
   onOpenAgentSettings?: (agentId: string) => void;
+  onDocumentUpdate?: (file: UploadedFile) => void;
 }
 
 export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
@@ -20,9 +22,33 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onRemoveFile,
   agents = [],
   onAgentClick,
-  onOpenAgentSettings
+  onOpenAgentSettings,
+  onDocumentUpdate
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka'>('text');
+  const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
+  const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
+  const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
+
+  // Сбрасываем таб при смене документа
+  useEffect(() => {
+    if (selectedFileId) {
+      setActiveTab('text');
+    }
+  }, [selectedFileId]);
+
+  // Синхронизируем локальное состояние с documents prop
+  useEffect(() => {
+    if (selectedFileId) {
+      const fileFromProps = documents.find(doc => doc.id === selectedFileId);
+      if (fileFromProps) {
+        setLocalSelectedFile(fileFromProps);
+      }
+    } else {
+      setLocalSelectedFile(null);
+    }
+  }, [documents, selectedFileId]);
 
   const getAgentName = (doc: UploadedFile) => {
     if (!doc.agentId) return 'Документ';
@@ -40,7 +66,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const selectedFile = documents.find(doc => doc.id === selectedFileId);
+  const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
   
   // Находим агента-создателя документа
   const documentCreatorAgent = selectedFile?.agentId 
@@ -83,6 +109,75 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (selectedFileId === fileId) {
       setSelectedFileId(null);
     }
+  };
+
+  const handleGenerateResult = async (role: 'dsl' | 'verstka') => {
+    if (!selectedFile || !documentCreatorAgent) return;
+
+    const targetAgent = role === 'dsl' 
+      ? agents.find(agent => agent.role === 'dsl')
+      : agents.find(agent => agent.role === 'verstka');
+
+    if (!targetAgent) {
+      alert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
+      return;
+    }
+
+    if (role === 'dsl') {
+      setIsGeneratingDSL(true);
+    } else {
+      setIsGeneratingVerstka(true);
+    }
+
+    try {
+      const { file } = await api.generateDocumentResult(
+        documentCreatorAgent.id,
+        selectedFile.id,
+        role
+      );
+
+      // Создаём обновлённый файл
+      const updatedFile: UploadedFile = {
+        id: file.id,
+        name: file.name,
+        type: file.mimeType,
+        data: file.content,
+        agentId: file.agentId,
+        dslContent: file.dslContent,
+        verstkaContent: file.verstkaContent,
+      };
+
+      // Сразу обновляем локальное состояние для мгновенного отображения
+      setLocalSelectedFile(updatedFile);
+
+      // Обновляем документ в родительском компоненте
+      if (onDocumentUpdate) {
+        onDocumentUpdate(updatedFile);
+      }
+
+      // Переключаемся на соответствующий таб
+      setActiveTab(role);
+    } catch (error: any) {
+      console.error('Failed to generate result:', error);
+      alert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
+    } finally {
+      setIsGeneratingDSL(false);
+      setIsGeneratingVerstka(false);
+    }
+  };
+
+  // Получаем контент для отображения в зависимости от активного таба
+  const getDisplayContent = () => {
+    if (!selectedFile) return null;
+
+    if (activeTab === 'text') {
+      return selectedFile.data;
+    } else if (activeTab === 'dsl') {
+      return selectedFile.dslContent || null;
+    } else if (activeTab === 'verstka') {
+      return selectedFile.verstkaContent || null;
+    }
+    return null;
   };
 
   return (
@@ -201,12 +296,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                 <button 
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      if (onAgentClick) {
-                                        onAgentClick(dslAgent.id);
-                                      }
+                                      handleGenerateResult('dsl');
                                     }}
-                                    className="text-purple-400 hover:text-purple-300 transition-colors"
+                                    disabled={isGeneratingDSL}
+                                    className="text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                                 >
+                                    {isGeneratingDSL && <Loader2 size={14} className="animate-spin" />}
                                     DSL
                                 </button>
                                 <button 
@@ -228,12 +323,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                 <button 
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      if (onAgentClick) {
-                                        onAgentClick(verstkaAgent.id);
-                                      }
+                                      handleGenerateResult('verstka');
                                     }}
-                                    className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                                    disabled={isGeneratingVerstka}
+                                    className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                                 >
+                                    {isGeneratingVerstka && <Loader2 size={14} className="animate-spin" />}
                                     Верстка
                                 </button>
                                 <button 
@@ -254,14 +349,75 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         )}
                     </div>
                  </div>
+
+                 {/* Tabs */}
+                 {showDSLButtons && (
+                   <div className="mb-6 flex items-center gap-2 border-b border-white/10">
+                     <button
+                       onClick={() => setActiveTab('text')}
+                       className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                         activeTab === 'text'
+                           ? 'text-white border-white/40'
+                           : 'text-white/50 border-transparent hover:text-white/70'
+                       }`}
+                     >
+                       Текст
+                     </button>
+                     <button
+                       onClick={() => setActiveTab('dsl')}
+                       className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                         activeTab === 'dsl'
+                           ? 'text-purple-400 border-purple-400/40'
+                           : 'text-white/50 border-transparent hover:text-white/70'
+                       }`}
+                     >
+                       DSL
+                     </button>
+                     <button
+                       onClick={() => setActiveTab('verstka')}
+                       className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                         activeTab === 'verstka'
+                           ? 'text-cyan-400 border-cyan-400/40'
+                           : 'text-white/50 border-transparent hover:text-white/70'
+                       }`}
+                     >
+                       Верстка
+                     </button>
+                   </div>
+                 )}
                  
                  <div className="bg-white/5 rounded-[2rem] border border-white/5 p-8 min-h-[50vh] shadow-inner">
-                    {selectedFile.type.includes('image') ? (
+                    {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                     ) : (
-                       <div className="prose prose-invert prose-lg max-w-none">
-                          <MarkdownRenderer content={decodeContent(selectedFile.data)} />
-                       </div>
+                       (() => {
+                         if (!selectedFile) {
+                           return (
+                             <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+                               <p className="text-base font-medium">Выберите документ для просмотра</p>
+                             </div>
+                           );
+                         }
+                         const content = getDisplayContent();
+                         if (content === null) {
+                           // Пустое состояние для DSL или Верстка
+                           const roleName = activeTab === 'dsl' ? 'DSL' : 'Верстка';
+                           const isDSL = activeTab === 'dsl';
+                           return (
+                             <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+                               <p className="text-base font-medium mb-2">Результат {roleName} еще не сгенерирован</p>
+                               <p className="text-sm text-white/20">
+                                 Используйте кнопку <span className={isDSL ? 'text-purple-400' : 'text-cyan-400'}>{roleName}</span> выше для генерации результата
+                               </p>
+                             </div>
+                           );
+                         }
+                         return (
+                           <div className="prose prose-invert prose-lg max-w-none">
+                             <MarkdownRenderer content={decodeContent(content)} />
+                           </div>
+                         );
+                       })()
                     )}
                  </div>
               </div>

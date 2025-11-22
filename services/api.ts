@@ -57,6 +57,8 @@ export interface ApiFile {
   content: string;
   agentId: string;
   isKnowledgeBase?: boolean;
+  dslContent?: string;
+  verstkaContent?: string;
   createdAt: string;
 }
 
@@ -191,6 +193,13 @@ export const api = {
 
   async getSummaryFiles(agentId: string) {
     return request<{ files: ApiFile[] }>(`/agents/${agentId}/files/summary`);
+  },
+
+  async generateDocumentResult(agentId: string, fileId: string, role: 'dsl' | 'verstka') {
+    return request<{ file: ApiFile }>(`/agents/${agentId}/files/${fileId}/generate-result`, {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    });
   },
 };
 

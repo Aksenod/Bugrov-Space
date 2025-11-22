@@ -1,6 +1,7 @@
 import { fetch } from 'undici';
 import { Buffer } from 'node:buffer';
 import { env } from '../env';
+import { logger } from '../utils/logger';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-5.1';
@@ -48,7 +49,7 @@ function decodeBase64ToText(base64String: string): string {
     const buffer = Buffer.from(base64String, 'base64');
     return buffer.toString('utf-8');
   } catch (error) {
-    console.warn('Failed to decode base64 content:', error);
+    logger.warn({ error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to decode base64 content');
     return base64String;
   }
 }
@@ -70,7 +71,7 @@ function processFileContent(file: AgentFile): string | null {
     
     return decodedContent;
   } catch (error) {
-    console.warn(`Failed to process file ${file.name}:`, error);
+    logger.warn({ fileName: file.name, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to process file');
     return `[Ошибка обработки файла ${file.name}]`;
   }
 }
@@ -79,9 +80,12 @@ function buildSystemPrompt(agent: AgentWithFiles) {
   const intro = `Ты выступаешь как агент "${agent.name}". ${agent.systemInstruction || ''}`.trim();
 
   // Логирование для диагностики
-  console.log(`[buildSystemPrompt] Agent: ${agent.name} (${agent.id})`);
-  console.log(`[buildSystemPrompt] Total files: ${agent.files.length}`);
-  console.log(`[buildSystemPrompt] File names:`, agent.files.map(f => f.name));
+  logger.debug({
+    agentId: agent.id,
+    agentName: agent.name,
+    totalFiles: agent.files.length,
+    fileNames: agent.files.map(f => f.name),
+  }, 'Building system prompt');
 
   // Обрабатываем все файлы (теперь поддерживаются только текстовые .txt, .md)
   const processedFiles = agent.files
@@ -91,8 +95,11 @@ function buildSystemPrompt(agent: AgentWithFiles) {
     })
     .filter((item): item is { file: AgentFile; content: string } => item !== null);
 
-  console.log(`[buildSystemPrompt] Processed files: ${processedFiles.length}`);
-  console.log(`[buildSystemPrompt] Processed file names:`, processedFiles.map(f => f.file.name));
+  logger.debug({
+    agentId: agent.id,
+    processedFilesCount: processedFiles.length,
+    processedFileNames: processedFiles.map(f => f.file.name),
+  }, 'Processed files for system prompt');
 
   const fileContext =
     processedFiles.length > 0
@@ -186,6 +193,46 @@ export async function generateSummaryContent(
     {
       role: 'user',
       content: `${instruction}\n\nДиалог:\n${transcript}`,
+    },
+  ];
+
+  const completion = await callOpenAi(agent.model ?? DEFAULT_MODEL, messages);
+  const text = extractMessageText(completion);
+
+  if (!text) {
+    throw new Error('OpenAI did not return any content');
+  }
+
+  return text;
+}
+
+export async function generateDocumentResult(
+  agent: Pick<AgentWithFiles, 'name' | 'systemInstruction' | 'model' | 'files'> & { id?: string; summaryInstruction?: string | null },
+  documentContent: string,
+  role: 'dsl' | 'verstka',
+): Promise<string> {
+  const agentWithFiles: AgentWithFiles = {
+    id: agent.id || '',
+    name: agent.name,
+    systemInstruction: agent.systemInstruction || '',
+    summaryInstruction: agent.summaryInstruction || null,
+    model: agent.model || null,
+    files: agent.files,
+  };
+  const systemPrompt = buildSystemPrompt(agentWithFiles);
+  
+  const roleInstruction = role === 'dsl' 
+    ? 'Преобразуй предоставленный контент в DSL формат согласно твоей инструкции.'
+    : 'Преобразуй предоставленный контент в формат верстки согласно твоей инструкции.';
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `${systemPrompt}\n\n${roleInstruction}`,
+    },
+    {
+      role: 'user',
+      content: `Вот контент документа для обработки:\n\n${documentContent}`,
     },
   ];
 

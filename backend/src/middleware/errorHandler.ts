@@ -1,0 +1,89 @@
+import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
+import { env } from '../env';
+
+export interface AppError extends Error {
+  statusCode?: number;
+  isOperational?: boolean;
+}
+
+export class ApiError extends Error implements AppError {
+  statusCode: number;
+  isOperational: boolean;
+
+  constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export function errorHandler(
+  err: Error | AppError | ZodError | Prisma.PrismaClientKnownRequestError,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  // Zod validation errors
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      error: 'Validation error',
+      details: err.flatten(),
+    });
+  }
+
+  // Prisma errors
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({
+        error: 'Unique constraint violation',
+        message: 'A record with this value already exists',
+      });
+    }
+    if (err.code === 'P2025') {
+      return res.status(404).json({
+        error: 'Record not found',
+        message: 'The requested record does not exist',
+      });
+    }
+    // Log unexpected Prisma errors
+    console.error('[Prisma Error]', err);
+    return res.status(500).json({
+      error: 'Database error',
+      message: env.nodeEnv === 'development' ? err.message : 'An internal error occurred',
+    });
+  }
+
+  // Custom API errors
+  if (err instanceof ApiError || (err as AppError).isOperational) {
+    const statusCode = (err as AppError).statusCode || 500;
+    return res.status(statusCode).json({
+      error: err.message || 'An error occurred',
+    });
+  }
+
+  // Unexpected errors - log in development, hide in production
+  console.error('[Unexpected Error]', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+  });
+
+  return res.status(500).json({
+    error: 'Internal server error',
+    message: env.nodeEnv === 'development' ? err.message : 'An unexpected error occurred',
+  });
+}
+
+// Wrapper для async route handlers
+export function asyncHandler(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+

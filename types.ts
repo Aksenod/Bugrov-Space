@@ -30,6 +30,8 @@ export interface UploadedFile {
   type: string;
   data: string; // Base64 string
   agentId?: string;
+  dslContent?: string;
+  verstkaContent?: string;
 }
 
 export interface Agent {
