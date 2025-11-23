@@ -20,7 +20,7 @@ const updateProjectSchema = z.object({
 // GET / - получить все проекты пользователя
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
-  const userId = authReq.userId;
+  const userId = authReq.userId!;
 
   const projects = await prisma.project.findMany({
     where: { userId },
@@ -48,7 +48,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 // GET /:id - получить конкретный проект
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
-  const userId = authReq.userId;
+  const userId = authReq.userId!;
   const { id } = req.params;
 
   const project = await prisma.project.findFirst({
@@ -79,7 +79,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 // POST / - создать новый проект
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
-  const userId = authReq.userId;
+  const userId = authReq.userId!;
 
   const parsed = projectSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -123,7 +123,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 // PUT /:id - обновить проект
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
-  const userId = authReq.userId;
+  const userId = authReq.userId!;
   const { id } = req.params;
 
   const parsed = updateProjectSchema.safeParse(req.body);
@@ -180,7 +180,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 // DELETE /:id - удалить проект
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
-  const userId = authReq.userId;
+  const userId = authReq.userId!;
   const { id } = req.params;
 
   // Проверяем, что проект принадлежит пользователю
@@ -197,13 +197,28 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Проект не найден' });
   }
 
-  // Проект можно удалить в любом случае - каскадное удаление агентов
-  await prisma.project.delete({
-    where: { id },
-  });
+  try {
+    // Проект можно удалить - каскадное удаление агентов происходит автоматически
+    // благодаря onDelete: Cascade в схеме для Agent -> Project
+    await prisma.project.delete({
+      where: { id },
+    });
 
-  logger.info({ userId, projectId: id }, 'Project deleted (with cascade delete of agents)');
-  res.status(204).send();
+    logger.info({ userId, projectId: id, agentCount: existing._count.agents }, 'Project deleted (with cascade delete of agents)');
+    res.status(204).send();
+  } catch (error: any) {
+    // Обрабатываем возможные ошибки базы данных
+    if (error?.code === 'P2014') {
+      // Foreign key constraint violation - не должно происходить при правильной схеме
+      logger.error({ userId, projectId: id, error: error.message }, 'Failed to delete project: foreign key constraint violation');
+      return res.status(500).json({ 
+        error: 'Не удалось удалить проект из-за ограничений базы данных',
+        message: 'Пожалуйста, попробуйте позже или обратитесь к администратору'
+      });
+    }
+    // Пробрасываем другие ошибки для обработки в errorHandler
+    throw error;
+  }
 }));
 
 export default router;
