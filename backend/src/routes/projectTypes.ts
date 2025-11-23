@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
+import { withRetry } from '../utils/prismaRetry';
 
 const router = Router();
 
@@ -12,9 +13,13 @@ const projectTypeSchema = z.object({
 
 // GET / - получить все типы проектов (публичный эндпоинт)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
-  const projectTypes = await prisma.projectType.findMany({
-    orderBy: { name: 'asc' },
-  });
+  const projectTypes = await withRetry(
+    () => prisma.projectType.findMany({
+      orderBy: { name: 'asc' },
+    }),
+    3,
+    'GET /project-types'
+  );
 
   logger.debug({ projectTypesCount: projectTypes.length }, 'Project types fetched');
   res.json({ projectTypes });
@@ -24,9 +29,13 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const projectType = await prisma.projectType.findUnique({
-    where: { id },
-  });
+  const projectType = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { id },
+    }),
+    3,
+    `GET /project-types/${id}`
+  );
 
   if (!projectType) {
     return res.status(404).json({ error: 'Тип проекта не найден' });
@@ -51,17 +60,25 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { name } = parsed.data;
 
   // Проверяем, что тип проекта с таким именем не существует
-  const existing = await prisma.projectType.findUnique({
-    where: { name },
-  });
+  const existing = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { name },
+    }),
+    3,
+    'POST /project-types - check existing'
+  );
 
   if (existing) {
     return res.status(409).json({ error: 'Тип проекта с таким именем уже существует' });
   }
 
-  const projectType = await prisma.projectType.create({
-    data: { name },
-  });
+  const projectType = await withRetry(
+    () => prisma.projectType.create({
+      data: { name },
+    }),
+    3,
+    'POST /project-types - create'
+  );
 
   logger.info({ projectTypeId: projectType.id, name }, 'Project type created');
   res.status(201).json({ projectType });
@@ -85,9 +102,13 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { name } = parsed.data;
 
   // Проверяем, что тип проекта существует
-  const existing = await prisma.projectType.findUnique({
-    where: { id },
-  });
+  const existing = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { id },
+    }),
+    3,
+    `PUT /project-types/${id} - find existing`
+  );
 
   if (!existing) {
     return res.status(404).json({ error: 'Тип проекта не найден' });
@@ -95,19 +116,27 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 
   // Проверяем, что тип проекта с таким именем не существует (если имя изменилось)
   if (name !== existing.name) {
-    const duplicate = await prisma.projectType.findUnique({
-      where: { name },
-    });
+    const duplicate = await withRetry(
+      () => prisma.projectType.findUnique({
+        where: { name },
+      }),
+      3,
+      `PUT /project-types/${id} - check duplicate`
+    );
 
     if (duplicate) {
       return res.status(409).json({ error: 'Тип проекта с таким именем уже существует' });
     }
   }
 
-  const updated = await prisma.projectType.update({
-    where: { id },
-    data: { name },
-  });
+  const updated = await withRetry(
+    () => prisma.projectType.update({
+      where: { id },
+      data: { name },
+    }),
+    3,
+    `PUT /project-types/${id} - update`
+  );
 
   logger.info({ projectTypeId: id, name }, 'Project type updated');
   res.json({ projectType: updated });
@@ -118,14 +147,18 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Проверяем, что тип проекта существует
-  const existing = await prisma.projectType.findUnique({
-    where: { id },
-    include: {
-      _count: {
-        select: { projects: true },
+  const existing = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { projects: true },
+        },
       },
-    },
-  });
+    }),
+    3,
+    `DELETE /project-types/${id} - find existing`
+  );
 
   if (!existing) {
     return res.status(404).json({ error: 'Тип проекта не найден' });
@@ -139,9 +172,13 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
-  await prisma.projectType.delete({
-    where: { id },
-  });
+  await withRetry(
+    () => prisma.projectType.delete({
+      where: { id },
+    }),
+    3,
+    `DELETE /project-types/${id} - delete`
+  );
 
   logger.info({ projectTypeId: id }, 'Project type deleted');
   res.status(204).send();
