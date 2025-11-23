@@ -6,6 +6,14 @@ export const prisma = new PrismaClient({
     { level: 'error', emit: 'event' },
     { level: 'warn', emit: 'event' },
   ],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+  // Настройки для более стабильного подключения к удаленной БД
+  // connection_limit: 10, // Максимум соединений в пуле
+  // pool_timeout: 20, // Таймаут ожидания соединения из пула (секунды)
 });
 
 // Логируем события Prisma
@@ -17,28 +25,14 @@ prisma.$on('warn' as never, (e: any) => {
   logger.warn({ prisma: 'warn' }, e.message);
 });
 
-// Включаем поддержку внешних ключей для SQLite
-// Используем $queryRawUnsafe вместо $executeRaw, так как PRAGMA statements
-// не работают в prepared statements, которые использует $executeRaw
-(async () => {
-  try {
-    // Проверяем, что это SQLite (по DATABASE_URL)
-    const dbUrl = process.env.DATABASE_URL || '';
-    if (dbUrl.includes('sqlite') || dbUrl.includes('.db')) {
-      await prisma.$queryRawUnsafe('PRAGMA foreign_keys = ON');
-      logger.info('Foreign keys enabled for SQLite');
-    }
-  } catch (error) {
-    // Игнорируем ошибку, если это не SQLite или если foreign keys уже включены
-    logger.warn('Could not enable foreign keys (may not be SQLite or already enabled)');
-  }
-})();
-
-// Логируем путь к базе данных при старте (только если доступен)
+// Логируем путь к базе данных при старте
 if (process.env.DATABASE_URL) {
+  const dbUrl = process.env.DATABASE_URL;
+  // Скрываем пароль в логах
+  const safeUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
   logger.info({
-    databaseUrl: process.env.DATABASE_URL,
-    databaseType: 'SQLite',
+    databaseUrl: safeUrl,
+    databaseType: 'PostgreSQL',
   }, 'Database connection configured');
 } else {
   logger.warn('DATABASE_URL not set, using default from schema.prisma');

@@ -62,6 +62,17 @@ export function errorHandler(
     });
   }
 
+  // Prisma connection errors
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    console.error('[Prisma Connection Error]', err);
+    return res.status(503).json({
+      error: 'Database connection error',
+      message: env.nodeEnv === 'development' 
+        ? `Cannot connect to database: ${err.message}` 
+        : 'Database is temporarily unavailable. Please try again later.',
+    });
+  }
+
   // Custom API errors
   if (err instanceof ApiError || (err as AppError).isOperational) {
     const statusCode = (err as AppError).statusCode || 500;

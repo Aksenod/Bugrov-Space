@@ -10,6 +10,7 @@ const router = Router();
 const projectSchema = z.object({
   name: z.string().min(1, 'Название проекта обязательно').max(50, 'Название проекта не может быть длиннее 50 символов'),
   description: z.string().max(500, 'Описание не может быть длиннее 500 символов').optional(),
+  projectTypeId: z.string().min(1, 'Тип проекта обязателен'),
 });
 
 const updateProjectSchema = z.object({
@@ -28,6 +29,12 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       _count: {
         select: { agents: true },
       },
+      projectType: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -36,6 +43,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     id: project.id,
     name: project.name,
     description: project.description,
+    projectTypeId: project.projectTypeId,
+    projectType: project.projectType,
     agentCount: project._count.agents,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -57,6 +66,12 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
       _count: {
         select: { agents: true },
       },
+      projectType: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
@@ -69,6 +84,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
       id: project.id,
       name: project.name,
       description: project.description,
+      projectTypeId: project.projectTypeId,
+      projectType: project.projectType,
       agentCount: project._count.agents,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
@@ -92,27 +109,45 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     return res.status(400).json({ error: `Validation error: ${errorMessages}` });
   }
 
-  const { name, description } = parsed.data;
+  const { name, description, projectTypeId } = parsed.data;
+
+  // Проверяем, что тип проекта существует
+  const projectType = await prisma.projectType.findUnique({
+    where: { id: projectTypeId },
+  });
+
+  if (!projectType) {
+    return res.status(404).json({ error: 'Тип проекта не найден' });
+  }
 
   const project = await prisma.project.create({
     data: {
       name,
       description: description || null,
       userId,
+      projectTypeId,
     },
     include: {
       _count: {
         select: { agents: true },
       },
+      projectType: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
-  logger.info({ userId, projectId: project.id, name }, 'Project created');
+  logger.info({ userId, projectId: project.id, name, projectTypeId }, 'Project created');
   res.status(201).json({
     project: {
       id: project.id,
       name: project.name,
       description: project.description,
+      projectTypeId: project.projectTypeId,
+      projectType: project.projectType,
       agentCount: project._count.agents,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
@@ -161,6 +196,12 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       _count: {
         select: { agents: true },
       },
+      projectType: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
@@ -170,6 +211,8 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       id: updated.id,
       name: updated.name,
       description: updated.description,
+      projectTypeId: updated.projectTypeId,
+      projectType: updated.projectType,
       agentCount: updated._count.agents,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
