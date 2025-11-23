@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "strict": true,
     "resolveJsonModule": true,
-    "types": ["node"],
+    "types": ["node", "jest", "@types/jest"],
     "sourceMap": true
   },
   "include": ["src"],

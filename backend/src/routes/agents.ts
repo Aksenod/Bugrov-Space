@@ -14,6 +14,7 @@ const agentSchema = z.object({
   summaryInstruction: z.string().optional(),
   model: z.string().optional(),
   role: z.string().optional(),
+  projectId: z.string().min(1, 'projectId обязателен'),
 });
 
 const reorderSchema = z.object({
@@ -23,9 +24,9 @@ const reorderSchema = z.object({
   })).min(1),
 });
 
-const getNextOrderValue = async (userId: string) => {
+const getNextOrderValue = async (userId: string, projectId: string) => {
   const lastAgent = await prisma.agent.findFirst({
-    where: { userId },
+    where: { userId, projectId },
     orderBy: { order: 'desc' },
     select: { order: true },
   });
@@ -34,9 +35,23 @@ const getNextOrderValue = async (userId: string) => {
 
 router.get('/', async (req, res) => {
   const userId = req.userId!;
+  const projectId = req.query.projectId as string;
+
+  if (!projectId) {
+    return res.status(400).json({ error: 'projectId обязателен' });
+  }
+
+  // Проверяем, что проект принадлежит пользователю
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId },
+  });
+
+  if (!project) {
+    return res.status(404).json({ error: 'Проект не найден' });
+  }
   
   const agents = await prisma.agent.findMany({
-    where: { userId },
+    where: { userId, projectId },
     include: {
       files: {
         where: {
@@ -57,6 +72,7 @@ router.get('/', async (req, res) => {
 
   logger.debug({
     userId,
+    projectId,
     agentsCount: agents.length,
     agents: agents.map(a => ({
       id: a.id,
@@ -65,7 +81,7 @@ router.get('/', async (req, res) => {
       systemInstructionLength: a.systemInstruction?.length || 0,
       filesCount: a.files.length,
     })),
-  }, 'Agents loaded for user');
+  }, 'Agents loaded for project');
 
   res.json({ agents });
 });
@@ -77,11 +93,23 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const nextOrder = await getNextOrderValue(userId);
+  const { projectId } = parsed.data;
+
+  // Проверяем, что проект принадлежит пользователю
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId },
+  });
+
+  if (!project) {
+    return res.status(404).json({ error: 'Проект не найден' });
+  }
+
+  const nextOrder = await getNextOrderValue(userId, projectId);
 
   const agent = await prisma.agent.create({
     data: {
       userId,
+      projectId,
       name: parsed.data.name,
       description: parsed.data.description ?? '',
       systemInstruction: parsed.data.systemInstruction ?? '',
@@ -141,7 +169,11 @@ router.put('/:agentId', async (req, res) => {
     updatingFields: Object.keys(req.body),
   }, 'Updating agent');
 
-  const parsed = agentSchema.partial().safeParse(req.body);
+  // Для обновления projectId не обязателен, но если передан - проверяем
+  const updateSchema = agentSchema.partial().extend({
+    projectId: z.string().min(1, 'projectId обязателен').optional(),
+  });
+  const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn({ agentId, userId, errors: parsed.error.flatten() }, 'Agent update validation failed');
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -163,6 +195,17 @@ router.put('/:agentId', async (req, res) => {
       model: existing.model,
       updatedAt: existing.updatedAt,
     }, 'Current agent state before update');
+
+    // Если передан projectId, проверяем, что проект принадлежит пользователю
+    if (parsed.data.projectId && parsed.data.projectId !== existing.projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: parsed.data.projectId, userId },
+      });
+      if (!project) {
+        logger.warn({ agentId, userId, projectId: parsed.data.projectId }, 'Project not found for agent update');
+        return res.status(404).json({ error: 'Проект не найден' });
+      }
+    }
 
     const updated = await prisma.agent.update({
       where: { id: agentId },

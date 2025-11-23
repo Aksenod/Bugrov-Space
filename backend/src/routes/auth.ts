@@ -59,6 +59,7 @@ authRouter.post('/register', authRateLimiter, asyncHandler(async (req, res) => {
   });
 
   console.log('[Register] User created:', user.id);
+  
   const token = signToken(user.id);
   return res.status(201).json({
     token,
