@@ -17,3 +17,5 @@ DROP TABLE "File";
 ALTER TABLE "new_File" RENAME TO "File";
 PRAGMA foreign_keys=ON;
 
+
+

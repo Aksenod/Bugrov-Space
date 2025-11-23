@@ -37,7 +37,12 @@ function ensureApiKey() {
   if (!env.openAiApiKey) {
     throw new Error('OPENAI_API_KEY is not configured on the server');
   }
-  return env.openAiApiKey;
+  const apiKey = env.openAiApiKey.trim();
+  // Логируем только если ключ очень короткий (возможная ошибка)
+  if (apiKey.length < 10) {
+    logger.warn({ keyLength: apiKey.length }, 'OpenAI API key seems very short');
+  }
+  return apiKey;
 }
 
 /**
@@ -123,28 +128,57 @@ function mapHistory(history: ConversationMessage[]): ChatMessage[] {
 
 async function callOpenAi(model: string, messages: ChatMessage[]) {
   const apiKey = ensureApiKey();
+  const requestBody = {
+    model: model || DEFAULT_MODEL,
+    messages,
+    temperature: 0.7,
+  };
+
+  logger.debug({
+    model: requestBody.model,
+    messagesCount: messages.length,
+    apiKeyPrefix: apiKey.substring(0, 7) + '...',
+  }, 'Sending request to OpenAI API');
+
   const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: model || DEFAULT_MODEL,
-      messages,
-      temperature: 0.7,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
-    let detail = response.statusText;
+    const status = response.status;
+    const statusText = response.statusText;
+    let errorDetail = statusText;
+    let errorData: any = null;
+
     try {
-      const data: any = await response.json();
-      detail = data?.error?.message ?? JSON.stringify(data);
-    } catch {
-      // ignore
+      errorData = await response.json();
+      errorDetail = errorData?.error?.message ?? errorData?.error?.code ?? JSON.stringify(errorData);
+    } catch (parseError) {
+      // Если не удалось распарсить JSON, пробуем получить текст
+      try {
+        const text = await response.text();
+        errorDetail = text || statusText;
+      } catch {
+        // ignore
+      }
     }
-    throw new Error(`OpenAI API error: ${detail}`);
+
+    // Детальное логирование ошибки
+    logger.error({
+      status,
+      statusText,
+      errorDetail,
+      errorData,
+      model: requestBody.model,
+      apiKeyPrefix: apiKey.substring(0, 7) + '...',
+    }, 'OpenAI API request failed');
+
+    throw new Error(`OpenAI API error: ${errorDetail}`);
   }
 
   return response.json();

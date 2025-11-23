@@ -42,13 +42,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   
   const resolveModel = (value: Agent['model']): LLMModel => {
     if (value === LLMModel.GPT51) return LLMModel.GPT51;
+    if (value === LLMModel.GPT5_MINI) return LLMModel.GPT5_MINI;
     if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
+    if (value === LLMModel.GPT4O_MINI) return LLMModel.GPT4O_MINI;
     return LLMModel.GPT51;
   };
 
   const renderModelIcon = (modelId: LLMModel) => {
     if (modelId === LLMModel.GPT4O_MINI) {
       return <Zap size={14} className="text-amber-400" />;
+    }
+    if (modelId === LLMModel.GPT5_MINI) {
+      return <Zap size={14} className="text-emerald-400" />;
     }
     if (modelId === LLMModel.GPT51) {
       return <Brain size={14} className="text-emerald-300" />;
@@ -124,7 +129,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   return (
     <div 
-      className={`fixed inset-y-2 right-2 w-full md:w-[380px] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl transform transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] z-[70] flex flex-col overflow-hidden max-h-[calc(100dvh-1rem)] ${
+      className={`fixed inset-y-2 right-2 w-full sm:w-[90%] md:w-[380px] bg-gradient-to-b from-black/80 via-black/70 to-black/80 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl shadow-indigo-500/10 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] z-[70] flex flex-col overflow-hidden max-h-[calc(100dvh-1rem)] will-change-transform ${
         isOpen ? 'translate-x-0' : 'translate-x-[120%]'
       }`}
     >
@@ -155,7 +160,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                  value={name}
                  onChange={(e) => setName(e.target.value)}
                  disabled={activeAgent.role && activeAgent.role.trim() !== ''}
-                 className={`w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${
+                 className={`w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner ${
                    activeAgent.role && activeAgent.role.trim() !== '' ? 'opacity-60 cursor-not-allowed' : ''
                  }`}
                />
@@ -170,32 +175,39 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
                Model Intelligence
              </label>
-             <div className="grid grid-cols-1 gap-2">
-               {MODELS.map((m) => (
-                 <button
-                   key={m.id}
-                   onClick={() => setModel(m.id)}
-                   className={`relative p-3 rounded-xl border text-left transition-all ${
-                     model === m.id 
-                       ? 'bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
-                       : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
-                   }`}
-                 >
-                   <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        {renderModelIcon(m.id as LLMModel)}
-                        <span className={`text-xs font-bold ${model === m.id ? 'text-white' : 'text-white/70'}`}>
-                          {m.name}
-                        </span>
-                      </div>
-                      {model === m.id && <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(129,140,248,1)]"></div>}
-                   </div>
-                   <p className="text-[10px] text-white/40 leading-tight pl-6">
-                     {m.description}
-                   </p>
-                 </button>
-               ))}
-             </div>
+            <div className="relative">
+              <select
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value as LLMModel);
+                }}
+                className="w-full appearance-none bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner cursor-pointer hover:bg-black/40"
+              >
+                {MODELS.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-black text-white">
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              {/* Model Icon */}
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                {renderModelIcon(model)}
+              </div>
+              {/* Dropdown Arrow */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              {/* Selected model indicator */}
+              <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(129,140,248,1)]"></div>
+              </div>
+            </div>
+            {/* Model Description */}
+            <p className="text-[10px] text-white/40 leading-tight mt-2 pl-1">
+              {MODELS.find(m => m.id === model)?.description}
+            </p>
           </section>
 
           {/* Roles Section */}
@@ -209,7 +221,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 onChange={(e) => {
                   setRole(e.target.value || '');
                 }}
-                className="w-full appearance-none bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner cursor-pointer hover:bg-black/40"
+                className="w-full appearance-none bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner cursor-pointer hover:bg-black/40"
               >
                 <option value="">Выключено</option>
                 <option value="copywriter">Копирайтер</option>
@@ -250,7 +262,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <textarea
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
-                className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/90 focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed"
+                className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed"
                 placeholder="Define agent behavior..."
               />
             </div>
@@ -267,7 +279,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <textarea
               value={summaryInst}
               onChange={(e) => setSummaryInst(e.target.value)}
-              className="w-full h-20 bg-black/20 border border-white/5 rounded-lg p-2 text-xs text-white/80 focus:ring-1 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all"
+              className="w-full h-20 bg-black/20 border border-white/5 rounded-lg p-2 text-xs text-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 placeholder-white/20 resize-none transition-all"
               placeholder="Instructions for saving results..."
             />
           </section>

@@ -462,22 +462,35 @@ router.post('/:agentId/messages', async (req, res) => {
 
     return res.json({ messages: [userMessage, modelMessage] });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get response from OpenAI';
+    const errorLower = errorMessage.toLowerCase();
+    
+    // Детальное логирование для диагностики
     logger.error({
       agentId,
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      agentName: agent.name,
+      agentModel: agent.model,
+      error: errorMessage,
+      errorType: error instanceof Error ? error.constructor.name : 'Unknown',
       stack: error instanceof Error ? error.stack : undefined,
     }, 'OpenAI API error');
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get response from OpenAI';
-    // Проверяем на специфические ошибки
+
+    // Проверяем на специфические ошибки с более точной диагностикой
     let userFriendlyMessage = 'Ошибка генерации. Попробуйте позже.';
-    if (errorMessage.includes('API key')) {
+    
+    if (errorLower.includes('api key') || errorLower.includes('invalid api key') || errorLower.includes('incorrect api key')) {
       userFriendlyMessage = 'Неверный API ключ OpenAI. Проверьте настройки сервера.';
-    } else if (errorMessage.includes('rate limit')) {
-      userFriendlyMessage = 'Превышен лимит запросов к OpenAI. Попробуйте позже.';
-    } else if (errorMessage.includes('model')) {
-      userFriendlyMessage = 'Ошибка модели OpenAI. Проверьте настройки агента.';
+    } else if (errorLower.includes('rate limit') || errorLower.includes('quota') || errorLower.includes('billing')) {
+      userFriendlyMessage = 'Превышен лимит запросов к OpenAI. Проверьте баланс и лимиты API.';
+    } else if (errorLower.includes('model') || errorLower.includes('not found') || errorLower.includes('invalid model')) {
+      userFriendlyMessage = 'Ошибка модели OpenAI. Проверьте настройки агента и доступность модели.';
+    } else if (errorLower.includes('not configured') || errorLower.includes('missing')) {
+      userFriendlyMessage = 'API ключ OpenAI не настроен на сервере. Обратитесь к администратору.';
+    } else if (errorLower.includes('network') || errorLower.includes('timeout') || errorLower.includes('connection')) {
+      userFriendlyMessage = 'Проблема с подключением к OpenAI. Проверьте интернет-соединение.';
     }
+    
     return res.status(500).json({ error: userFriendlyMessage, details: errorMessage });
   }
 });

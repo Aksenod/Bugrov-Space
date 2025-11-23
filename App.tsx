@@ -3,11 +3,14 @@ import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain } from 'lucid
 
 import { Message, Role, LLMModel, MODELS, UploadedFile, Agent, User } from './types';
 import { MessageBubble } from './components/MessageBubble';
+import { MessageSkeleton } from './components/MessageSkeleton';
 import { ChatInput } from './components/ChatInput';
 import { SettingsPanel } from './components/SettingsPanel';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
 import { AuthPage } from './components/AuthPage';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { AlertDialog } from './components/AlertDialog';
 import { api, ApiAgent, ApiFile, ApiMessage, ApiUser } from './services/api';
 
 const PROJECT_NAME = 'Bugrov Space';
@@ -88,6 +91,27 @@ export default function App() {
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [summaryDocuments, setSummaryDocuments] = useState<Record<string, UploadedFile[]>>({});
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    variant?: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    isOpen: false,
+    message: '',
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
@@ -118,13 +142,16 @@ export default function App() {
     }
   }, [activeAgent?.id, projectDocuments.length]);
   const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT51;
-  const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
+  const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI || resolvedModel === LLMModel.GPT5_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
+  const isGPT5Mini = resolvedModel === LLMModel.GPT5_MINI;
   const modelBadgeClass = isUltraModel
-    ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-200/80'
-    : isMiniModel
-      ? 'bg-amber-500/5 border-amber-500/20 text-amber-300/80'
-      : 'bg-pink-500/5 border-pink-500/20 text-pink-300/80';
+    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+    : isGPT5Mini
+      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+      : isMiniModel
+        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+        : 'bg-pink-500/10 border-pink-500/30 text-pink-400';
   const ModelBadgeIcon = isUltraModel ? Brain : isMiniModel ? Zap : Cpu;
   const modelBadgeLabel =
     MODELS.find((m) => m.id === resolvedModel)?.name ?? 'GPT-5.1';
@@ -192,6 +219,41 @@ export default function App() {
       handleLogout();
     }
   }, [authToken, bootstrap, handleLogout]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!currentUser || !activeAgent) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K - открыть настройки агента
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSettingsOpen(true);
+      }
+      
+      // Escape - закрыть модальные окна
+      if (e.key === 'Escape') {
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        }
+        if (isDocsOpen) {
+          setIsDocsOpen(false);
+        }
+        if (isSidebarOpen) {
+          setIsSidebarOpen(false);
+        }
+      }
+      
+      // Cmd/Ctrl + / - открыть документы
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault();
+        setIsDocsOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentUser, activeAgent, isSettingsOpen, isDocsOpen, isSidebarOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
@@ -356,6 +418,44 @@ export default function App() {
     }
 
     return message;
+  };
+
+  // Helper functions for dialogs
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    variant: 'danger' | 'warning' | 'info' = 'danger'
+  ) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+      variant,
+    });
+  };
+
+  const showAlert = (
+    message: string,
+    title?: string,
+    variant: 'success' | 'error' | 'info' | 'warning' = 'info',
+    duration: number = 0
+  ) => {
+    setAlertDialog({
+      isOpen: true,
+      message,
+      title,
+      variant,
+    });
+    if (duration > 0) {
+      setTimeout(() => {
+        setAlertDialog(prev => ({ ...prev, isOpen: false }));
+      }, duration);
+    }
   };
 
   const handleLogin = async (username: string, password: string) => {
@@ -542,16 +642,23 @@ export default function App() {
 
   const handleClearChat = async () => {
     if (!activeAgent) return;
-    if (!confirm('Очистить историю чата?')) return;
-    try {
-      await api.clearMessages(activeAgent.id);
-      setChatHistories((prev) => ({ ...prev, [activeAgent.id]: [] }));
-      loadedAgentsRef.current.delete(activeAgent.id);
-      setSummarySuccess(false);
-    } catch (error: any) {
-      console.error('Failed to clear chat', error);
-      alert(`Не удалось очистить чат: ${error?.message || 'Неизвестная ошибка'}`);
-    }
+    showConfirm(
+      'Очистить историю чата?',
+      'Все сообщения в этом чате будут удалены.\nЭто действие нельзя отменить.',
+      async () => {
+        try {
+          await api.clearMessages(activeAgent.id);
+          setChatHistories((prev) => ({ ...prev, [activeAgent.id]: [] }));
+          loadedAgentsRef.current.delete(activeAgent.id);
+          setSummarySuccess(false);
+          showAlert('История чата успешно очищена', undefined, 'success', 3000);
+        } catch (error: any) {
+          console.error('Failed to clear chat', error);
+          showAlert(`Не удалось очистить чат: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
+        }
+      },
+      'warning'
+    );
   };
 
   const handleGenerateSummary = async () => {
@@ -596,7 +703,7 @@ export default function App() {
         status: error?.status,
         stack: error?.stack,
       });
-      alert(`Не удалось создать саммари: ${error?.message || 'Неизвестная ошибка'}`);
+      showAlert(`Не удалось создать саммари: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -643,30 +750,37 @@ export default function App() {
     const agent = agents.find((a) => a.id === agentId);
     // Запрещаем удаление агентов с ролью
     if (agent && agent.role && agent.role.trim() !== '') {
-      alert('Нельзя удалить агента с назначенной ролью.');
+      showAlert('Нельзя удалить агента с назначенной ролью.', 'Ошибка', 'error', 5000);
       return;
     }
     if (agents.length <= 1) {
-      alert('Нельзя удалить последнего агента.');
+      showAlert('Нельзя удалить последнего агента.', 'Ошибка', 'error', 5000);
       return;
     }
-    if (!confirm('Удалить агента и его историю?')) return;
-    try {
-      await api.deleteAgent(agentId);
-      setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
-      setChatHistories((prev) => {
-        const next = { ...prev };
-        delete next[agentId];
-        return next;
-      });
-      if (activeAgentId === agentId) {
-        const remaining = agents.filter((agent) => agent.id !== agentId);
-        setActiveAgentId(remaining[0]?.id ?? null);
-      }
-    } catch (error: any) {
-      console.error('Failed to delete agent', error);
-      alert(error?.message || 'Не удалось удалить агента.');
-    }
+    showConfirm(
+      'Удалить агента?',
+      `Агент "${agent?.name || 'Без имени'}" и вся его история будут удалены.\n\nЭто действие нельзя отменить.`,
+      async () => {
+        try {
+          await api.deleteAgent(agentId);
+          setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
+          setChatHistories((prev) => {
+            const next = { ...prev };
+            delete next[agentId];
+            return next;
+          });
+          if (activeAgentId === agentId) {
+            const remaining = agents.filter((agent) => agent.id !== agentId);
+            setActiveAgentId(remaining[0]?.id ?? null);
+          }
+          showAlert('Агент успешно удален', undefined, 'success', 3000);
+        } catch (error: any) {
+          console.error('Failed to delete agent', error);
+          showAlert(error?.message || 'Не удалось удалить агента.', 'Ошибка', 'error', 5000);
+        }
+      },
+      'danger'
+    );
   };
 
   const handleFileUpload = async (fileList: FileList) => {
@@ -713,7 +827,7 @@ export default function App() {
     }
 
     if (errors.length > 0) {
-      alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
+      showAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error', 5000);
     }
 
     if (uploads.length > 0) {
@@ -723,9 +837,9 @@ export default function App() {
         ),
       );
       // НЕ добавляем в summaryDocuments - это база знаний агента, не документ проекта
-      alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
+      showAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success', 3000);
     } else if (errors.length === 0) {
-      alert('Не удалось загрузить файлы');
+      showAlert('Не удалось загрузить файлы', 'Ошибка', 'error', 5000);
     }
   };
 
@@ -746,52 +860,57 @@ export default function App() {
     }
     
     // Показываем окно подтверждения
-    const confirmed = confirm(`Удалить файл "${fileToRemove.name}"?\n\nЭто действие нельзя отменить.`);
-    if (!confirmed) return;
-    
-    // Используем agentId файла, если он есть, иначе используем activeAgent.id
-    const agentIdForDelete = fileToRemove.agentId || activeAgent.id;
-    
-    console.log('[Frontend] Calling api.deleteProjectFile:', { fileId, agentIdForDelete });
-    
-    try {
-      await api.deleteProjectFile(fileId);
-      console.log('[Frontend] File deleted successfully');
-      
-      // Удаляем из summaryDocuments (все документы проекта теперь общие)
-      setSummaryDocuments((prev) => {
-        const updated = { ...prev };
-        if (updated['all']) {
-          updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+    showConfirm(
+      'Удалить файл?',
+      `Файл "${fileToRemove.name}" будет удален.\n\nЭто действие нельзя отменить.`,
+      async () => {
+        // Используем agentId файла, если он есть, иначе используем activeAgent.id
+        const agentIdForDelete = fileToRemove.agentId || activeAgent.id;
+        
+        console.log('[Frontend] Calling api.deleteProjectFile:', { fileId, agentIdForDelete });
+        
+        try {
+          await api.deleteProjectFile(fileId);
+          console.log('[Frontend] File deleted successfully');
+          
+          // Удаляем из summaryDocuments (все документы проекта теперь общие)
+          setSummaryDocuments((prev) => {
+            const updated = { ...prev };
+            if (updated['all']) {
+              updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+            }
+            return updated;
+          });
+          
+          // Удаляем из agent.files на фронтенде - из того агента, которому принадлежит файл
+          setAgents((prev) =>
+            prev.map((agent) => {
+              // Если у файла есть agentId, удаляем из соответствующего агента
+              // Иначе удаляем из всех агентов (на всякий случай)
+              if (fileToRemove.agentId) {
+                return agent.id === fileToRemove.agentId
+                  ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
+                  : agent;
+              } else {
+                // Если agentId нет, удаляем из всех агентов (fallback)
+                return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+              }
+            }),
+          );
+          showAlert('Файл успешно удален', undefined, 'success', 3000);
+        } catch (error: any) {
+          console.error('[Frontend] Failed to remove file:', error);
+          console.error('[Frontend] Error details:', { 
+            message: error?.message, 
+            status: error?.status,
+            agentId: agentIdForDelete,
+            fileId 
+          });
+          showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
         }
-        return updated;
-      });
-      
-      // Удаляем из agent.files на фронтенде - из того агента, которому принадлежит файл
-      setAgents((prev) =>
-        prev.map((agent) => {
-          // Если у файла есть agentId, удаляем из соответствующего агента
-          // Иначе удаляем из всех агентов (на всякий случай)
-          if (fileToRemove.agentId) {
-            return agent.id === fileToRemove.agentId
-              ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
-              : agent;
-          } else {
-            // Если agentId нет, удаляем из всех агентов (fallback)
-            return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
-          }
-        }),
-      );
-    } catch (error: any) {
-      console.error('[Frontend] Failed to remove file:', error);
-      console.error('[Frontend] Error details:', { 
-        message: error?.message, 
-        status: error?.status,
-        agentId: agentIdForDelete,
-        fileId 
-      });
-      alert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`);
-    }
+      },
+      'danger'
+    );
   };
 
   const renderAuthOrLoader = () => {
@@ -799,8 +918,11 @@ export default function App() {
       return (
         <div className="flex items-center justify-center h-full bg-black text-white">
           <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto" />
-            <p className="text-sm text-white/70">Загружаем рабочее пространство…</p>
+            <div className="relative">
+              <div className="absolute inset-0 bg-indigo-500/30 blur-xl rounded-full animate-pulse"></div>
+              <div className="relative animate-spin rounded-full h-12 w-12 border-3 border-white/20 border-t-indigo-400 mx-auto"></div>
+            </div>
+            <p className="text-sm text-white/70 font-medium animate-pulse">Загружаем рабочее пространство…</p>
           </div>
         </div>
       );
@@ -819,11 +941,18 @@ export default function App() {
 
     if (!activeAgent) {
       return (
-        <div className="flex items-center justify-center h-full bg-black text-white">
-          <div className="text-center space-y-4">
-            <p className="text-xl font-semibold">Создайте первого агента, чтобы начать работу</p>
+        <div className="flex items-center justify-center h-full bg-black text-white px-4">
+          <div className="text-center space-y-6 max-w-md">
+            <div className="relative">
+              <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
+              <Bot size={80} className="relative mx-auto opacity-50" />
+            </div>
+            <div>
+              <p className="text-xl font-bold mb-2">Создайте первого агента</p>
+              <p className="text-sm text-white/60">Начните работу, создав вашего первого AI агента</p>
+            </div>
             <button
-              className="px-4 py-2 bg-white text-black rounded-full font-semibold"
+              className="px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
               onClick={handleAddAgent}
             >
               Создать агента
@@ -842,7 +971,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full bg-black text-white font-sans overflow-hidden">
+    <div className="flex h-full bg-gradient-to-br from-black via-black to-indigo-950/20 text-white font-sans overflow-hidden">
       <AgentSidebar 
         projectName={PROJECT_NAME}
         agents={agents}
@@ -863,44 +992,42 @@ export default function App() {
       />
 
       <main className="flex-1 flex flex-col relative h-full w-full overflow-hidden transition-all duration-300">
-        <header className="flex-shrink-0 h-16 m-2 bg-black/60 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl flex items-center justify-between px-6 z-30">
-           <div className="flex items-center gap-3 overflow-hidden">
+        <header className="flex-shrink-0 min-h-[4.5rem] sm:min-h-[4rem] m-2 bg-gradient-to-r from-black/85 via-black/75 to-black/85 backdrop-blur-xl border border-white/20 rounded-[1.5rem] shadow-2xl shadow-black/50 shadow-indigo-500/10 flex items-center justify-between pl-4 sm:pl-6 pr-2 sm:pr-3 z-30 py-2.5 sm:py-2">
+           <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
               <button 
                 onClick={() => setIsSidebarOpen(true)}
-                className="md:hidden p-2 -ml-2 text-white/60 hover:text-white"
+                className="md:hidden p-2.5 -ml-2 text-white/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center transition-all hover:bg-white/5"
               >
                 <Menu size={20} />
               </button>
               
-              <div>
-                 <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-lg tracking-tight text-white truncate max-w-[150px] sm:max-w-xs">
+              <div className="flex-1 min-w-0">
+                 <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
+                    <h2 className="font-bold text-lg sm:text-xl tracking-tight text-white truncate max-w-[200px] sm:max-w-xs md:max-w-sm leading-tight">
                       {activeAgent.name}
                     </h2>
-                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white/50 border border-white/5">AI</span>
                     
-                    <button 
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="ml-1 p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-all"
-                      title="Agent Settings"
-                    >
-                      <Settings size={16} />
-                    </button>
-                 </div>
-                 
-                 <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-full border transition-all duration-300 ${modelBadgeClass}`}>
-                    <ModelBadgeIcon size={10} className={isUltraModel ? 'text-emerald-300' : isMiniModel ? 'text-amber-400' : 'text-pink-400'} />
-                    <span className="text-[9px] font-bold uppercase tracking-wider opacity-90">
-                      {modelBadgeLabel}
-                    </span>
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all duration-300 shadow-sm backdrop-blur-sm flex-shrink-0 ${modelBadgeClass}`}>
+                      <ModelBadgeIcon size={12} className={isUltraModel ? 'text-emerald-300' : isGPT5Mini ? 'text-emerald-400' : isMiniModel ? 'text-amber-400' : 'text-pink-400'} />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        {modelBadgeLabel}
+                      </span>
+                    </div>
                  </div>
               </div>
            </div>
 
-           <div className="flex items-center gap-2">
+           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center hover:shadow-sm hover:bg-white/15"
+                title="Agent Settings (⌘K)"
+              >
+                <Settings size={17} />
+              </button>
               <button 
                 onClick={handleClearChat}
-                className={`p-2 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors ${
+                className={`p-2.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-red-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center hover:shadow-sm ${
                   !activeAgent ? 'opacity-40 cursor-not-allowed' : ''
                 }`}
                 title="Clear Chat"
@@ -911,29 +1038,33 @@ export default function App() {
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin relative">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin relative bg-gradient-to-b from-transparent via-transparent to-black/20">
            {messages.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white/20 pointer-events-none">
-                 <Bot size={64} className="mb-4 opacity-20" />
-                 <p className="text-sm font-medium">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 pointer-events-none px-4">
+                 <div className="relative mb-6">
+                   <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
+                   <Bot size={64} className="relative opacity-40" />
+                 </div>
+                 <p className="text-base font-semibold text-white/60 mb-2">
                    Начните диалог с {activeAgent?.name || 'агентом'}
+                 </p>
+                 <p className="text-sm text-white/40 text-center max-w-md">
+                   Задайте вопрос или попросите помочь с задачей
                  </p>
               </div>
            )}
            
-           {messages.map((msg) => (
-             <MessageBubble key={msg.id} message={msg} />
-           ))}
+           {messages
+             .filter((msg) => !(msg.isStreaming && msg.text.length === 0))
+             .map((msg) => (
+               <MessageBubble key={msg.id} message={msg} />
+             ))}
+           {isLoading && messages.length > 0 && <MessageSkeleton />}
            <div ref={messagesEndRef} />
         </div>
 
         <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
            <ChatInput onSend={handleSendMessage} disabled={isLoading || !activeAgent} />
-           <div className="text-center mt-3">
-              <p className="text-[10px] text-white/20">
-                 AI can make mistakes. Review generated information.
-              </p>
-           </div>
         </div>
 
       </main>
@@ -996,25 +1127,50 @@ export default function App() {
           
           if (!fileToRemove) return;
           
-          const confirmed = confirm(`Удалить файл "${fileToRemove.name}" из базы знаний?`);
-          if (!confirmed) return;
-          
-          try {
-            await api.deleteProjectFile(fileId);
-            // Обновляем агентов, удаляя файл из того агента, которому он принадлежит
-            setAgents((prev) =>
-              prev.map((agent) => {
-                if (fileToRemove.agentId && agent.id === fileToRemove.agentId) {
-                  return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
-                }
-                return agent;
-              })
-            );
-          } catch (error: any) {
-            console.error('Failed to remove agent file:', error);
-            alert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`);
-          }
+          showConfirm(
+            'Удалить файл из базы знаний?',
+            `Файл "${fileToRemove.name}" будет удален из базы знаний.\n\nЭто действие нельзя отменить.`,
+            async () => {
+              try {
+                await api.deleteProjectFile(fileId);
+                // Обновляем агентов, удаляя файл из того агента, которому он принадлежит
+                setAgents((prev) =>
+                  prev.map((agent) => {
+                    if (fileToRemove.agentId && agent.id === fileToRemove.agentId) {
+                      return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+                    }
+                    return agent;
+                  })
+                );
+                showAlert('Файл успешно удален из базы знаний', undefined, 'success', 3000);
+              } catch (error: any) {
+                console.error('Failed to remove agent file:', error);
+                showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
+              }
+            },
+            'danger'
+          );
         }}
+        onShowConfirm={showConfirm}
+        onShowAlert={showAlert}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        variant={alertDialog.variant}
+        duration={alertDialog.variant === 'success' ? 3000 : alertDialog.variant === 'error' ? 5000 : 4000}
       />
 
     </div>

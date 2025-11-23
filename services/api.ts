@@ -1,4 +1,21 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'https://bugrov-space.onrender.com/api').replace(/\/$/, '');
+// Автоматически определяем URL API: в режиме разработки используем localhost, иначе продакшн
+const getApiBaseUrl = (): string => {
+  // Если указана переменная окружения, используем её
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  }
+  
+  // Если мы на localhost (режим разработки), используем локальный бэкенд
+  if (typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:4000/api';
+  }
+  
+  // Иначе используем продакшн URL
+  return 'https://bugrov-space.onrender.com/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 const TOKEN_STORAGE_KEY = 'bugrov_space_token';
 
 let authToken: string | null =
@@ -53,15 +70,41 @@ const parseError = async (response: Response) => {
 async function request<T>(path: string, init: RequestInit = {}, retries = 1): Promise<T> {
   const maxRetries = 2; // Максимум 2 попытки (3 запроса всего)
   const retryDelay = 3000; // 3 секунды между попытками
+  const url = `${API_BASE_URL}${path}`;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
+      console.log(`[API] ${init.method || 'GET'} ${url} (attempt ${attempt + 1}/${retries + 1})`);
+      
+      const response = await fetch(url, {
         ...init,
         headers: getHeaders(init.headers as Record<string, string>),
       });
 
+      console.log(`[API] Response status: ${response.status} for ${url}`);
+
       if (!response.ok) {
+        // Специальная обработка для 429 (Too Many Requests)
+        if (response.status === 429) {
+          let message = 'Слишком много запросов. Пожалуйста, подождите несколько минут и попробуйте снова.';
+          try {
+            const data = await response.json();
+            // express-rate-limit может возвращать сообщение в разных форматах
+            if (typeof data === 'string') {
+              message = data;
+            } else if (data?.message) {
+              message = data.message;
+            } else if (data?.error) {
+              message = typeof data.error === 'string' ? data.error : data.error.message || message;
+            }
+          } catch {
+            // Если не удалось распарсить JSON, используем дефолтное сообщение
+          }
+          const error = new Error(message) as Error & { status?: number };
+          error.status = 429;
+          throw error;
+        }
+        
         const message = await parseError(response);
         const error = new Error(message || 'Request failed') as Error & { status?: number };
         error.status = response.status; // Добавляем HTTP статус к ошибке
@@ -74,8 +117,23 @@ async function request<T>(path: string, init: RequestInit = {}, retries = 1): Pr
 
       return (await response.json()) as T;
     } catch (error: any) {
-      // Если это ошибка сети и еще есть попытки
-      const isNetworkError = error?.message === 'Failed to fetch' || error?.name === 'TypeError' || error?.message?.includes('network');
+      // Определяем ошибки сети более точно
+      const isNetworkError = 
+        error?.message === 'Failed to fetch' || 
+        error?.name === 'TypeError' || 
+        error?.message?.includes('network') ||
+        error?.message?.includes('fetch') ||
+        (error?.code === 'ECONNREFUSED') ||
+        (error?.code === 'ENOTFOUND') ||
+        (error?.message?.includes('CORS'));
+      
+      console.error(`[API] Error for ${url}:`, {
+        message: error?.message,
+        name: error?.name,
+        isNetworkError,
+        attempt: attempt + 1,
+        maxAttempts: retries + 1,
+      });
       
       if (isNetworkError && attempt < retries) {
         // Ждем перед повтором (сервер Render может просыпаться)
@@ -86,7 +144,7 @@ async function request<T>(path: string, init: RequestInit = {}, retries = 1): Pr
 
       // Если это ошибка сети (Failed to fetch), добавляем более понятное сообщение
       if (isNetworkError) {
-        const networkError = new Error('Не удалось подключиться к серверу. Сервер может быть неактивен, попробуйте еще раз через несколько секунд.') as Error & { status?: number; originalError?: any };
+        const networkError = new Error('Ошибка соединения. Проверьте подключение к интернету и убедитесь, что бэкенд запущен.') as Error & { status?: number; originalError?: any };
         networkError.status = 0;
         networkError.originalError = error;
         throw networkError;

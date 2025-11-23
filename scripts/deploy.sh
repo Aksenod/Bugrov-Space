@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e  # Exit on any error
 
-echo "🔨 Building project..."
-npm run build
+echo "🔨 Building project for production..."
+# Устанавливаем продакшн URL API при сборке
+VITE_API_URL=https://bugrov-space.onrender.com/api npm run build
 
 echo "📦 Copying GitHub Pages files..."
 cp CNAME dist/CNAME

@@ -37,9 +37,15 @@ export function errorHandler(
   // Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
+      // Определяем, какое поле вызвало ошибку уникальности
+      const target = (err.meta as any)?.target;
+      let message = 'A record with this value already exists';
+      if (Array.isArray(target) && target.includes('username')) {
+        message = 'Username already taken';
+      }
       return res.status(409).json({
         error: 'Unique constraint violation',
-        message: 'A record with this value already exists',
+        message,
       });
     }
     if (err.code === 'P2025') {
@@ -86,4 +92,6 @@ export function asyncHandler(
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
+
+
 

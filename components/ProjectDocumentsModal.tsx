@@ -33,6 +33,8 @@ interface ProjectDocumentsModalProps {
   onFileUpload?: (files: FileList) => void;
   onRemoveAgentFile?: (fileId: string) => void;
   onAgentFilesUpdate?: (agentId: string, files: UploadedFile[]) => void;
+  onShowConfirm?: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'warning' | 'info') => void;
+  onShowAlert?: (message: string, title?: string, variant?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
 export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
@@ -47,7 +49,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onUpdateAgent,
   onFileUpload,
   onRemoveAgentFile,
-  onAgentFilesUpdate
+  onAgentFilesUpdate,
+  onShowConfirm,
+  onShowAlert
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka' | 'code' | 'preview'>('text');
@@ -188,13 +192,27 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const handleDelete = async (fileId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onRemoveFile) return;
-    if (!confirm('Удалить этот документ?')) return;
     
-    onRemoveFile(fileId);
-    
-    // Если удаляемый файл был выбран, сбросить выбор
-    if (selectedFileId === fileId) {
-      setSelectedFileId(null);
+    if (onShowConfirm) {
+      onShowConfirm(
+        'Удалить документ?',
+        'Этот документ будет удален.\n\nЭто действие нельзя отменить.',
+        () => {
+          onRemoveFile(fileId);
+          // Если удаляемый файл был выбран, сбросить выбор
+          if (selectedFileId === fileId) {
+            setSelectedFileId(null);
+          }
+        },
+        'danger'
+      );
+    } else {
+      // Fallback на старый confirm
+      if (!confirm('Удалить этот документ?')) return;
+      onRemoveFile(fileId);
+      if (selectedFileId === fileId) {
+        setSelectedFileId(null);
+      }
     }
   };
 
@@ -207,7 +225,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     });
 
     if (!targetAgent) {
-      alert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
+      if (onShowAlert) {
+        onShowAlert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`, 'Ошибка', 'error');
+      } else {
+        alert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
+      }
       return;
     }
 
@@ -258,7 +280,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       }, 100);
     } catch (error: any) {
       console.error('Failed to generate result:', error);
-      alert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
+      if (onShowAlert) {
+        onShowAlert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+      } else {
+        alert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
+      }
     } finally {
       setIsGeneratingDSL(false);
       setIsGeneratingVerstka(false);
@@ -322,7 +348,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         onClick={onClose}
       />
       
-      <div className="relative w-full max-w-6xl h-[85vh] bg-black/40 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+      <div className="relative w-full max-w-6xl h-[90vh] sm:h-[85vh] bg-gradient-to-br from-black/50 via-black/40 to-indigo-950/30 backdrop-blur-3xl border border-white/10 rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-amber-500/10 flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-300 m-2 sm:m-0">
         
         {/* Sidebar List */}
         <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-white/5 ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
@@ -340,10 +366,13 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
             {documents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center p-6 border-2 border-dashed border-white/5 rounded-3xl m-4">
-                <FileText size={40} className="mb-4 opacity-50" />
-                <p className="text-base font-medium">No documents yet.</p>
-                <p className="text-xs mt-2 max-w-[200px]">Use the "Save" button in chat to create reports.</p>
+              <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full animate-pulse"></div>
+                  <FileText size={40} className="relative opacity-60" />
+                </div>
+                <p className="text-base font-semibold text-white/70 mb-2">Нет документов</p>
+                <p className="text-xs text-white/50 max-w-[200px]">Используйте кнопку "Сохранить" в чате для создания отчетов.</p>
               </div>
             ) : (
               documents.map(doc => (
@@ -380,7 +409,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           {/* Mobile Header for Preview */}
           <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-black/40 backdrop-blur-md">
             <button onClick={() => setSelectedFileId(null)} className="text-white/60 hover:text-white">
-               ← Back
+               ← Назад
             </button>
             <span className="font-medium truncate text-white">
               {selectedFile ? getDocumentDisplayName(selectedFile) : ''}
@@ -560,8 +589,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                        (() => {
                          if (!selectedFile) {
                            return (
-                             <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
-                               <p className="text-base font-medium">Выберите документ для просмотра</p>
+                             <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center px-4">
+                               <div className="relative mb-4">
+                                 <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-pulse"></div>
+                                 <FileText size={40} className="relative opacity-50" />
+                               </div>
+                               <p className="text-base font-semibold text-white/60">Выберите документ для просмотра</p>
                              </div>
                            );
                          }
@@ -658,11 +691,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-white/20">
-               <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/5">
-                  <Eye size={48} className="opacity-50" />
+            <div className="flex-1 flex flex-col items-center justify-center text-white/30 px-4">
+               <div className="relative mb-6">
+                 <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
+                 <div className="relative w-24 h-24 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                    <Eye size={48} className="opacity-50" />
+                 </div>
                </div>
-               <p className="text-lg font-medium">Select a document to view</p>
+               <p className="text-lg font-semibold text-white/60 mb-2">Выберите документ</p>
+               <p className="text-sm text-white/40 text-center max-w-sm">Выберите документ из списка слева для просмотра</p>
             </div>
           )}
         </div>
@@ -726,7 +763,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           }
           
           if (errors.length > 0) {
-            alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
+            if (onShowAlert) {
+              onShowAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error');
+            } else {
+              alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
+            }
           }
           
           if (uploads.length > 0) {
@@ -737,9 +778,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 onAgentFilesUpdate(settingsAgentId, [...updatedAgent.files, ...uploads]);
               }
             }
-            alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
+            if (onShowAlert) {
+              onShowAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success');
+            } else {
+              alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
+            }
           } else if (errors.length === 0) {
-            alert('Не удалось загрузить файлы');
+            if (onShowAlert) {
+              onShowAlert('Не удалось загрузить файлы', 'Ошибка', 'error');
+            } else {
+              alert('Не удалось загрузить файлы');
+            }
           }
         };
         
