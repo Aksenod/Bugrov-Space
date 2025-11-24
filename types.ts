@@ -14,7 +14,6 @@ export interface Message {
 
 export enum LLMModel {
   GPT51 = 'gpt-5.1',
-  GPT5_MINI = 'gpt-5-mini',
   GPT4O_MINI = 'gpt-4o-mini',
   GPT4O = 'gpt-4o'
 }
@@ -31,8 +30,6 @@ export interface UploadedFile {
   type: string;
   data: string; // Base64 string
   agentId?: string;
-  dslContent?: string;
-  verstkaContent?: string;
 }
 
 export interface Agent {
@@ -51,6 +48,39 @@ export interface Agent {
 export interface User {
   id: string;
   username: string;
+  role?: string;
+}
+
+export interface ProjectType {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  projectTypeId: string;
+  projectType?: ProjectType;
+  agentCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProjectTypeAgent {
+  id: string;
+  projectTypeId: string;
+  name: string;
+  description: string;
+  systemInstruction: string;
+  summaryInstruction: string;
+  model: string;
+  role?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const MODELS: ModelConfig[] = [
@@ -60,8 +90,13 @@ export const MODELS: ModelConfig[] = [
     description: 'Максимальная точность и рассуждение (Deep Reasoning)'
   },
   {
-    id: LLMModel.GPT5_MINI,
-    name: 'GPT-5 mini',
-    description: 'Быстрая и эффективная модель GPT-5'
+    id: LLMModel.GPT4O_MINI,
+    name: 'GPT-4o mini',
+    description: 'Быстрый и эффективный (Fast & Efficient)'
+  },
+  {
+    id: LLMModel.GPT4O,
+    name: 'GPT-4o',
+    description: 'Сложное рассуждение (Reasoning & Logic)'
   }
 ];

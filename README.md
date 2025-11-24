@@ -7,7 +7,7 @@
 This repo now contains:
 
 - **frontend** (Vite + React) — `/`
-- **backend API** (Express + Prisma + SQLite) — `/backend`
+- **backend API** (Express + Prisma + PostgreSQL) — `/backend`
 
 Frontend talks to the backend API on Render for auth, chat history, files and GPT calls.
 
@@ -22,10 +22,16 @@ Frontend talks to the backend API on Render for auth, chat history, files and GP
 
 ```bash
 PORT=4000
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 OPENAI_API_KEY=your_openai_key
 JWT_SECRET=some_long_secret
+CORS_ORIGIN=https://bugrov.space,http://localhost:3000
 ```
+
+**Важно для PostgreSQL:**
+- Для локальной разработки используйте **External Database URL** (с полным доменом)
+- Для продакшена на Render используйте **Internal Database URL** (без домена, только хост)
+- Оба URL должны содержать `?sslmode=require` для SSL подключения к Render.com
 
 Use `cp backend/env.example backend/.env` as a starting point and fill in your values.
 
@@ -50,12 +56,31 @@ cd backend && npm install
 
 ## Database
 
-The backend ships with Prisma + SQLite. Generate the client and run migrations:
+The backend uses Prisma + PostgreSQL. Generate the client and run migrations:
 
 ```bash
 cd backend
+# Установить зависимости (если еще не установлены)
+npm install
+
+# Сгенерировать Prisma Client
+npx prisma generate
+
+# Применить миграции
 npx prisma migrate deploy
 ```
+
+**Требования:**
+- PostgreSQL 12+ (тестировано на PostgreSQL 18.1)
+- SSL подключение требуется для Render.com (`?sslmode=require`)
+
+**Структура базы данных:**
+- User - пользователи
+- ProjectType - типы проектов
+- Project - проекты
+- Agent - агенты
+- Message - сообщения
+- File - файлы
 
 ## Deploy
 
@@ -64,6 +89,13 @@ npx prisma migrate deploy
 Backend автоматически деплоится на Render при пуше в репозиторий.
 
 Сервис: `https://bugrov-space.onrender.com`
+
+**Важно:** После миграции на PostgreSQL необходимо настроить переменную окружения `DATABASE_URL` на Render:
+1. Откройте настройки сервиса на Render.com
+2. Перейдите в раздел **Environment**
+3. Добавьте переменную `DATABASE_URL` со значением Internal Database URL (см. `RENDER_SETUP.md`)
+
+Подробные инструкции: см. файл `RENDER_SETUP.md`
 
 ### Frontend (GitHub Pages)
 

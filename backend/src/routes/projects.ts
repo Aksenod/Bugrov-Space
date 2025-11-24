@@ -4,6 +4,7 @@ import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import { AuthenticatedRequest } from '../types/express';
 import { asyncHandler } from '../middleware/errorHandler';
+import { withRetry } from '../utils/prismaRetry';
 
 const router = Router();
 
@@ -23,21 +24,25 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
   const userId = authReq.userId!;
 
-  const projects = await prisma.project.findMany({
-    where: { userId },
-    include: {
-      _count: {
-        select: { agents: true },
-      },
-      projectType: {
-        select: {
-          id: true,
-          name: true,
+  const projects = await withRetry(
+    () => prisma.project.findMany({
+      where: { userId },
+      include: {
+        _count: {
+          select: { agents: true },
+        },
+        projectType: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+      orderBy: { createdAt: 'desc' },
+    }),
+    3,
+    'GET /projects'
+  );
 
   const projectsWithCount = projects.map(project => ({
     id: project.id,
@@ -60,20 +65,24 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const userId = authReq.userId!;
   const { id } = req.params;
 
-  const project = await prisma.project.findFirst({
-    where: { id, userId },
-    include: {
-      _count: {
-        select: { agents: true },
-      },
-      projectType: {
-        select: {
-          id: true,
-          name: true,
+  const project = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id, userId },
+      include: {
+        _count: {
+          select: { agents: true },
+        },
+        projectType: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
+    }),
+    3,
+    `GET /projects/${id}`
+  );
 
   if (!project) {
     return res.status(404).json({ error: 'Проект не найден' });
@@ -112,33 +121,41 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { name, description, projectTypeId } = parsed.data;
 
   // Проверяем, что тип проекта существует
-  const projectType = await prisma.projectType.findUnique({
-    where: { id: projectTypeId },
-  });
+  const projectType = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { id: projectTypeId },
+    }),
+    3,
+    'POST /projects - find projectType'
+  );
 
   if (!projectType) {
     return res.status(404).json({ error: 'Тип проекта не найден' });
   }
 
-  const project = await prisma.project.create({
-    data: {
-      name,
-      description: description || null,
-      userId,
-      projectTypeId,
-    },
-    include: {
-      _count: {
-        select: { agents: true },
+  const project = await withRetry(
+    () => prisma.project.create({
+      data: {
+        name,
+        description: description || null,
+        userId,
+        projectTypeId,
       },
-      projectType: {
-        select: {
-          id: true,
-          name: true,
+      include: {
+        _count: {
+          select: { agents: true },
+        },
+        projectType: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
+    }),
+    3,
+    'POST /projects - create project'
+  );
 
   logger.info({ userId, projectId: project.id, name, projectTypeId }, 'Project created');
   res.status(201).json({
@@ -173,9 +190,13 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Проверяем, что проект принадлежит пользователю
-  const existing = await prisma.project.findFirst({
-    where: { id, userId },
-  });
+  const existing = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id, userId },
+    }),
+    3,
+    `PUT /projects/${id} - find existing`
+  );
 
   if (!existing) {
     return res.status(404).json({ error: 'Проект не найден' });
@@ -189,21 +210,25 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     updateData.description = parsed.data.description || null;
   }
 
-  const updated = await prisma.project.update({
-    where: { id },
-    data: updateData,
-    include: {
-      _count: {
-        select: { agents: true },
-      },
-      projectType: {
-        select: {
-          id: true,
-          name: true,
+  const updated = await withRetry(
+    () => prisma.project.update({
+      where: { id },
+      data: updateData,
+      include: {
+        _count: {
+          select: { agents: true },
+        },
+        projectType: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
+    }),
+    3,
+    `PUT /projects/${id} - update`
+  );
 
   logger.info({ userId, projectId: id, updates: updateData }, 'Project updated');
   res.json({
@@ -227,14 +252,18 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Проверяем, что проект принадлежит пользователю
-  const existing = await prisma.project.findFirst({
-    where: { id, userId },
-    include: {
-      _count: {
-        select: { agents: true },
+  const existing = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id, userId },
+      include: {
+        _count: {
+          select: { agents: true },
+        },
       },
-    },
-  });
+    }),
+    3,
+    `DELETE /projects/${id} - find existing`
+  );
 
   if (!existing) {
     return res.status(404).json({ error: 'Проект не найден' });
@@ -243,9 +272,13 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   try {
     // Проект можно удалить - каскадное удаление агентов происходит автоматически
     // благодаря onDelete: Cascade в схеме для Agent -> Project
-    await prisma.project.delete({
-      where: { id },
-    });
+    await withRetry(
+      () => prisma.project.delete({
+        where: { id },
+      }),
+      3,
+      `DELETE /projects/${id} - delete`
+    );
 
     logger.info({ userId, projectId: id, agentCount: existing._count.agents }, 'Project deleted (with cascade delete of agents)');
     res.status(204).send();

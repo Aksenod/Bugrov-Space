@@ -15,14 +15,20 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Agent, User } from '../types';
-import { Bot, FileText, PenTool, Hash, Briefcase, Plus, FolderOpen, Save, CheckCircle, Loader2, LogOut, User as UserIcon, Trash2 } from 'lucide-react';
+import { Agent, User, Project } from '../types';
+import { Bot, FileText, PenTool, Hash, Briefcase, Plus, FolderOpen, Save, CheckCircle, Loader2, LogOut, User as UserIcon, Trash2, Settings } from 'lucide-react';
+import { ProjectSelector } from './ProjectSelector';
 
 interface AgentSidebarProps {
-  projectName: string;
+  projects: Project[];
+  activeProject: Project | null;
   agents: Agent[];
+  projectTypeAgents: Agent[];
   activeAgentId: string;
   onSelectAgent: (id: string) => void;
+  onSelectProject: (projectId: string) => void;
+  onCreateProject: () => void;
+  onEditProject: (project: Project) => void;
   onAddAgent: () => void;
   onDeleteAgent: (id: string) => void;
   onReorderAgents: (agentIds: string[]) => void;
@@ -34,14 +40,20 @@ interface AgentSidebarProps {
   summarySuccess: boolean;
   currentUser: User | null;
   onLogout: () => void;
+  onOpenAdmin?: () => void;
   documentsCount?: number;
 }
 
 export const AgentSidebar: React.FC<AgentSidebarProps> = ({
-  projectName,
+  projects,
+  activeProject,
   agents,
+  projectTypeAgents,
   activeAgentId,
   onSelectAgent,
+  onSelectProject,
+  onCreateProject,
+  onEditProject,
   onAddAgent,
   onDeleteAgent,
   onReorderAgents,
@@ -53,8 +65,12 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   summarySuccess,
   currentUser,
   onLogout,
+  onOpenAdmin,
   documentsCount = 0
 }) => {
+  
+  // Проверка, является ли пользователь администратором
+  const isAdmin = currentUser && (currentUser.username === 'admin' || currentUser.role === 'admin');
   
   const getIcon = (name: string) => {
     const lower = name.toLowerCase();
@@ -71,9 +87,13 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
+    // Обычные пользователи не могут перемещать агентов
+    if (!isAdmin) return;
+    
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
+    // Перемещение только для обычных агентов проекта (не для агентов типа проекта)
     const oldIndex = agents.findIndex((agent) => agent.id === active.id);
     const newIndex = agents.findIndex((agent) => agent.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
@@ -94,61 +114,127 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside 
-        className={`fixed inset-y-2 left-2 z-40 w-[280px] sm:w-64 bg-gradient-to-b from-black/70 via-black/60 to-black/70 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl shadow-indigo-500/5 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:relative md:translate-x-0 md:inset-y-auto md:h-auto md:m-2 md:mr-0 flex flex-col will-change-transform ${
+        className={`fixed inset-y-2 left-2 z-40 w-64 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl transform transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:relative md:translate-x-0 md:inset-y-auto md:h-auto md:m-2 md:mr-0 flex flex-col ${
           isOpen ? 'translate-x-0' : '-translate-x-[120%]'
         }`}
       >
         {/* Project Header */}
         <div className="p-4 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg shadow-[0_0_10px_rgba(99,102,241,0.3)]">
-               <Briefcase size={16} className="text-white" />
-            </div>
-            <div className="overflow-hidden">
-               <div className="text-[9px] font-bold text-indigo-300/90 uppercase tracking-widest mb-0.5">Project</div>
-               <h1 className="font-bold text-white tracking-tight truncate text-xs leading-tight">{projectName}</h1>
-            </div>
-          </div>
+          <ProjectSelector
+            projects={projects}
+            activeProject={activeProject}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
+            onEditProject={onEditProject}
+          />
         </div>
 
         {/* Agent List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
+          {/* Агенты типа проекта */}
+          {projectTypeAgents.length > 0 && (
+            <>
+              <div className="px-2 py-2 mb-0.5">
+                <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">
+                  Агенты типа проекта
+                </span>
+              </div>
+              {projectTypeAgents.map((agent) => (
+                <div
+                  key={agent.id}
+                  onClick={() => {
+                    onSelectAgent(agent.id);
+                    onCloseMobile();
+                  }}
+                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
+                    agent.id === activeAgentId
+                      ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
+                      : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-lg ${
+                    agent.id === activeAgentId
+                      ? 'bg-indigo-500/30'
+                      : 'bg-white/5 group-hover:bg-indigo-500/20'
+                  } transition-colors`}>
+                    {getIcon(agent.name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-xs truncate">{agent.name}</div>
+                  </div>
+                </div>
+              ))}
+              <div className="h-2" /> {/* Разделитель */}
+            </>
+          )}
+          
+          {/* Обычные агенты проекта */}
           <div className="px-2 py-2 mb-0.5">
             <span className="text-[9px] font-bold text-white/60 uppercase tracking-widest">
               Agents
             </span>
           </div>
           
-          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-            <SortableContext items={agents.map(agent => agent.id)} strategy={verticalListSortingStrategy}>
-              {agents.map((agent, index) => (
-                <SortableAgentItem
-                  key={agent.id}
-                  agent={agent}
-                  index={index + 1}
-                  isActive={agent.id === activeAgentId}
-                  canDelete={agents.length > 1 && (!agent.role || agent.role.trim() === '')}
-                  onSelectAgent={() => {
-                      onSelectAgent(agent.id);
-                      onCloseMobile();
-                    }}
-                  onDeleteAgent={() => onDeleteAgent(agent.id)}
-                  getIcon={getIcon}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+          {isAdmin ? (
+            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+              <SortableContext items={agents.map(agent => agent.id)} strategy={verticalListSortingStrategy}>
+                {agents.map((agent) => (
+                  <SortableAgentItem
+                    key={agent.id}
+                    agent={agent}
+                    isActive={agent.id === activeAgentId}
+                    canDelete={agents.length > 1 && (!agent.role || agent.role.trim() === '')}
+                    onSelectAgent={() => {
+                        onSelectAgent(agent.id);
+                        onCloseMobile();
+                      }}
+                    onDeleteAgent={() => onDeleteAgent(agent.id)}
+                    getIcon={getIcon}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            // Для обычных пользователей - без drag-and-drop
+            agents.map((agent) => (
+              <div
+                key={agent.id}
+                onClick={() => {
+                  onSelectAgent(agent.id);
+                  onCloseMobile();
+                }}
+                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
+                  agent.id === activeAgentId
+                    ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
+                    : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg ${
+                  agent.id === activeAgentId
+                    ? 'bg-indigo-500/30'
+                    : 'bg-white/5 group-hover:bg-indigo-500/20'
+                } transition-colors`}>
+                  {getIcon(agent.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-xs truncate">{agent.name}</div>
+                </div>
+              </div>
+            ))
+          )}
 
-          {/* Add Agent Button */}
-          <button
-            onClick={onAddAgent}
-            className="w-full flex items-center gap-3 p-3 mt-3 rounded-xl border border-white/10 border-dashed hover:border-indigo-400/50 hover:bg-indigo-500/10 text-white/50 hover:text-indigo-300 transition-all group focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black min-h-[44px]"
-          >
-            <div className="p-1.5 rounded-lg bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
-               <Plus size={16} />
-            </div>
-            <span className="font-semibold text-xs">Добавить агента</span>
-          </button>
+          {/* Add Agent Button - только для администраторов */}
+          {isAdmin && (
+            <button
+              onClick={onAddAgent}
+              className="w-full flex items-center gap-3 p-2.5 mt-3 rounded-xl border border-white/10 border-dashed hover:border-indigo-400/50 hover:bg-indigo-500/10 text-white/40 hover:text-indigo-300 transition-all group"
+            >
+              <div className="p-1.5 rounded-lg bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
+                 <Plus size={16} />
+              </div>
+              <span className="font-medium text-xs">Add Agent</span>
+            </button>
+          )}
         </div>
 
         {/* Project Space & User Section */}
@@ -161,7 +247,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                     onOpenDocs();
                     onCloseMobile();
                  }}
-                 className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 hover:border-white/20 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500/70 focus:ring-offset-2 focus:ring-offset-black min-h-[44px]"
+                 className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5 transition-all group-hover:border-white/10"
                >
                  <div className="relative p-1.5 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
                     <FolderOpen size={16} />
@@ -171,7 +257,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                       </span>
                     )}
                  </div>
-                 <span className="font-semibold text-xs">Documents</span>
+                 <span className="font-medium text-xs">Documents</span>
                </button>
                
                {/* Embedded Save Button */}
@@ -213,17 +299,32 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                        {currentUser.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-col flex">
-                       <span className="text-xs font-semibold text-white/90 truncate">{currentUser.username}</span>
+                       <span className="text-xs font-bold text-white truncate">{currentUser.username}</span>
                     </div>
                   </div>
                   
-                  <button 
-                    onClick={onLogout}
-                    className="p-2.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all focus:outline-none focus:ring-2 focus:ring-red-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    title="Выйти"
-                  >
-                    <LogOut size={16} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {onOpenAdmin && isAdmin && (
+                      <button 
+                        onClick={() => {
+                          onOpenAdmin();
+                          onCloseMobile();
+                        }}
+                        className="p-2 rounded-lg text-white/30 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                        title="Администратор"
+                      >
+                        <Settings size={16} />
+                      </button>
+                    )}
+                    
+                    <button 
+                      onClick={onLogout}
+                      className="p-2 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                      title="Выйти"
+                    >
+                      <LogOut size={16} />
+                    </button>
+                  </div>
                 </div>
              )}
         </div>
@@ -235,7 +336,6 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
 interface SortableAgentItemProps {
   agent: Agent;
-  index: number;
   isActive: boolean;
   canDelete: boolean;
   onSelectAgent: () => void;
@@ -245,7 +345,6 @@ interface SortableAgentItemProps {
 
 const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
   agent,
-  index,
   isActive,
   canDelete,
   onSelectAgent,
@@ -257,7 +356,6 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
     transform: CSS.Transform.toString(transform),
     transition,
     cursor: 'grab',
-    willChange: 'transform',
   } as React.CSSProperties;
 
   return (
@@ -270,26 +368,22 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
         {...attributes}
         {...listeners}
         onClick={onSelectAgent}
-        className={`w-full flex items-center gap-3 p-2.5 pr-10 rounded-xl transition-all duration-300 ease-out group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black ${
+        className={`w-full flex items-center gap-3 p-2.5 pr-10 rounded-xl transition-all duration-300 group relative overflow-hidden ${
           isActive
-            ? 'bg-white/10 text-white shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/20 shadow-indigo-500/10'
-            : 'hover:bg-white/5 text-white/70 hover:text-white border border-white/5 hover:border-white/10 hover:scale-[1.02] active:scale-[0.98]'
+            ? 'bg-white/10 text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)] border border-white/10'
+            : 'hover:bg-white/5 text-white/50 hover:text-white border border-transparent'
         } ${isDragging ? 'opacity-80' : ''}`}
       >
         {isActive && (
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/15 to-transparent opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-50" />
         )}
 
-        <div className={`flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-colors ${
-          isActive 
-            ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/40' 
-            : 'bg-white/5 text-white/50 border border-white/10'
-        }`}>
-          {index}
+        <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'bg-white/10 text-white shadow-inner' : 'bg-transparent'}`}>
+          {getIcon(agent.name)}
         </div>
 
         <div className="flex-1 min-w-0 relative z-10 text-left">
-          <h3 className={`font-semibold text-xs truncate ${isActive ? 'text-white' : 'text-white/70'}`}>
+          <h3 className="font-medium text-xs truncate">
             {agent.name}
           </h3>
         </div>
@@ -308,7 +402,7 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
               ? 'text-white/30 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100'
               : 'text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100'
           }`}
-          title="Удалить агента"
+          title="Delete Agent"
         >
           <Trash2 size={14} />
         </button>

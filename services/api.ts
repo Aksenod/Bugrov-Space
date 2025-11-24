@@ -1,21 +1,4 @@
-// Автоматически определяем URL API: в режиме разработки используем localhost, иначе продакшн
-const getApiBaseUrl = (): string => {
-  // Если указана переменная окружения, используем её
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
-  }
-  
-  // Если мы на localhost (режим разработки), используем локальный бэкенд
-  if (typeof window !== 'undefined' && 
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:4000/api';
-  }
-  
-  // Иначе используем продакшн URL
-  return 'https://bugrov-space.onrender.com/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'https://bugrov-space.onrender.com/api').replace(/\/$/, '');
 const TOKEN_STORAGE_KEY = 'bugrov_space_token';
 
 let authToken: string | null =
@@ -35,131 +18,90 @@ const getHeaders = (custom: Record<string, string> = {}) => {
 const parseError = async (response: Response) => {
   try {
     const data = await response.json();
-    // Если error - это объект, извлекаем строку из него
-    if (data?.error) {
-      if (typeof data.error === 'string') {
-        return data.error;
-      }
-      if (typeof data.error === 'object') {
-        // Если это объект с полями, пытаемся извлечь сообщение
-        if (data.error.message) {
-          return data.error.message;
-        }
-        if (data.error._errors && Array.isArray(data.error._errors)) {
-          return data.error._errors.join(', ');
-        }
-        // Если это объект валидации Zod
-        if (data.error.issues && Array.isArray(data.error.issues)) {
-          return data.error.issues.map((err: any) => {
-            if (err.path && err.path.length > 0) {
-              return `${err.path.join('.')}: ${err.message}`;
-            }
-            return err.message;
-          }).join(', ');
-        }
-        // В крайнем случае - JSON строка
-        return JSON.stringify(data.error);
-      }
+    
+    // Сначала проверяем поле message на верхнем уровне (приоритет)
+    if (data?.message && typeof data.message === 'string') {
+      return data.message;
     }
+    
+    const error = data?.error;
+    
+    // Если error - это строка, возвращаем её
+    if (typeof error === 'string') {
+      return error;
+    }
+    
+    // Если error - это объект (например, от zod.flatten())
+    if (error && typeof error === 'object') {
+      const errorMessages: string[] = [];
+      
+      // Обработка fieldErrors: { field: ['error1', 'error2'] }
+      if (error.fieldErrors && typeof error.fieldErrors === 'object') {
+        Object.entries(error.fieldErrors).forEach(([field, errors]) => {
+          if (Array.isArray(errors)) {
+            errors.forEach((err) => {
+              if (typeof err === 'string') {
+                errorMessages.push(`${field}: ${err}`);
+              }
+            });
+          } else if (typeof errors === 'string') {
+            errorMessages.push(`${field}: ${errors}`);
+          }
+        });
+      }
+      
+      // Обработка formErrors: ['error1', 'error2']
+      if (error.formErrors && Array.isArray(error.formErrors)) {
+        error.formErrors.forEach((err) => {
+          if (typeof err === 'string') {
+            errorMessages.push(err);
+          }
+        });
+      }
+      
+      // Если есть другие поля в объекте ошибки
+      if (errorMessages.length === 0) {
+        // Пытаемся найти сообщение в других полях
+        if (error.message && typeof error.message === 'string') {
+          return error.message;
+        }
+        // Если ничего не найдено, возвращаем JSON строку
+        return JSON.stringify(error);
+      }
+      
+      return errorMessages.join('. ') || 'Validation error';
+    }
+    
     return response.statusText || 'Request failed';
   } catch {
     return response.statusText || 'Request failed';
   }
 };
 
-async function request<T>(path: string, init: RequestInit = {}, retries = 1): Promise<T> {
-  const maxRetries = 2; // Максимум 2 попытки (3 запроса всего)
-  const retryDelay = 3000; // 3 секунды между попытками
-  const url = `${API_BASE_URL}${path}`;
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: getHeaders(init.headers as Record<string, string>),
+  });
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      console.log(`[API] ${init.method || 'GET'} ${url} (attempt ${attempt + 1}/${retries + 1})`);
-      
-      const response = await fetch(url, {
-        ...init,
-        headers: getHeaders(init.headers as Record<string, string>),
-      });
-
-      console.log(`[API] Response status: ${response.status} for ${url}`);
-
-      if (!response.ok) {
-        // Специальная обработка для 429 (Too Many Requests)
-        if (response.status === 429) {
-          let message = 'Слишком много запросов. Пожалуйста, подождите несколько минут и попробуйте снова.';
-          try {
-            const data = await response.json();
-            // express-rate-limit может возвращать сообщение в разных форматах
-            if (typeof data === 'string') {
-              message = data;
-            } else if (data?.message) {
-              message = data.message;
-            } else if (data?.error) {
-              message = typeof data.error === 'string' ? data.error : data.error.message || message;
-            }
-          } catch {
-            // Если не удалось распарсить JSON, используем дефолтное сообщение
-          }
-          const error = new Error(message) as Error & { status?: number };
-          error.status = 429;
-          throw error;
-        }
-        
-        const message = await parseError(response);
-        const error = new Error(message || 'Request failed') as Error & { status?: number };
-        error.status = response.status; // Добавляем HTTP статус к ошибке
-        throw error;
-      }
-
-      if (response.status === 204) {
-        return undefined as T;
-      }
-
-      return (await response.json()) as T;
-    } catch (error: any) {
-      // Определяем ошибки сети более точно
-      const isNetworkError = 
-        error?.message === 'Failed to fetch' || 
-        error?.name === 'TypeError' || 
-        error?.message?.includes('network') ||
-        error?.message?.includes('fetch') ||
-        (error?.code === 'ECONNREFUSED') ||
-        (error?.code === 'ENOTFOUND') ||
-        (error?.message?.includes('CORS'));
-      
-      console.error(`[API] Error for ${url}:`, {
-        message: error?.message,
-        name: error?.name,
-        isNetworkError,
-        attempt: attempt + 1,
-        maxAttempts: retries + 1,
-      });
-      
-      if (isNetworkError && attempt < retries) {
-        // Ждем перед повтором (сервер Render может просыпаться)
-        console.log(`[API] Network error, retrying in ${retryDelay}ms... (attempt ${attempt + 1}/${retries + 1})`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        continue;
-      }
-
-      // Если это ошибка сети (Failed to fetch), добавляем более понятное сообщение
-      if (isNetworkError) {
-        const networkError = new Error('Ошибка соединения. Проверьте подключение к интернету и убедитесь, что бэкенд запущен.') as Error & { status?: number; originalError?: any };
-        networkError.status = 0;
-        networkError.originalError = error;
-        throw networkError;
-      }
-      
-      throw error;
-    }
+  if (!response.ok) {
+    const message = await parseError(response);
+    const error = new Error(message || 'Request failed') as Error & { status?: number };
+    error.status = response.status; // Добавляем HTTP статус к ошибке
+    throw error;
   }
 
-  throw new Error('Request failed after retries');
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
 }
 
 export interface ApiUser {
   id: string;
   username: string;
+  role?: string; // 'admin' | 'user'
 }
 
 export interface ApiFile {
@@ -167,10 +109,9 @@ export interface ApiFile {
   name: string;
   mimeType: string;
   content: string;
-  agentId: string;
+  agentId?: string;
+  projectId?: string;
   isKnowledgeBase?: boolean;
-  dslContent?: string;
-  verstkaContent?: string;
   createdAt: string;
 }
 
@@ -183,7 +124,43 @@ export interface ApiAgent {
   model: string;
   role?: string;
   order?: number;
+  isTemplate?: boolean;
+  projectTypeId?: string;
   files: ApiFile[];
+}
+
+export interface ApiProjectType {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApiProjectTypeAgent {
+  id: string;
+  projectTypeId: string;
+  name: string;
+  description: string;
+  systemInstruction: string;
+  summaryInstruction: string;
+  model: string;
+  role?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApiProject {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  projectTypeId: string;
+  projectType?: ApiProjectType;
+  agentCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApiMessage {
@@ -233,8 +210,11 @@ export const api = {
     return request<{ user: ApiUser }>('/auth/me');
   },
 
-  async getAgents() {
-    return request<{ agents: ApiAgent[] }>('/agents');
+  async getAgents(projectId: string) {
+    if (!projectId || projectId.trim() === '') {
+      throw new Error('projectId обязателен');
+    }
+    return request<{ agents: ApiAgent[]; projectTypeAgents?: ApiProjectTypeAgent[] }>(`/agents?projectId=${encodeURIComponent(projectId)}`);
   },
 
   async createAgent(payload: {
@@ -244,6 +224,7 @@ export const api = {
     summaryInstruction?: string;
     model?: string;
     role?: string;
+    projectId: string;
   }) {
     return request<{ agent: ApiAgent }>('/agents', {
       method: 'POST',
@@ -277,10 +258,10 @@ export const api = {
     return request<void>(`/agents/${agentId}/messages`, { method: 'DELETE' });
   },
 
-  async sendMessage(agentId: string, text: string) {
+  async sendMessage(agentId: string, text: string, projectId?: string) {
     return request<{ messages: ApiMessage[] }>(`/agents/${agentId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, projectId }),
     });
   },
 
@@ -291,8 +272,9 @@ export const api = {
     });
   },
 
-  async deleteProjectFile(fileId: string) {
-    return request<void>(`/agents/files/${fileId}`, { method: 'DELETE' });
+
+  async getAgentFiles(agentId: string) {
+    return request<{ files: ApiFile[] }>(`/agents/${agentId}/files`);
   },
 
   async deleteFile(agentId: string, fileId: string) {
@@ -303,14 +285,121 @@ export const api = {
     return request<{ file: ApiFile }>(`/agents/${agentId}/summary`, { method: 'POST' });
   },
 
-  async getSummaryFiles(agentId: string) {
-    return request<{ files: ApiFile[] }>(`/agents/${agentId}/files/summary`);
+  async getSummaryFiles(agentId: string, projectId?: string) {
+    const query = projectId ? `?projectId=${projectId}` : '';
+    return request<{ files: ApiFile[] }>(`/agents/${agentId}/files/summary${query}`);
   },
 
-  async generateDocumentResult(agentId: string, fileId: string, role: 'dsl' | 'verstka') {
-    return request<{ file: ApiFile }>(`/agents/${agentId}/files/${fileId}/generate-result`, {
+  // Projects API
+  async getProjects() {
+    return request<{ projects: ApiProject[] }>('/projects');
+  },
+
+  async getProject(projectId: string) {
+    return request<{ project: ApiProject }>(`/projects/${projectId}`);
+  },
+
+  async createProject(payload: {
+    name: string;
+    description?: string;
+    projectTypeName?: string; // Для админа
+    projectTypeId?: string; // Для пользователя
+  }) {
+    return request<{ project: ApiProject }>('/projects', {
       method: 'POST',
-      body: JSON.stringify({ role }),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateProject(projectId: string, payload: { name?: string; description?: string }) {
+    return request<{ project: ApiProject }>(`/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteProject(projectId: string) {
+    return request<void>(`/projects/${projectId}`, { method: 'DELETE' });
+  },
+
+  async getProjectFiles(projectId: string) {
+    return request<{ files: ApiFile[] }>(`/projects/${projectId}/files`);
+  },
+
+  async uploadProjectFile(projectId: string, payload: { name: string; mimeType: string; content: string }) {
+    return request<{ file: ApiFile }>(`/projects/${projectId}/files`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteProjectFile(projectId: string, fileId: string) {
+    return request<void>(`/projects/${projectId}/files/${fileId}`, { method: 'DELETE' });
+  },
+
+  // Project Types API
+  async getProjectTypes() {
+    return request<{ projectTypes: ApiProjectType[] }>('/project-types');
+  },
+
+  async createProjectType(name: string) {
+    return request<{ projectType: ApiProjectType }>('/project-types', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  async updateProjectType(id: string, name: string) {
+    return request<{ projectType: ApiProjectType }>(`/project-types/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  async deleteProjectType(id: string) {
+    return request<void>(`/project-types/${id}`, { method: 'DELETE' });
+  },
+
+  async getProjectTypeAgents(projectTypeId: string) {
+    return request<{ agents: ApiProjectTypeAgent[] }>(`/project-types/${projectTypeId}/agents`);
+  },
+
+  async createProjectTypeAgent(projectTypeId: string, payload: {
+    name: string;
+    description?: string;
+    systemInstruction?: string;
+    summaryInstruction?: string;
+    model?: string;
+    role?: string;
+  }) {
+    return request<{ agent: ApiProjectTypeAgent }>(`/project-types/${projectTypeId}/agents`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateProjectTypeAgent(projectTypeId: string, agentId: string, payload: {
+    name?: string;
+    description?: string;
+    systemInstruction?: string;
+    summaryInstruction?: string;
+    model?: string;
+    role?: string;
+  }) {
+    return request<{ agent: ApiProjectTypeAgent }>(`/project-types/${projectTypeId}/agents/${agentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteProjectTypeAgent(projectTypeId: string, agentId: string) {
+    return request<void>(`/project-types/${projectTypeId}/agents/${agentId}`, { method: 'DELETE' });
+  },
+
+  async reorderProjectTypeAgents(projectTypeId: string, orders: { id: string; order: number }[]) {
+    return request<{ success: boolean }>(`/project-types/${projectTypeId}/agents/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ orders }),
     });
   },
 };

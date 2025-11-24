@@ -156,7 +156,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
             <Sparkles className="text-white w-8 h-8" />
           </div>
           <h1 className="text-4xl font-bold text-white tracking-tight mb-2">Bugrov Space</h1>
-          <p className="text-white/50 text-sm font-medium uppercase tracking-widest">Next Gen AI Workspace</p>
+          <p className="text-white/50 text-sm font-medium uppercase tracking-widest">AI teams for designers</p>
         </div>
 
         {/* Card */}

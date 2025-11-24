@@ -54,11 +54,44 @@ export function errorHandler(
         message: 'The requested record does not exist',
       });
     }
+    // Обработка других известных кодов ошибок Prisma
+    if (err.code === 'P1001' || err.code === 'P1002' || err.code === 'P1017') {
+      // Ошибки подключения к БД
+      // P1001: Can't reach database server
+      // P1002: The database server at {host}:{port} was reached but timed out
+      // P1017: Server has closed the connection
+      console.error('[Prisma Connection Error]', {
+        code: err.code,
+        message: err.message,
+      });
+      return res.status(503).json({
+        error: 'Database connection error',
+        message: env.nodeEnv === 'development' 
+          ? `Database connection error (${err.code}): ${err.message}` 
+          : 'Database is temporarily unavailable. Please try again later.',
+      });
+    }
+    if (err.code === 'P2003') {
+      // Foreign key constraint failed
+      console.error('[Prisma Foreign Key Error]', err);
+      return res.status(400).json({
+        error: 'Database constraint error',
+        message: env.nodeEnv === 'development' 
+          ? `Foreign key constraint failed: ${err.message}` 
+          : 'Invalid data provided',
+      });
+    }
     // Log unexpected Prisma errors
-    console.error('[Prisma Error]', err);
+    console.error('[Prisma Error]', {
+      code: err.code,
+      message: err.message,
+      meta: err.meta,
+    });
     return res.status(500).json({
       error: 'Database error',
-      message: env.nodeEnv === 'development' ? err.message : 'An internal error occurred',
+      message: env.nodeEnv === 'development' 
+        ? `Database error (${err.code}): ${err.message}` 
+        : 'A database error occurred. Please try again later.',
     });
   }
 

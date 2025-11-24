@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { X, Upload, FileText, Trash2, Save, Info, Edit3, FileCheck, Cpu, Zap, Brain, PenTool, Code2, Layout } from 'lucide-react';
-import { Agent, MODELS, LLMModel } from '../types';
+import { X, Upload, FileText, Trash2, Save, Info, Edit3, FileCheck, Cpu, Zap, Brain, Plus, Settings as SettingsIcon, PenTool, Code2, Layout } from 'lucide-react';
+import { Agent, MODELS, LLMModel, User } from '../types';
+import { api, ApiProjectType, ApiProjectTypeAgent } from '../services/api';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface SettingsPanelProps {
   onFileUpload: (files: FileList) => void;
   onRemoveFile: (id: string) => void;
   onApplyChanges: () => void;
+  currentUser: User | null;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -19,9 +21,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onUpdateAgent,
   onFileUpload,
   onRemoveFile,
-  onApplyChanges
+  onApplyChanges,
+  currentUser
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Проверка, является ли пользователь администратором
+  const isAdmin = currentUser && (currentUser.username === 'admin' || currentUser.role === 'admin');
+  
+  // Состояние для табов
+  const [activeTab, setActiveTab] = useState<'agent' | 'projectTypes'>('agent');
+  
+  // Состояние для управления агентами типов проектов
+  const [projectTypes, setProjectTypes] = useState<ApiProjectType[]>([]);
+  const [selectedProjectTypeId, setSelectedProjectTypeId] = useState<string | null>(null);
+  const [projectTypeAgents, setProjectTypeAgents] = useState<ApiProjectTypeAgent[]>([]);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(false);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   
   // Local state for editing
   const [name, setName] = useState(activeAgent.name);
@@ -29,20 +46,111 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [summaryInst, setSummaryInst] = useState(activeAgent.summaryInstruction || "");
   const [role, setRole] = useState(activeAgent.role || "");
   
-  // Get current role value for select (supports old format with comma-separated)
-  const getCurrentRole = (): string => {
-    if (!role) return '';
-    const roles = role.split(',').map(r => r.trim());
-    // Return first valid role from copywriter, dsl, verstka
-    if (roles.includes('copywriter')) return 'copywriter';
-    if (roles.includes('dsl')) return 'dsl';
-    if (roles.includes('verstka')) return 'verstka';
-    return '';
+  // Ленивая загрузка файлов агента (база знаний) при открытии панели
+  // Это оптимизация - файлы не загружаются при загрузке списка агентов
+  useEffect(() => {
+    if (isOpen && activeAgent.id && activeAgent.files.length === 0) {
+      // Загружаем файлы только если их еще нет
+      api.getAgentFiles(activeAgent.id)
+        .then(({ files }) => {
+          // Обновляем агента с загруженными файлами
+          onUpdateAgent({
+            ...activeAgent,
+            files: files.map(file => ({
+              id: file.id,
+              name: file.name,
+              type: file.mimeType,
+              data: file.content,
+              agentId: file.agentId,
+            })),
+          });
+        })
+        .catch(error => {
+          console.error('Failed to load agent files', error);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeAgent.id]);
+  
+  // Загружаем типы проектов при открытии панели (только для админов)
+  useEffect(() => {
+    if (isOpen && isAdmin && activeTab === 'projectTypes') {
+      loadProjectTypes();
+    }
+  }, [isOpen, isAdmin, activeTab]);
+  
+  // Загружаем агентов выбранного типа проекта
+  useEffect(() => {
+    if (selectedProjectTypeId) {
+      loadProjectTypeAgents(selectedProjectTypeId);
+    } else {
+      setProjectTypeAgents([]);
+    }
+  }, [selectedProjectTypeId]);
+  
+  const loadProjectTypes = async () => {
+    setIsLoadingTypes(true);
+    try {
+      const { projectTypes: types } = await api.getProjectTypes();
+      setProjectTypes(types);
+      if (types.length > 0 && !selectedProjectTypeId) {
+        setSelectedProjectTypeId(types[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load project types', error);
+    } finally {
+      setIsLoadingTypes(false);
+    }
   };
   
+  const loadProjectTypeAgents = async (projectTypeId: string) => {
+    setIsLoadingAgents(true);
+    try {
+      const { agents } = await api.getProjectTypeAgents(projectTypeId);
+      setProjectTypeAgents(agents);
+    } catch (error) {
+      console.error('Failed to load project type agents', error);
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  };
+  
+  const handleCreateProjectTypeAgent = async () => {
+    if (!selectedProjectTypeId) return;
+    
+    setIsCreatingAgent(true);
+    try {
+      await api.createProjectTypeAgent(selectedProjectTypeId, {
+        name: 'Новый агент',
+        description: '',
+        systemInstruction: '',
+        summaryInstruction: '',
+        model: 'gpt-5.1',
+        role: '',
+      });
+      
+      await loadProjectTypeAgents(selectedProjectTypeId);
+    } catch (error) {
+      console.error('Failed to create project type agent', error);
+    } finally {
+      setIsCreatingAgent(false);
+    }
+  };
+  
+  const handleDeleteProjectTypeAgent = async (agentId: string) => {
+    if (!selectedProjectTypeId) return;
+    
+    if (!confirm('Удалить этого агента?')) return;
+    
+    try {
+      await api.deleteProjectTypeAgent(selectedProjectTypeId, agentId);
+      await loadProjectTypeAgents(selectedProjectTypeId);
+    } catch (error) {
+      console.error('Failed to delete project type agent', error);
+    }
+  };
   const resolveModel = (value: Agent['model']): LLMModel => {
     if (value === LLMModel.GPT51) return LLMModel.GPT51;
-    if (value === LLMModel.GPT5_MINI) return LLMModel.GPT5_MINI;
     if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
     if (value === LLMModel.GPT4O_MINI) return LLMModel.GPT4O_MINI;
     return LLMModel.GPT51;
@@ -52,35 +160,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     if (modelId === LLMModel.GPT4O_MINI) {
       return <Zap size={14} className="text-amber-400" />;
     }
-    if (modelId === LLMModel.GPT5_MINI) {
-      return <Zap size={14} className="text-emerald-400" />;
-    }
     if (modelId === LLMModel.GPT51) {
       return <Brain size={14} className="text-emerald-300" />;
     }
     return <Cpu size={14} className="text-pink-400" />;
-  };
-
-  // Render icon for role
-  const renderRoleIcon = (roleName: string) => {
-    if (roleName === 'copywriter') {
-      return <PenTool size={14} className="text-indigo-400" />;
-    }
-    if (roleName === 'dsl') {
-      return <Code2 size={14} className="text-purple-400" />;
-    }
-    if (roleName === 'verstka') {
-      return <Layout size={14} className="text-cyan-400" />;
-    }
-    return null;
-  };
-
-  // Get role label
-  const getRoleLabel = (roleName: string): string => {
-    if (roleName === 'copywriter') return 'Копирайтер';
-    if (roleName === 'dsl') return 'DSL';
-    if (roleName === 'verstka') return 'Верстка';
-    return 'Выключено';
   };
 
   const [model, setModel] = useState<LLMModel>(resolveModel(activeAgent.model));
@@ -129,27 +212,56 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   return (
     <div 
-      className={`fixed inset-y-2 right-2 w-full sm:w-[90%] md:w-[380px] bg-gradient-to-b from-black/80 via-black/70 to-black/80 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl shadow-indigo-500/10 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] z-[70] flex flex-col overflow-hidden max-h-[calc(100dvh-1rem)] will-change-transform ${
+      className={`fixed inset-y-2 right-2 w-full md:w-[380px] bg-black/70 backdrop-blur-2xl border border-white/10 rounded-[1.5rem] shadow-2xl transform transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] z-[70] flex flex-col overflow-hidden max-h-[calc(100dvh-1rem)] ${
         isOpen ? 'translate-x-0' : 'translate-x-[120%]'
       }`}
     >
         {/* Header */}
-        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
-            <div className="p-1.5 bg-indigo-500/20 rounded-lg">
-              <Info size={16} className="text-indigo-300" />
-            </div>
-            Agent Config
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-full bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors">
-            <X size={16} />
-          </button>
+        <div className="p-4 border-b border-white/10 bg-white/5 shrink-0">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+                <SettingsIcon size={16} className="text-indigo-300" />
+              </div>
+              Settings
+            </h2>
+            <button onClick={onClose} className="p-1.5 rounded-full bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+          
+          {/* Tabs */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('agent')}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'agent'
+                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+              }`}
+            >
+              Agent Config
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('projectTypes')}
+                className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'projectTypes'
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                }`}
+              >
+                Type Agents
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar">
-          
-          {/* Agent Name Section */}
+          {activeTab === 'agent' ? (
+            <>
+              {/* Agent Name Section */}
           <section>
              <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
                Identity
@@ -160,7 +272,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                  value={name}
                  onChange={(e) => setName(e.target.value)}
                  disabled={activeAgent.role && activeAgent.role.trim() !== ''}
-                 className={`w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner ${
+                 className={`w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${
                    activeAgent.role && activeAgent.role.trim() !== '' ? 'opacity-60 cursor-not-allowed' : ''
                  }`}
                />
@@ -175,79 +287,57 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
                Model Intelligence
              </label>
-            <div className="relative">
-              <select
-                value={model}
-                onChange={(e) => {
-                  setModel(e.target.value as LLMModel);
-                }}
-                className="w-full appearance-none bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner cursor-pointer hover:bg-black/40"
-              >
-                {MODELS.map((m) => (
-                  <option key={m.id} value={m.id} className="bg-black text-white">
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              {/* Model Icon */}
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                {renderModelIcon(model)}
-              </div>
-              {/* Dropdown Arrow */}
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-              {/* Selected model indicator */}
-              <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-                <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(129,140,248,1)]"></div>
-              </div>
-            </div>
-            {/* Model Description */}
-            <p className="text-[10px] text-white/40 leading-tight mt-2 pl-1">
-              {MODELS.find(m => m.id === model)?.description}
-            </p>
+             <div className="grid grid-cols-1 gap-2">
+               {MODELS.map((m) => (
+                 <button
+                   key={m.id}
+                   onClick={() => setModel(m.id)}
+                   className={`relative p-3 rounded-xl border text-left transition-all ${
+                     model === m.id 
+                       ? 'bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
+                       : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
+                   }`}
+                 >
+                   <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        {renderModelIcon(m.id as LLMModel)}
+                        <span className={`text-xs font-bold ${model === m.id ? 'text-white' : 'text-white/70'}`}>
+                          {m.name}
+                        </span>
+                      </div>
+                      {model === m.id && <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(129,140,248,1)]"></div>}
+                   </div>
+                   <p className="text-[10px] text-white/40 leading-tight pl-6">
+                     {m.description}
+                   </p>
+                 </button>
+               ))}
+             </div>
           </section>
 
           {/* Roles Section */}
           <section>
             <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-               Роль
+               Роли
             </label>
-            <div className="relative">
-              <select
-                value={getCurrentRole()}
-                onChange={(e) => {
-                  setRole(e.target.value || '');
-                }}
-                className="w-full appearance-none bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner cursor-pointer hover:bg-black/40"
-              >
-                <option value="">Выключено</option>
-                <option value="copywriter">Копирайтер</option>
-                <option value="dsl">DSL</option>
-                <option value="verstka">Верстка</option>
-              </select>
-              {/* Role Icon */}
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                {getCurrentRole() ? (
-                  renderRoleIcon(getCurrentRole())
-                ) : (
-                  <div className="w-3.5 h-3.5 rounded-full border border-white/20" />
-                )}
-              </div>
-              {/* Dropdown Arrow */}
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-              {/* Selected role indicator */}
-              {getCurrentRole() && (
-                <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_5px_rgba(129,140,248,1)]"></div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-black/30 hover:bg-white/5 transition-all">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-white">Копирайтер</span>
                 </div>
-              )}
+                <button
+                  onClick={() => setRole(role === "copywriter" ? "" : "copywriter")}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                    role === "copywriter" ? "bg-indigo-500" : "bg-white/20"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+                      role === "copywriter" ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </section>
 
@@ -262,7 +352,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <textarea
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
-                className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed"
+                className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/90 focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed"
                 placeholder="Define agent behavior..."
               />
             </div>
@@ -279,7 +369,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <textarea
               value={summaryInst}
               onChange={(e) => setSummaryInst(e.target.value)}
-              className="w-full h-20 bg-black/20 border border-white/5 rounded-lg p-2 text-xs text-white/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 placeholder-white/20 resize-none transition-all"
+              className="w-full h-20 bg-black/20 border border-white/5 rounded-lg p-2 text-xs text-white/80 focus:ring-1 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all"
               placeholder="Instructions for saving results..."
             />
           </section>
@@ -341,19 +431,95 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               );
             })()}
           </section>
-
+            </>
+          ) : (
+            /* Project Type Agents Management */
+            <div className="space-y-4">
+              <section>
+                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                  Тип проекта
+                </label>
+                {isLoadingTypes ? (
+                  <div className="text-white/40 text-xs">Загрузка...</div>
+                ) : (
+                  <select
+                    value={selectedProjectTypeId || ''}
+                    onChange={(e) => setSelectedProjectTypeId(e.target.value)}
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black focus:border-indigo-500/50 transition-all shadow-inner cursor-pointer hover:bg-black/40"
+                  >
+                    {projectTypes.map((type) => (
+                      <option key={type.id} value={type.id} className="bg-black text-white">
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </section>
+              
+              {selectedProjectTypeId && (
+                <section>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                      Агенты типа проекта
+                    </label>
+                    <button
+                      onClick={handleCreateProjectTypeAgent}
+                      disabled={isCreatingAgent}
+                      className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-all disabled:opacity-50"
+                      title="Добавить агента"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  
+                  {isLoadingAgents ? (
+                    <div className="text-white/40 text-xs">Загрузка агентов...</div>
+                  ) : projectTypeAgents.length === 0 ? (
+                    <div className="text-white/40 text-xs text-center py-4">
+                      Нет агентов для этого типа проекта
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {projectTypeAgents.map((agent) => (
+                        <div
+                          key={agent.id}
+                          className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-white truncate">{agent.name}</div>
+                            {agent.description && (
+                              <div className="text-xs text-white/60 truncate mt-1">{agent.description}</div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteProjectTypeAgent(agent.id)}
+                            className="p-1.5 text-white/30 hover:text-red-400 transition-colors rounded hover:bg-red-500/10 ml-2"
+                            title="Удалить"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-xl shrink-0">
-          <button
-            onClick={handleSave}
-            className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-indigo-50 py-3 px-4 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] active:scale-[0.98]"
-          >
-            <Save size={16} />
-            Apply Changes
-          </button>
-        </div>
-    </div>
+        {activeTab === 'agent' && (
+          <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-xl shrink-0">
+            <button
+              onClick={handleSave}
+              className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-indigo-50 py-3 px-4 rounded-xl font-bold text-sm transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] active:scale-[0.98]"
+            >
+              <Save size={16} />
+              Apply Changes
+            </button>
+          </div>
+        )}
+      </div>
   );
 };

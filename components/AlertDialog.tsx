@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { CheckCircle2, XCircle, Info, AlertCircle, X } from 'lucide-react';
 
 interface AlertDialogProps {
@@ -18,22 +19,80 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
   variant = 'info',
   duration = 0,
 }) => {
+  const [isClosing, setIsClosing] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  const handleClose = useCallback(() => {
+    // Очищаем предыдущий таймер, если есть
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    
+    // Синхронно устанавливаем isClosing, чтобы гарантировать, что компонент останется видимым
+    flushSync(() => {
+      setIsClosing(true);
+    });
+    
+    // Не сбрасываем isVisible сразу, чтобы анимация закрытия работала
+    // Используем requestAnimationFrame для гарантии, что браузер успел применить стили
+    requestAnimationFrame(() => {
+      closeTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          onClose();
+          setIsClosing(false);
+          setIsVisible(false);
+        }
+        closeTimeoutRef.current = null;
+      }, 300); // Match animation duration
+    });
+  }, [onClose]);
+
   useEffect(() => {
-    if (isOpen && duration > 0) {
-      const timer = setTimeout(() => {
-        onClose();
-      }, duration);
-      return () => clearTimeout(timer);
+    isMountedRef.current = true;
+    
+    if (isOpen) {
+      setIsClosing(false);
+      // Небольшая задержка для запуска анимации появления
+      const visibilityTimer = setTimeout(() => {
+        if (isMountedRef.current) {
+          setIsVisible(true);
+        }
+      }, 10);
+      
+      let autoCloseTimer: NodeJS.Timeout | undefined;
+      if (duration > 0) {
+        autoCloseTimer = setTimeout(() => {
+          handleClose();
+        }, duration);
+      }
+      
+      return () => {
+        clearTimeout(visibilityTimer);
+        if (autoCloseTimer) {
+          clearTimeout(autoCloseTimer);
+        }
+      };
+    } else {
+      // Не сбрасываем isVisible сразу, если идет анимация закрытия
+      // isVisible будет сброшен после завершения анимации в handleClose
+      if (!isClosing) {
+        setIsVisible(false);
+      }
     }
-  }, [isOpen, duration, onClose]);
+  }, [isOpen, duration, handleClose, isClosing]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  if (!isOpen && !isClosing) return null;
 
   const variantConfig = {
     success: {
@@ -75,14 +134,16 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none"
-      onClick={handleBackdropClick}
+      className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-6 pointer-events-none"
     >
-      {/* Backdrop - only for click-to-close, no blur */}
-      <div className="absolute inset-0 bg-transparent transition-opacity animate-in fade-in duration-300 pointer-events-auto" />
-
       {/* Alert */}
-      <div className={`relative w-full max-w-md bg-gradient-to-br from-black/90 via-black/80 to-black/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] ${config.glow} shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 overflow-hidden pointer-events-auto`}>
+      <div className={`relative w-full max-w-md bg-gradient-to-br from-black/90 via-black/80 to-black/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] ${config.glow} shadow-2xl overflow-hidden pointer-events-auto transition-all duration-300 ease-out ${
+        isClosing 
+          ? 'opacity-0 -translate-y-4 scale-95' 
+          : isVisible
+            ? 'opacity-100 translate-y-0 scale-100'
+            : 'opacity-0 translate-y-4 scale-95'
+      }`}>
         {/* Decorative gradient overlay */}
         <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${config.gradient}`} />
 
@@ -101,7 +162,7 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
               </p>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors flex-shrink-0"
             >
               <X size={16} />
