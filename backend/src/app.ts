@@ -4,6 +4,7 @@ import routes from './routes';
 import { env } from './env';
 import { apiRateLimiter } from './middleware/rateLimitMiddleware';
 import { logger } from './utils/logger';
+import { prisma } from './db/prisma';
 
 const app = express();
 
@@ -28,7 +29,7 @@ app.use((req, res, next) => {
 app.use(
   cors({
     origin: env.corsOrigin === '*' 
-      ? (_origin, callback) => callback(null, true) 
+      ? (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => callback(null, true) 
       : env.corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -42,8 +43,21 @@ app.use(express.json({ limit: '5mb' }));
 // Применяем rate limiting ко всем API запросам
 app.use('/api', apiRateLimiter);
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+app.get('/health', async (_req, res) => {
+  try {
+    // Проверяем подключение к БД
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ 
+      status: 'ok',
+      database: 'connected'
+    });
+  } catch (error: any) {
+    res.status(503).json({ 
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: env.nodeEnv === 'development' ? error.message : 'Database unavailable'
+    });
+  }
 });
 
 app.use('/api', routes);
