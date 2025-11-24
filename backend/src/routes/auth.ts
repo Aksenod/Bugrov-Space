@@ -6,6 +6,7 @@ import { signToken } from '../utils/token';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { authRateLimiter } from '../middleware/rateLimitMiddleware';
 import { AuthenticatedRequest } from '../types/express';
+import { withRetry } from '../utils/prismaRetry';
 
 const authRouter = Router();
 
@@ -22,7 +23,7 @@ const registerSchema = z.object({
   username: normalizeUsername(data.username),
 }));
 
-authRouter.post('/register', authRateLimiter, async (req, res) => {
+authRouter.post('/register', authRateLimiter, async (req, res, next) => {
   try {
     console.log('[Register] Request body:', JSON.stringify(req.body));
     const parsed = registerSchema.safeParse(req.body);
@@ -40,19 +41,27 @@ authRouter.post('/register', authRateLimiter, async (req, res) => {
     const { username, password } = parsed.data;
     console.log('[Register] Normalized username:', username);
     
-    const existing = await prisma.user.findUnique({ where: { username } });
+    const existing = await withRetry(
+      () => prisma.user.findUnique({ where: { username } }),
+      3,
+      'register-check-existing'
+    );
     if (existing) {
       console.log('[Register] Username already exists:', username);
       return res.status(409).json({ error: 'Username already taken' });
     }
 
     const passwordHash = await hashPassword(password.trim());
-    const user = await prisma.user.create({
-      data: {
-        username,
-        passwordHash,
-      },
-    });
+    const user = await withRetry(
+      () => prisma.user.create({
+        data: {
+          username,
+          passwordHash,
+        },
+      }),
+      3,
+      'register-create-user'
+    );
 
     console.log('[Register] User created:', user.id);
     const token = signToken(user.id);
@@ -61,12 +70,14 @@ authRouter.post('/register', authRateLimiter, async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
+        role: user.role,
       },
       agents: [],
     });
   } catch (error: any) {
     console.error('[Register] Error:', error);
-    return res.status(500).json({ error: error?.message || 'Internal server error' });
+    // Пробрасываем ошибку в errorHandler для правильной обработки Prisma ошибок
+    next(error);
   }
 });
 
@@ -78,37 +89,53 @@ const loginSchema = z.object({
   username: normalizeUsername(data.username),
 }));
 
-authRouter.post('/login', authRateLimiter, async (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map((err) => {
-      if (err.path.length > 0) {
-        return `${err.path.join('.')}: ${err.message}`;
-      }
-      return err.message;
-    }).join(', ');
-    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
-  }
+authRouter.post('/login', authRateLimiter, async (req, res, next) => {
+  try {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMessages = parsed.error.issues.map((err) => {
+        if (err.path.length > 0) {
+          return `${err.path.join('.')}: ${err.message}`;
+        }
+        return err.message;
+      }).join(', ');
+      return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+    }
 
-  const { username, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { username } });
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
+    const { username, password } = parsed.data;
+    console.log('[Login] Attempting login for username:', username);
+    
+    const user = await withRetry(
+      () => prisma.user.findUnique({ where: { username } }),
+      3,
+      'login-find-user'
+    );
+    if (!user) {
+      console.log('[Login] User not found:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-  const valid = await verifyPassword(password.trim(), user.passwordHash);
-  if (!valid) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
+    const valid = await verifyPassword(password.trim(), user.passwordHash);
+    if (!valid) {
+      console.log('[Login] Invalid password for user:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-  const token = signToken(user.id);
-  return res.json({
-    token,
-    user: {
-      id: user.id,
-      username: user.username,
-    },
-  });
+    console.log('[Login] Successful login for user:', username);
+    const token = signToken(user.id);
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Login] Error:', error);
+    // Пробрасываем ошибку в errorHandler
+    next(error);
+  }
 });
 
 const resetSchema = z.object({
@@ -119,53 +146,80 @@ const resetSchema = z.object({
   username: normalizeUsername(data.username),
 }));
 
-authRouter.post('/reset', authRateLimiter, async (req, res) => {
-  const parsed = resetSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map((err) => {
-      if (err.path.length > 0) {
-        return `${err.path.join('.')}: ${err.message}`;
-      }
-      return err.message;
-    }).join(', ');
-    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+authRouter.post('/reset', authRateLimiter, async (req, res, next) => {
+  try {
+    const parsed = resetSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMessages = parsed.error.issues.map((err) => {
+        if (err.path.length > 0) {
+          return `${err.path.join('.')}: ${err.message}`;
+        }
+        return err.message;
+      }).join(', ');
+      return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+    }
+
+    const { username, newPassword } = parsed.data;
+    console.log('[Reset] Attempting password reset for username:', username);
+    
+    const user = await withRetry(
+      () => prisma.user.findUnique({ where: { username } }),
+      3,
+      'reset-find-user'
+    );
+
+    if (!user) {
+      console.log('[Reset] User not found:', username);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const passwordHash = await hashPassword(newPassword.trim());
+    await withRetry(
+      () => prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      }),
+      3,
+      'reset-update-password'
+    );
+
+    console.log('[Reset] Password reset successful for user:', username);
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Reset] Error:', error);
+    // Пробрасываем ошибку в errorHandler
+    next(error);
   }
-
-  const { username, newPassword } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { username } });
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  const passwordHash = await hashPassword(newPassword.trim());
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash },
-  });
-
-  return res.json({ success: true });
 });
 
-authRouter.get('/me', authMiddleware, async (req, res) => {
-  const authReq = req as AuthenticatedRequest;
-  if (!authReq.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+authRouter.get('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    if (!authReq.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await withRetry(
+      () => prisma.user.findUnique({
+        where: { id: authReq.userId },
+        select: {
+          id: true,
+          username: true,
+          role: true,
+        },
+      }),
+      3,
+      'me-find-user'
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ user });
+  } catch (error) {
+    next(error);
   }
-
-  const user = await prisma.user.findUnique({
-    where: { id: authReq.userId },
-    select: {
-      id: true,
-      username: true,
-    },
-  });
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  return res.json({ user });
 });
 
 export default authRouter;
