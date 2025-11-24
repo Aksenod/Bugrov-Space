@@ -184,4 +184,37 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.status(204).send();
 }));
 
+// GET /:id/agents - получить агентов типа проекта
+router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Проверяем, что тип проекта существует
+  const projectType = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { id },
+    }),
+    3,
+    `GET /project-types/${id}/agents - find projectType`
+  );
+
+  if (!projectType) {
+    return res.status(404).json({ error: 'Тип проекта не найден' });
+  }
+
+  // Загружаем агентов типа проекта
+  const agents = await withRetry(
+    () => (prisma as any).projectTypeAgent.findMany({
+      where: { projectTypeId: id },
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    }),
+    3,
+    `GET /project-types/${id}/agents - find agents`
+  );
+
+  res.json({ agents });
+}));
+
 export default router;

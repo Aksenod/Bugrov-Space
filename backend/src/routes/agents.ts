@@ -679,115 +679,133 @@ router.post('/:agentId/files', async (req, res) => {
 });
 
 // GET /:agentId/files - получить файлы агента (база знаний)
-router.get('/:agentId/files', async (req, res) => {
-  const userId = req.userId!;
-  const { agentId } = req.params;
+router.get('/:agentId/files', async (req, res, next) => {
+  try {
+    const userId = req.userId!;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({
-      where: { id: agentId, userId },
-    }),
-    3,
-    `GET /agents/${agentId}/files - find agent`
-  );
+    const { agentId } = req.params;
 
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
+    const agent = await withRetry(
+      () => prisma.agent.findFirst({
+        where: { id: agentId, userId },
+      }),
+      3,
+      `GET /agents/${agentId}/files - find agent`
+    );
 
-  // Загружаем только файлы базы знаний (не документы проекта)
-  const files = await withRetry(
-    () => prisma.file.findMany({
-      where: {
-        agentId,
-        isKnowledgeBase: true,  // Только база знаний
-        name: {
-          not: {
-            startsWith: 'Summary'
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    // Загружаем только файлы базы знаний (не документы проекта)
+    const files = await withRetry(
+      () => prisma.file.findMany({
+        where: {
+          agentId,
+          isKnowledgeBase: true,  // Только база знаний
+          name: {
+            not: {
+              startsWith: 'Summary'
+            }
           }
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        mimeType: true,
-        content: true,
-        agentId: true,
-        isKnowledgeBase: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    }),
-    3,
-    `GET /agents/${agentId}/files - find files`
-  );
+        },
+        select: {
+          id: true,
+          name: true,
+          mimeType: true,
+          content: true,
+          agentId: true,
+          isKnowledgeBase: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      3,
+      `GET /agents/${agentId}/files - find files`
+    );
 
-  res.json({ files });
+    res.json({ files });
+  } catch (error: any) {
+    console.error('[GET /agents/:agentId/files] Error:', error);
+    next(error);
+  }
 });
 
-router.get('/:agentId/files/summary', async (req, res) => {
-  const userId = req.userId!;
-  const { agentId } = req.params;
-  const projectId = req.query.projectId as string | undefined;
+router.get('/:agentId/files/summary', async (req, res, next) => {
+  try {
+    const userId = req.userId!;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({
-      where: { id: agentId, userId },
-    }),
-    3,
-    `GET /agents/${agentId}/files/summary - find agent`
-  );
+    const { agentId } = req.params;
+    const projectId = req.query.projectId as string | undefined;
 
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
+    const agent = await withRetry(
+      () => prisma.agent.findFirst({
+        where: { id: agentId, userId },
+      }),
+      3,
+      `GET /agents/${agentId}/files/summary - find agent`
+    );
+
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    // Загружаем документы проекта (НЕ базу знаний агентов)
+    // projectId обязателен для изоляции проектов
+    if (!projectId) {
+      return res.status(400).json({ 
+        error: 'projectId query parameter is required. Project isolation requires explicit project context.' 
+      });
+    }
+
+    // Получаем всех агентов проекта для загрузки их файлов
+    const projectAgents = await withRetry(
+      () => prisma.agent.findMany({
+        where: { projectId: projectId },
+        select: { id: true },
+      }),
+      3,
+      `GET /agents/${agentId}/files/summary - find project agents`
+    );
+    const agentIds = projectAgents.map(a => a.id);
+
+    const projectFiles = await withRetry(
+      () => prisma.file.findMany({
+        where: {
+          isKnowledgeBase: false,  // Исключаем базу знаний
+          agentId: { in: agentIds },  // Файлы агентов проекта
+        },
+        select: {
+          id: true,
+          name: true,
+          mimeType: true,
+          content: true,
+          agentId: true,
+          isKnowledgeBase: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      3,
+      `GET /agents/${agentId}/files/summary - find project files`
+    );
+
+    // Логирование для диагностики
+    console.log(`[Summary Files Debug] Agent: ${agentId}`);
+    console.log(`[Summary Files Debug] Project documents (excluding knowledge base): ${projectFiles.length}`);
+    console.log(`[Summary Files Debug] Project file names:`, projectFiles.map(f => f.name));
+
+    res.json({ files: projectFiles });
+  } catch (error: any) {
+    console.error('[GET /agents/:agentId/files/summary] Error:', error);
+    next(error);
   }
-
-  // Загружаем документы проекта (НЕ базу знаний агентов)
-  // projectId обязателен для изоляции проектов
-  if (!projectId) {
-    return res.status(400).json({ 
-      error: 'projectId query parameter is required. Project isolation requires explicit project context.' 
-    });
-  }
-
-  // Получаем всех агентов проекта для загрузки их файлов
-  const projectAgents = await withRetry(
-    () => prisma.agent.findMany({
-      where: { projectId: projectId },
-      select: { id: true },
-    }),
-    3,
-    `GET /agents/${agentId}/files/summary - find project agents`
-  );
-  const agentIds = projectAgents.map(a => a.id);
-
-  const projectFiles = await withRetry(
-    () => prisma.file.findMany({
-      where: {
-        isKnowledgeBase: false,  // Исключаем базу знаний
-        agentId: { in: agentIds },  // Файлы агентов проекта
-      },
-      select: {
-        id: true,
-        name: true,
-        mimeType: true,
-        content: true,
-        agentId: true,
-        isKnowledgeBase: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    }),
-    3,
-    `GET /agents/${agentId}/files/summary - find project files`
-  );
-
-  // Логирование для диагностики
-  console.log(`[Summary Files Debug] Agent: ${agentId}`);
-  console.log(`[Summary Files Debug] Project documents (excluding knowledge base): ${projectFiles.length}`);
-  console.log(`[Summary Files Debug] Project file names:`, projectFiles.map(f => f.name));
-
-  res.json({ files: projectFiles });
 });
 
 // ВАЖНО: Этот маршрут должен быть ВЫШЕ /:agentId/files/:fileId
