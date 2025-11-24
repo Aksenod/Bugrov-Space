@@ -6,10 +6,7 @@ module.exports = {
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       isolatedModules: true,
-      tsconfig: {
-        skipLibCheck: true,
-        noImplicitAny: false,
-      },
+      tsconfig: '<rootDir>/tsconfig.jest.json',
     }],
   },
   collectCoverageFrom: [
