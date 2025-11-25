@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical, ChevronDown, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -97,6 +97,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<ApiProjectTypeAgent | null>(null);
+  
+  // Filters and sorting state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedProjectTypeFilters, setSelectedProjectTypeFilters] = useState<string[]>([]);
+  const [selectedRoleFilters, setSelectedRoleFilters] = useState<string[]>([]);
+  const [selectedModelFilters, setSelectedModelFilters] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'projectTypesCount'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  
+  const FILTERS_STORAGE_KEY = 'admin_agents_filters';
+  const SORT_STORAGE_KEY = 'admin_agents_sort';
   
   // Agent form state
   const [agentName, setAgentName] = useState('');
