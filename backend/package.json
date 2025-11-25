@@ -7,7 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "prebuild": "rm -rf node_modules/.prisma node_modules/@prisma/client prisma-client && prisma generate",
     "build": "tsc",
-    "postbuild": "prisma migrate deploy || (node scripts/resolve-migration.js 20251125000000_add_project_model 2>/dev/null || true) && prisma migrate deploy || node scripts/create-missing-tables.js || true",
+    "postbuild": "prisma migrate deploy || (node scripts/resolve-migration.js 20251125000000_add_project_model 2>/dev/null; node scripts/resolve-migration.js 20251125100000_change_project_user_restrict 2>/dev/null; true) && (prisma migrate deploy || node scripts/create-missing-tables.js || true)",
     "start": "node dist/index.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
