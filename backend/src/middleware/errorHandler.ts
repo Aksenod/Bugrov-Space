@@ -35,6 +35,21 @@ export function errorHandler(
     });
   }
 
+  // Prisma Client Validation Errors (не PrismaClientKnownRequestError, а отдельный тип)
+  if (err.name === 'PrismaClientValidationError' || err.message?.includes('Invalid `prisma.')) {
+    logger.error({ 
+      message: err.message, 
+      name: err.name,
+      stack: err.stack 
+    }, 'Prisma Client validation error - schema mismatch');
+    return res.status(500).json({
+      error: 'Prisma Client validation error',
+      message: env.nodeEnv === 'development' 
+        ? `Prisma Client validation failed. This usually means the Prisma Client was generated with an old schema. Error: ${err.message}` 
+        : 'Database client configuration error. Please contact administrator.',
+    });
+  }
+
   // Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {

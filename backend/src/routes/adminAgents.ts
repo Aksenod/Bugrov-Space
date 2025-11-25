@@ -205,6 +205,24 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
         'POST /admin/agents - create'
       );
     } catch (error: any) {
+      // Обработка ошибки валидации Prisma - Prisma Client не перегенерирован
+      if (error?.name === 'PrismaClientValidationError' || 
+          error?.message?.includes('Argument `projectType` is missing') ||
+          error?.message?.includes('Invalid `prisma.projectTypeAgent.create()')) {
+        logger.error({ 
+          error: error.message, 
+          name: error.name,
+          code: error.code,
+          meta: error.meta,
+          stack: error.stack 
+        }, 'Prisma Client validation error - client may not be regenerated after schema change');
+        return res.status(500).json({ 
+          error: 'Prisma Client needs regeneration',
+          message: 'The Prisma Client was generated with an old schema. Please redeploy to regenerate the client.',
+          details: env.nodeEnv === 'development' ? error.message : undefined
+        });
+      }
+      
       // Если таблица не существует (миграция не применена)
       if (error?.code === 'P2021' || 
           error?.message?.includes('does not exist') || 
@@ -224,6 +242,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       }
       logger.error({ 
         error: error.message, 
+        name: error.name,
         code: error.code,
         meta: error.meta,
         stack: error.stack 
