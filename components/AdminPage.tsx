@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type } from 'lucide-react';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile } from '../services/api';
 import { LLMModel, MODELS, UploadedFile } from '../types';
 import { AlertDialog } from './AlertDialog';
@@ -7,10 +7,12 @@ import { ConfirmDialog } from './ConfirmDialog';
 
 interface AdminPageProps {
   onClose: () => void;
+  initialAgentId?: string;
+  onAgentUpdated?: () => void;
 }
 
-export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'projectTypes' | 'agents'>('projectTypes');
+export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, onAgentUpdated }) => {
+  const [activeTab, setActiveTab] = useState<'projectTypes' | 'agents'>('agents');
   
   // Project Types state
   const [projectTypes, setProjectTypes] = useState<ApiProjectType[]>([]);
@@ -36,10 +38,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
   const [selectedProjectTypeIds, setSelectedProjectTypeIds] = useState<string[]>([]);
   const [isSavingAgent, setIsSavingAgent] = useState(false);
   const [isProjectTypesDropdownOpen, setIsProjectTypesDropdownOpen] = useState(false);
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [agentFiles, setAgentFiles] = useState<UploadedFile[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAutoOpenedRef = useRef(false); // Флаг для отслеживания автоматического открытия
   const STORAGE_KEY = 'admin_agent_draft';
 
   // Dialog states
@@ -112,6 +117,91 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
       loadAgents();
     }
   }, [activeTab]);
+
+  // Сбрасываем флаг при изменении initialAgentId и переключаемся на вкладку агентов
+  useEffect(() => {
+    hasAutoOpenedRef.current = false;
+    if (initialAgentId) {
+      setActiveTab('agents');
+    }
+  }, [initialAgentId]);
+
+  // Автоматически открываем диалог редактирования агента, если передан initialAgentId
+  // Загружаем агента напрямую по ID, не дожидаясь загрузки списка
+  useEffect(() => {
+    if (initialAgentId && !isAgentDialogOpen && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true; // Помечаем сразу, чтобы не открывать дважды
+      
+      const loadAndOpenAgent = async () => {
+        try {
+          // Загружаем агента напрямую по ID
+          const { agent } = await api.getAgent(initialAgentId);
+          
+          // Загружаем типы проектов для этого агента
+          let projectTypes: Array<{ id: string; name: string; order?: number }> = [];
+          try {
+            const { projectTypes: types } = await api.getAgentProjectTypes(initialAgentId);
+            projectTypes = types;
+          } catch (error) {
+            console.warn('Failed to load project types for agent', error);
+          }
+          
+          // Загружаем файлы агента
+          let agentFilesData: UploadedFile[] = [];
+          try {
+            const { files } = await api.getAgentFiles(initialAgentId);
+            agentFilesData = files.map(file => ({
+              id: file.id,
+              name: file.name,
+              type: file.mimeType,
+              data: file.content,
+              agentId: file.agentId,
+            }));
+          } catch (error) {
+            console.error('Failed to load agent files', error);
+          }
+          
+          // Подготавливаем агента с типами проектов
+          const agentWithProjectTypes = {
+            ...agent,
+            projectTypes,
+          };
+          
+          // Открываем диалог с загруженным агентом
+          setEditingAgent(agentWithProjectTypes);
+          setAgentName(agent.name);
+          setAgentDescription(agent.description || '');
+          setAgentSystemInstruction(agent.systemInstruction || '');
+          setAgentSummaryInstruction(agent.summaryInstruction || '');
+          setAgentModel(resolveModel(agent.model));
+          setAgentRole(agent.role || '');
+          setSelectedProjectTypeIds(projectTypes.map(pt => pt.id));
+          setAgentFiles(agentFilesData);
+          setIsAgentDialogOpen(true);
+        } catch (error: any) {
+          console.error('Failed to load agent directly', error);
+          // Если не удалось загрузить агента напрямую, сбрасываем флаг
+          // чтобы резервный вариант мог попытаться найти его в списке
+          hasAutoOpenedRef.current = false;
+        }
+      };
+      
+      loadAndOpenAgent();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAgentId, isAgentDialogOpen]);
+
+  // Резервный вариант: если прямой загрузкой не получилось, пытаемся найти в списке
+  useEffect(() => {
+    if (initialAgentId && agents.length > 0 && !isAgentDialogOpen && !hasAutoOpenedRef.current) {
+      const agentToEdit = agents.find(agent => agent.id === initialAgentId);
+      if (agentToEdit) {
+        hasAutoOpenedRef.current = true; // Помечаем, что диалог был открыт автоматически
+        handleOpenAgentDialog(agentToEdit);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAgentId, agents, isAgentDialogOpen]);
 
   const loadProjectTypes = async () => {
     setIsLoading(true);
@@ -254,6 +344,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
     setIsAgentDialogOpen(false);
     setEditingAgent(null);
     setIsProjectTypesDropdownOpen(false);
+    setIsRoleDropdownOpen(false);
+    setIsModelDropdownOpen(false);
     setAgentFiles([]);
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -333,6 +425,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
         }
         // Обновляем список агентов
         await loadAgents();
+        // Уведомляем родительский компонент об обновлении агента
+        if (onAgentUpdated) {
+          onAgentUpdated();
+        }
       } catch (error: any) {
         console.error('Auto-save failed', error);
         // Не показываем ошибку пользователю при автосохранении, только логируем
@@ -500,6 +596,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
       await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
       await loadAgents();
+      // Уведомляем родительский компонент об обновлении агента
+      if (onAgentUpdated) {
+        onAgentUpdated();
+      }
       // Очищаем черновик после успешного сохранения
       localStorage.removeItem(STORAGE_KEY);
       handleCloseAgentDialog();
@@ -554,36 +654,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-black to-indigo-950/20">
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-black via-black to-indigo-950/20 overflow-x-hidden">
+      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-6 max-w-6xl w-full">
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold text-white">Админ-панель</h1>
+        <div className="mb-4 sm:mb-6">
+          <div className="flex justify-between items-center mb-3 sm:mb-4">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Админ-панель</h1>
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors flex items-center gap-2"
+              className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
             >
-              <X size={20} />
-              Назад
+              <X size={16} className="sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Назад</span>
             </button>
           </div>
             
             {/* Tabs */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab('projectTypes')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  activeTab === 'projectTypes'
-                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
-                }`}
-              >
-                Типы проектов
-              </button>
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={() => setActiveTab('agents')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                   activeTab === 'agents'
                     ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                     : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
@@ -591,30 +681,40 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
               >
                 Агенты
               </button>
+              <button
+                onClick={() => setActiveTab('projectTypes')}
+                className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                  activeTab === 'projectTypes'
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                }`}
+              >
+                Типы проектов
+              </button>
             </div>
           </div>
 
           {/* Content */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {activeTab === 'projectTypes' ? (
               <>
                 {/* Create Form */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 sm:gap-2">
                   <input
                     type="text"
                     value={newTypeName}
                     onChange={(e) => setNewTypeName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
                     placeholder="Название типа проекта"
-                    className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-transparent"
+                    className="flex-1 px-2.5 sm:px-4 py-2 sm:py-2.5 text-sm bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-transparent"
                   />
                   <button
                     onClick={handleCreate}
                     disabled={isCreating || !newTypeName.trim()}
-                    className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-2.5 sm:px-4 py-2 sm:py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2"
                   >
-                    {isCreating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                    Создать
+                    {isCreating ? <Loader2 size={14} className="sm:w-4 sm:h-4 animate-spin" /> : <Plus size={14} className="sm:w-4 sm:h-4" />}
+                    <span className="hidden sm:inline">Создать</span>
                   </button>
                 </div>
 
@@ -624,11 +724,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                     <Loader2 size={24} className="animate-spin text-indigo-400" />
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {projectTypes.map((type) => (
                       <div
                         key={type.id}
-                        className="flex items-center gap-3 p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
                       >
                         {editingId === type.id ? (
                           <>
@@ -637,12 +737,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                               value={editingName}
                               onChange={(e) => setEditingName(e.target.value)}
                               onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(type.id)}
-                              className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70"
+                              className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70"
                               autoFocus
                             />
                             <button
                               onClick={() => handleSaveEdit(type.id)}
-                              className="px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-semibold transition-colors"
+                              className="px-2 sm:px-3 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors"
                             >
                               Сохранить
                             </button>
@@ -651,28 +751,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                                 setEditingId(null);
                                 setEditingName('');
                               }}
-                              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm transition-colors"
+                              className="px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs sm:text-sm transition-colors"
                             >
                               Отмена
                             </button>
                           </>
                         ) : (
                           <>
-                            <span className="flex-1 text-white font-medium">{type.name}</span>
+                            <span className="flex-1 text-white text-sm sm:text-base font-medium">{type.name}</span>
                             <button
                               onClick={() => handleStartEdit(type)}
-                              className="p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                              className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
                               title="Редактировать"
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={14} className="sm:w-4 sm:h-4" />
                             </button>
                             {type.id !== 'default' && (
                               <button
                                 onClick={() => handleDelete(type.id, type.name)}
-                                className="p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
                                 title="Удалить"
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={14} className="sm:w-4 sm:h-4" />
                               </button>
                             )}
                           </>
@@ -685,14 +785,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
             ) : (
               <>
                 {/* Agents Tab */}
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-bold text-white">Агенты-шаблоны</h2>
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                  <h2 className="text-base sm:text-lg font-bold text-white">Агенты-шаблоны</h2>
                   <button
                     onClick={() => handleOpenAgentDialog()}
-                    className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                    className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1 sm:gap-2"
                   >
-                    <Plus size={16} />
-                    Создать агента
+                    <Plus size={14} className="sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Создать агента</span>
+                    <span className="sm:hidden">Создать</span>
                   </button>
                 </div>
 
@@ -701,32 +802,33 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                     <Loader2 size={24} className="animate-spin text-indigo-400" />
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {agents.length === 0 ? (
-                      <div className="text-center py-8 text-white/60">
+                      <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-white/60">
                         Нет агентов. Создайте первого агента.
                       </div>
                     ) : (
                       agents.map((agent) => (
                         <div
                           key={agent.id}
-                          className="p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                          onClick={() => handleOpenAgentDialog(agent)}
+                          className="p-2.5 sm:p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
                         >
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start justify-between gap-2 sm:gap-4">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Bot size={18} className="text-indigo-400" />
-                                <h3 className="text-white font-semibold">{agent.name}</h3>
+                              <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                                <Bot size={16} className="sm:w-[18px] sm:h-[18px] text-indigo-400 shrink-0" />
+                                <h3 className="text-sm sm:text-base text-white font-semibold truncate">{agent.name}</h3>
                               </div>
                               {agent.description && (
-                                <p className="text-sm text-white/60 mb-2">{agent.description}</p>
+                                <p className="text-xs sm:text-sm text-white/60 mb-1.5 sm:mb-2 line-clamp-2">{agent.description}</p>
                               )}
                               {agent.projectTypes && agent.projectTypes.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
+                                <div className="flex flex-wrap gap-1 sm:gap-2 mt-1.5 sm:mt-2">
                                   {agent.projectTypes.map((pt) => (
                                     <span
                                       key={pt.id}
-                                      className="px-2 py-1 bg-indigo-500/20 text-indigo-300 text-xs rounded-full border border-indigo-500/30"
+                                      className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-indigo-500/20 text-indigo-300 text-[10px] sm:text-xs rounded-full border border-indigo-500/30"
                                     >
                                       {pt.name}
                                     </span>
@@ -734,20 +836,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => handleOpenAgentDialog(agent)}
-                                className="p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
                                 title="Редактировать"
                               >
-                                <Edit2 size={16} />
+                                <Edit2 size={14} className="sm:w-4 sm:h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeleteAgent(agent.id, agent.name)}
-                                className="p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
                                 title="Удалить"
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={14} className="sm:w-4 sm:h-4" />
                               </button>
                             </div>
                           </div>
@@ -764,66 +866,421 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
       {/* Agent Dialog */}
       {isAgentDialogOpen && (
         <div 
-          className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4"
+          className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-x-hidden"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setIsProjectTypesDropdownOpen(false);
+              setIsRoleDropdownOpen(false);
+              setIsModelDropdownOpen(false);
+              // Не закрываем диалог при клике вне области, чтобы пользователь мог сохранить изменения
             }
           }}
         >
-          <div className="w-full max-w-2xl bg-gradient-to-b from-black/90 via-black/80 to-black/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="w-full max-w-2xl bg-gradient-to-b from-black/90 via-black/80 to-black/90 backdrop-blur-2xl border border-white/10 rounded-xl sm:rounded-[2rem] shadow-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden mx-auto">
             {/* Dialog Header */}
-            <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
-              <h2 className="text-xl font-bold text-white">
-                {editingAgent ? 'Редактировать агента' : 'Создать агента'}
-              </h2>
-              <button
-                onClick={handleCloseAgentDialog}
-                className="p-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
+            <div className="border-b border-white/10 bg-white/5 shrink-0">
+              <div className="p-3 sm:p-4 md:p-6 flex justify-between items-center">
+                <h2 className="text-base sm:text-lg md:text-xl font-bold text-white">
+                  {editingAgent ? 'Редактировать агента' : 'Создать агента'}
+                </h2>
+                <button
+                  onClick={handleCloseAgentDialog}
+                  className="p-1.5 sm:p-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
+                >
+                  <X size={18} className="sm:w-5 sm:h-5" />
+                </button>
+              </div>
+              
+              {/* Auto-save indicator */}
+              <div className="px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      if (!editingAgent) return null;
+                      
+                      const hasChanges = 
+                        agentName.trim() !== (editingAgent.name || '') ||
+                        agentDescription.trim() !== (editingAgent.description || '') ||
+                        agentSystemInstruction.trim() !== (editingAgent.systemInstruction || '') ||
+                        agentSummaryInstruction.trim() !== (editingAgent.summaryInstruction || '') ||
+                        agentModel !== resolveModel(editingAgent.model) ||
+                        agentRole !== (editingAgent.role || '');
+                      
+                      if (isSavingAgent) {
+                        return (
+                          <>
+                            <Loader2 size={12} className="animate-spin text-indigo-400" />
+                            <span className="text-indigo-400">Сохранение...</span>
+                          </>
+                        );
+                      }
+                      
+                      // Проверяем, есть ли активный таймер автосохранения
+                      const isPendingSave = saveTimeoutRef.current !== null;
+                      
+                      if (hasChanges && isPendingSave) {
+                        return (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                            <span className="text-amber-400">Сохранение через 1 сек...</span>
+                          </>
+                        );
+                      }
+                      
+                      if (hasChanges && !isPendingSave) {
+                        return (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                            <span className="text-amber-400">Изменения не сохранены</span>
+                          </>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                          <span className="text-emerald-400">Все изменения сохранены</span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <span className="text-white/30 text-[10px]">Автосохранение включено</span>
+                </div>
+              </div>
             </div>
 
             {/* Dialog Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Agent Name */}
-              <section>
-                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-                  Имя агента
-                </label>
-                <div className="relative group">
-                  <input
-                    type="text"
-                    value={agentName}
-                    onChange={(e) => setAgentName(e.target.value)}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner"
-                    placeholder="Название агента"
-                  />
-                  <Edit3 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors" />
-                </div>
-              </section>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
 
-              {/* Project Types Selection */}
-              <section>
-                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-                  Привязать к типам проектов
-                </label>
+              {/* Основная информация - Группа 1 */}
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-5 bg-gradient-to-br from-indigo-950/30 to-purple-950/20 rounded-xl sm:rounded-2xl border border-indigo-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="p-1 sm:p-1.5 bg-indigo-500/20 rounded-lg">
+                    <Bot size={12} className="sm:w-3.5 sm:h-3.5 text-indigo-300" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white">Основная информация</h3>
+                </div>
+                
+                {/* Agent Name */}
+                <section>
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
+                    Имя агента
+                    <span className="text-red-400">*</span>
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-40 sm:w-48 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Уникальное имя для идентификации агента в системе
+                      </div>
+                    </div>
+                  </label>
+                  <div className="relative group">
+                    <input
+                      type="text"
+                      value={agentName}
+                      onChange={(e) => setAgentName(e.target.value)}
+                      className={`w-full bg-black/40 border rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 pl-8 sm:pl-10 pr-14 sm:pr-20 text-xs sm:text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${
+                        !agentName.trim() 
+                          ? 'border-red-500/30 focus:border-red-500/50' 
+                          : 'border-white/10'
+                      }`}
+                      placeholder="Например: Ассистент по маркетингу"
+                      maxLength={100}
+                    />
+                    <Edit3 size={12} className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors sm:w-3.5 sm:h-3.5" />
+                    <div className="absolute right-1.5 sm:right-3 top-1/2 -translate-y-1/2 text-[9px] sm:text-[10px] text-white/30">
+                      {agentName.length}/100
+                    </div>
+                  </div>
+                  {!agentName.trim() && (
+                    <p className="mt-1 text-[9px] sm:text-[10px] text-red-400">Имя агента обязательно</p>
+                  )}
+                </section>
+
+                {/* Description */}
+                <section>
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
+                    Описание
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-40 sm:w-48 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Краткое описание назначения и функций агента
+                      </div>
+                    </div>
+                  </label>
+                  <textarea
+                    value={agentDescription}
+                    onChange={(e) => setAgentDescription(e.target.value)}
+                    className="w-full h-20 sm:h-24 bg-black/40 border border-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 text-xs text-white/90 focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner"
+                    placeholder="Опишите, для чего предназначен этот агент..."
+                    maxLength={500}
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-[9px] sm:text-[10px] text-white/30">Опционально</span>
+                    <span className="text-[9px] sm:text-[10px] text-white/30">{agentDescription.length}/500</span>
+                  </div>
+                </section>
+              </div>
+
+              {/* Инструкции - Группа 2 */}
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-5 bg-gradient-to-br from-amber-950/30 to-orange-950/20 rounded-xl sm:rounded-2xl border border-amber-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="p-1 sm:p-1.5 bg-amber-500/20 rounded-lg">
+                    <PenTool size={12} className="sm:w-3.5 sm:h-3.5 text-amber-300" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white">Инструкции агента</h3>
+                </div>
+
+                {/* System Instruction */}
+                <section>
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
+                    Системная инструкция
+                    <span className="text-red-400">*</span>
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-52 sm:w-64 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Основные правила поведения агента. Опишите, как агент должен отвечать на вопросы и взаимодействовать с пользователем.
+                      </div>
+                    </div>
+                  </label>
+                  <textarea
+                    value={agentSystemInstruction}
+                    onChange={(e) => setAgentSystemInstruction(e.target.value)}
+                    className={`w-full h-32 sm:h-40 bg-black/40 border rounded-lg sm:rounded-xl p-2 sm:p-3 text-xs text-white/90 focus:ring-2 focus:ring-amber-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed font-mono ${
+                      !agentSystemInstruction.trim() 
+                        ? 'border-red-500/30 focus:border-red-500/50' 
+                        : 'border-white/10'
+                    }`}
+                    placeholder="Ты - полезный AI-ассистент. Твоя задача - помогать пользователям..."
+                    maxLength={5000}
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    {!agentSystemInstruction.trim() ? (
+                      <span className="text-[9px] sm:text-[10px] text-red-400">Системная инструкция обязательна</span>
+                    ) : (
+                      <span className="text-[9px] sm:text-[10px] text-white/30">Рекомендуется: 200-1000 символов</span>
+                    )}
+                    <span className="text-[9px] sm:text-[10px] text-white/30">{agentSystemInstruction.length}/5000</span>
+                  </div>
+                </section>
+
+                {/* Summary Instruction */}
+                <section className="bg-gradient-to-br from-indigo-900/20 to-purple-900/10 p-3 sm:p-4 rounded-lg sm:rounded-xl border border-indigo-500/20">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 text-indigo-300">
+                    <FileCheck size={12} className="sm:w-3.5 sm:h-3.5" />
+                    <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest">
+                      Инструкция для сохранения результатов
+                      <div className="group relative">
+                        <Info size={9} className="sm:w-2.5 sm:h-2.5 text-indigo-300/50 hover:text-indigo-300 cursor-help" />
+                        <div className="absolute left-0 top-full mt-2 w-52 sm:w-64 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                          Укажите, как агент должен форматировать и сохранять результаты работы
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                  <textarea
+                    value={agentSummaryInstruction}
+                    onChange={(e) => setAgentSummaryInstruction(e.target.value)}
+                    className="w-full h-20 sm:h-24 bg-black/30 border border-white/10 rounded-lg p-2 sm:p-3 text-xs text-white/80 focus:ring-1 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all"
+                    placeholder="Сохраняй результаты в формате Markdown. Используй заголовки для структуры..."
+                    maxLength={2000}
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-[9px] sm:text-[10px] text-white/30">Опционально</span>
+                    <span className="text-[9px] sm:text-[10px] text-white/30">{agentSummaryInstruction.length}/2000</span>
+                  </div>
+                </section>
+              </div>
+
+              {/* Конфигурация модели - Группа 3 */}
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-5 bg-gradient-to-br from-purple-950/30 to-pink-950/20 rounded-xl sm:rounded-2xl border border-purple-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="p-1 sm:p-1.5 bg-purple-500/20 rounded-lg">
+                    <Cpu size={12} className="sm:w-3.5 sm:h-3.5 text-purple-300" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white">Конфигурация модели</h3>
+                </div>
+
+                {/* Model Selection - компактный вид */}
+                <section>
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
+                    Модель ИИ
+                    <span className="text-red-400">*</span>
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-48 sm:w-56 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Выберите модель для обработки запросов. GPT-5.1 - самый мощный, GPT-4o-mini - самый быстрый
+                      </div>
+                    </div>
+                  </label>
+                  
+                  {/* Компактный вид - показываем только выбранную модель */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsModelDropdownOpen(!isModelDropdownOpen);
+                        setIsProjectTypesDropdownOpen(false);
+                        setIsRoleDropdownOpen(false);
+                      }}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-white focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all shadow-inner flex items-center justify-between hover:bg-black/50 group"
+                    >
+                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                        {(() => {
+                          const selectedModel = MODELS.find(m => m.id === agentModel);
+                          if (!selectedModel) return null;
+                          return (
+                            <>
+                              <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/30 shrink-0">
+                                {renderModelIcon(selectedModel.id as LLMModel)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                                  <span className="text-xs sm:text-sm font-bold text-white">
+                                    {selectedModel.name}
+                                  </span>
+                                  <span className="text-[9px] sm:text-[10px] text-purple-300 font-semibold bg-purple-500/20 px-1.5 sm:px-2 py-0.5 rounded-full">
+                                    {selectedModel.id === LLMModel.GPT4O_MINI ? '⚡ Быстрая' : selectedModel.id === LLMModel.GPT51 ? '🧠 Мощная' : '💎 Сбалансированная'}
+                                  </span>
+                                </div>
+                                <p className="text-[9px] sm:text-[10px] text-white/60 truncate mt-0.5 text-left">
+                                  {selectedModel.description}
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                      <svg
+                        className={`w-4 h-4 text-white/40 transition-transform shrink-0 ml-2 ${isModelDropdownOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {isModelDropdownOpen && (
+                      <>
+                        {/* Backdrop to close on click outside */}
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setIsModelDropdownOpen(false)}
+                        />
+                        <div className="absolute z-20 w-full mt-2 bg-gradient-to-b from-black/95 via-black/90 to-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                          <div className="py-1">
+                            {MODELS.map((m) => {
+                              const isSelected = agentModel === m.id;
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAgentModel(m.id);
+                                    setIsModelDropdownOpen(false);
+                                  }}
+                                  className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
+                                    isSelected
+                                      ? 'bg-purple-500/10 hover:bg-purple-500/15'
+                                      : 'hover:bg-white/5'
+                                  }`}
+                                >
+                                  <div className={`p-2 rounded-lg shrink-0 ${
+                                    isSelected ? 'bg-purple-500/30' : 'bg-white/5'
+                                  }`}>
+                                    {renderModelIcon(m.id as LLMModel)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-white/80'}`}>
+                                        {m.name}
+                                      </span>
+                                      <span className="text-[10px] text-white/50">
+                                        {m.id === LLMModel.GPT4O_MINI ? '⚡ Быстрая' : m.id === LLMModel.GPT51 ? '🧠 Мощная' : '💎 Сбалансированная'}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-white/60 leading-relaxed text-left">
+                                      {m.description}
+                                    </p>
+                                  </div>
+                                  {isSelected && (
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <div className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,1)]"></div>
+                                      <span className="text-[10px] text-purple-300 font-semibold">Выбрано</span>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              {/* Привязки - Группа 4 */}
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-5 bg-gradient-to-br from-cyan-950/30 to-blue-950/20 rounded-xl sm:rounded-2xl border border-cyan-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="p-1 sm:p-1.5 bg-cyan-500/20 rounded-lg">
+                    <Layout size={12} className="sm:w-3.5 sm:h-3.5 text-cyan-300" />
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white">Привязки к проектам</h3>
+                </div>
+
+                {/* Project Types Selection */}
+                <section>
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
+                    Типы проектов
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-40 sm:w-48 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Выберите типы проектов, где будет доступен этот агент
+                      </div>
+                    </div>
+                  </label>
                 
                 {/* Dropdown Multi-Select */}
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setIsProjectTypesDropdownOpen(!isProjectTypesDropdownOpen)}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner flex items-center justify-between hover:bg-black/40"
+                    onClick={() => {
+                      setIsProjectTypesDropdownOpen(!isProjectTypesDropdownOpen);
+                      setIsRoleDropdownOpen(false);
+                      setIsModelDropdownOpen(false);
+                    }}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all shadow-inner flex items-center justify-between hover:bg-black/50 min-h-[40px] sm:min-h-[48px]"
                   >
-                    <span className={selectedProjectTypeIds.length > 0 ? 'text-white' : 'text-white/40'}>
-                      {selectedProjectTypeIds.length > 0
-                        ? `Выбрано: ${selectedProjectTypeIds.length}`
-                        : 'Выберите типы проектов'}
-                    </span>
+                    <div className="flex-1 flex items-center gap-2 flex-wrap min-w-0">
+                      {selectedProjectTypeIds.length > 0 ? (
+                        <>
+                          {selectedProjectTypeIds.slice(0, 2).map((id) => {
+                            const type = projectTypes.find(pt => pt.id === id);
+                            if (!type) return null;
+                            return (
+                              <span
+                                key={id}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-500/20 text-cyan-300 text-xs rounded-full border border-cyan-500/30 font-medium shrink-0"
+                              >
+                                {type.name}
+                              </span>
+                            );
+                          })}
+                          {selectedProjectTypeIds.length > 2 && (
+                            <span className="text-xs text-white/60 font-medium">
+                              +{selectedProjectTypeIds.length - 2}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-white/40">Выберите типы проектов</span>
+                      )}
+                    </div>
                     <svg
-                      className={`w-4 h-4 text-white/40 transition-transform ${isProjectTypesDropdownOpen ? 'rotate-180' : ''}`}
+                      className={`w-4 h-4 text-white/40 transition-transform shrink-0 ml-2 ${isProjectTypesDropdownOpen ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -843,7 +1300,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                       <div className="absolute z-20 w-full mt-2 bg-gradient-to-b from-black/95 via-black/90 to-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden">
                         {/* Selected items at top */}
                         {selectedProjectTypeIds.length > 0 && (
-                          <div className="p-3 border-b border-white/10 bg-indigo-500/5">
+                          <div className="p-3 border-b border-white/10 bg-cyan-500/5">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">
+                                Выбрано: {selectedProjectTypeIds.length}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedProjectTypeIds([]);
+                                }}
+                                className="text-[10px] text-cyan-300/60 hover:text-cyan-300 transition-colors"
+                                type="button"
+                              >
+                                Очистить все
+                              </button>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {selectedProjectTypeIds.map((id) => {
                                 const type = projectTypes.find(pt => pt.id === id);
@@ -851,7 +1323,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                                 return (
                                   <span
                                     key={id}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/20 text-indigo-300 text-xs rounded-full border border-indigo-500/30"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-500/20 text-cyan-300 text-xs rounded-full border border-cyan-500/30"
                                   >
                                     {type.name}
                                     <button
@@ -859,7 +1331,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                                         e.stopPropagation();
                                         toggleProjectType(id);
                                       }}
-                                      className="hover:text-indigo-100 transition-colors"
+                                      className="hover:text-cyan-100 transition-colors rounded-full hover:bg-cyan-500/20 p-0.5"
                                       type="button"
                                     >
                                       <X size={12} />
@@ -885,7 +1357,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                                   key={type.id}
                                   className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
                                     isSelected
-                                      ? 'bg-indigo-500/10 hover:bg-indigo-500/15'
+                                      ? 'bg-cyan-500/10 hover:bg-cyan-500/15'
                                       : 'hover:bg-white/5'
                                   }`}
                                   onClick={(e) => e.stopPropagation()}
@@ -894,10 +1366,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleProjectType(type.id)}
-                                    className="w-4 h-4 rounded border-white/20 bg-black/30 text-indigo-500 focus:ring-indigo-500/50 focus:ring-offset-0 cursor-pointer"
+                                    className="w-4 h-4 rounded border-white/20 bg-black/30 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-0 cursor-pointer"
                                     onClick={(e) => e.stopPropagation()}
                                   />
-                                  <span className={`text-sm flex-1 ${isSelected ? 'text-indigo-300 font-medium' : 'text-white'}`}>
+                                  <span className={`text-sm flex-1 ${isSelected ? 'text-cyan-300 font-medium' : 'text-white'}`}>
                                     {type.name}
                                   </span>
                                 </label>
@@ -911,57 +1383,137 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                 </div>
               </section>
 
-              {/* Description */}
-              <section>
-                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-                  Описание
-                </label>
-                <textarea
-                  value={agentDescription}
-                  onChange={(e) => setAgentDescription(e.target.value)}
-                  className="w-full h-20 bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/90 focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner"
-                  placeholder="Краткое описание агента"
-                />
-              </section>
+                {/* Role */}
+                <section>
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
+                    Специализация
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-40 sm:w-48 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Роль определяет особое поведение агента в системе
+                      </div>
+                    </div>
+                  </label>
+                  
+                  {/* Custom Dropdown */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRoleDropdownOpen(!isRoleDropdownOpen);
+                        setIsProjectTypesDropdownOpen(false);
+                      }}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition-all shadow-inner flex items-center justify-between hover:bg-black/50 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        {(() => {
+                          const roleConfig = {
+                            '': { icon: null, label: 'Не выбрано', color: 'text-white/40' },
+                            'copywriter': { icon: PenTool, label: 'Копирайтер', color: 'text-cyan-300' },
+                            'layout': { icon: Layout, label: 'Верстальщик', color: 'text-purple-300' },
+                            'dsl': { icon: Code2, label: 'DSL', color: 'text-emerald-300' },
+                          };
+                          const config = roleConfig[agentRole as keyof typeof roleConfig] || roleConfig[''];
+                          const Icon = config.icon;
+                          return (
+                            <>
+                              {Icon && (
+                                <div className={`p-1.5 rounded-lg bg-${agentRole === 'copywriter' ? 'cyan' : agentRole === 'layout' ? 'purple' : agentRole === 'dsl' ? 'emerald' : 'white'}-500/20`}>
+                                  <Icon size={14} className={config.color} />
+                                </div>
+                              )}
+                              <span className={agentRole ? 'text-white' : 'text-white/40'}>
+                                {config.label}
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                      <svg
+                        className={`w-4 h-4 text-white/40 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
 
-              {/* Model Selection */}
-              <section>
-                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-                  Модель
-                </label>
-                <div className="relative group">
-                  <select
-                    value={agentModel}
-                    onChange={(e) => setAgentModel(e.target.value as LLMModel)}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pl-10 pr-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner appearance-none cursor-pointer"
-                  >
-                    {MODELS.map((m) => (
-                      <option key={m.id} value={m.id} className="bg-black text-white">
-                        {m.name} - {m.description}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    {renderModelIcon(agentModel)}
+                    {/* Dropdown Menu */}
+                    {isRoleDropdownOpen && (
+                      <>
+                        {/* Backdrop to close on click outside */}
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setIsRoleDropdownOpen(false)}
+                        />
+                        <div className="absolute z-20 w-full mt-2 bg-gradient-to-b from-black/95 via-black/90 to-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                          <div className="py-1">
+                            {[
+                              { value: '', label: 'Не выбрано', icon: null, color: 'text-white/60' },
+                              { value: 'copywriter', label: 'Копирайтер', icon: PenTool, color: 'text-cyan-300', bgColor: 'bg-cyan-500/20', borderColor: 'border-cyan-500/30' },
+                              { value: 'layout', label: 'Верстальщик', icon: Layout, color: 'text-purple-300', bgColor: 'bg-purple-500/20', borderColor: 'border-purple-500/30' },
+                              { value: 'dsl', label: 'DSL', icon: Code2, color: 'text-emerald-300', bgColor: 'bg-emerald-500/20', borderColor: 'border-emerald-500/30' },
+                            ].map((role) => {
+                              const isSelected = agentRole === role.value;
+                              const Icon = role.icon;
+                              return (
+                                <button
+                                  key={role.value}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAgentRole(role.value);
+                                    setIsRoleDropdownOpen(false);
+                                  }}
+                                  className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${
+                                    isSelected
+                                      ? 'bg-cyan-500/10 hover:bg-cyan-500/15'
+                                      : 'hover:bg-white/5'
+                                  }`}
+                                >
+                                  {Icon ? (
+                                    <div className={`p-1.5 rounded-lg ${isSelected ? role.bgColor : 'bg-white/5'} border ${isSelected ? role.borderColor : 'border-white/10'}`}>
+                                      <Icon size={14} className={isSelected ? role.color : 'text-white/50'} />
+                                    </div>
+                                  ) : (
+                                    <div className="w-8 h-8" />
+                                  )}
+                                  <span className={`text-sm flex-1 text-left ${isSelected ? 'text-cyan-300 font-medium' : 'text-white'}`}>
+                                    {role.label}
+                                  </span>
+                                  {isSelected && (
+                                    <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)]"></div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </section>
+                </section>
+              </div>
 
-              {/* Knowledge Base Section */}
-              <section className="bg-gradient-to-br from-emerald-900/20 to-teal-900/10 p-4 rounded-xl border border-emerald-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Brain size={16} className="text-emerald-300" />
-                    <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest">
+              {/* База знаний - Группа 5 */}
+              <section className="bg-gradient-to-br from-emerald-900/20 to-teal-900/10 p-3 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border border-emerald-500/20">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="p-1 sm:p-1.5 bg-emerald-500/20 rounded-lg">
+                      <Brain size={14} className="sm:w-4 sm:h-4 text-emerald-300" />
+                    </div>
+                    <label className="block text-xs sm:text-sm font-bold text-emerald-300">
                       База знаний
                     </label>
+                    <div className="group relative">
+                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-emerald-300/50 hover:text-emerald-300 cursor-help" />
+                      <div className="absolute left-0 top-full mt-2 w-48 sm:w-56 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                        Загрузите документы (.txt, .md), которые агент будет использовать как справочную информацию
+                      </div>
+                    </div>
                   </div>
-                  <span className="px-2 py-1 bg-emerald-500/20 rounded-full text-[9px] text-emerald-300 font-semibold">
+                  <span className="px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-500/20 rounded-full text-[10px] sm:text-xs text-emerald-300 font-semibold border border-emerald-500/30">
                     {agentFiles.filter(file => !file.name.startsWith('Summary')).length} файлов
                   </span>
                 </div>
@@ -972,7 +1524,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                       onClick={() => !isUploadingFiles && fileInputRef.current?.click()}
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
-                      className={`border-2 border-dashed rounded-xl p-6 text-center transition-all group mb-3 ${
+                      className={`border-2 border-dashed rounded-lg sm:rounded-xl p-4 sm:p-6 text-center transition-all group mb-2 sm:mb-3 ${
                         isUploadingFiles
                           ? 'border-emerald-500/20 bg-emerald-500/5 cursor-wait opacity-60'
                           : 'border-emerald-500/30 hover:border-emerald-400/60 hover:bg-emerald-500/10 bg-emerald-500/5 cursor-pointer'
@@ -980,18 +1532,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                     >
                       {isUploadingFiles ? (
                         <>
-                          <Loader2 className="mx-auto h-7 w-7 text-emerald-300/70 mb-2 animate-spin" />
-                          <p className="text-xs font-medium text-emerald-200/80 transition-colors mb-1">
+                          <Loader2 className="mx-auto h-5 w-5 sm:h-7 sm:w-7 text-emerald-300/70 mb-1.5 sm:mb-2 animate-spin" />
+                          <p className="text-[10px] sm:text-xs font-medium text-emerald-200/80 transition-colors mb-1">
                             Загрузка файлов...
                           </p>
                         </>
                       ) : (
                         <>
-                          <Upload className="mx-auto h-7 w-7 text-emerald-300/70 group-hover:text-emerald-300 mb-2 transition-colors duration-300" />
-                          <p className="text-xs font-medium text-emerald-200/80 group-hover:text-emerald-200 transition-colors mb-1">
+                          <Upload className="mx-auto h-5 w-5 sm:h-7 sm:w-7 text-emerald-300/70 group-hover:text-emerald-300 mb-1.5 sm:mb-2 transition-colors duration-300" />
+                          <p className="text-[10px] sm:text-xs font-medium text-emerald-200/80 group-hover:text-emerald-200 transition-colors mb-1">
                             Перетащите файлы сюда или нажмите для загрузки
                           </p>
-                          <p className="text-[10px] text-emerald-300/50">
+                          <p className="text-[9px] sm:text-[10px] text-emerald-300/50">
                             .txt, .md файлы только
                           </p>
                         </>
@@ -1040,77 +1592,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose }) => {
                 )}
               </section>
 
-              {/* System Instruction */}
-              <section>
-                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-                  Системная инструкция
-                </label>
-                <textarea
-                  value={agentSystemInstruction}
-                  onChange={(e) => setAgentSystemInstruction(e.target.value)}
-                  className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white/90 focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed"
-                  placeholder="Определите поведение агента..."
-                />
-              </section>
-
-              {/* Summary Instruction */}
-              <section className="bg-gradient-to-br from-indigo-900/20 to-purple-900/10 p-4 rounded-xl border border-indigo-500/20">
-                <div className="flex items-center gap-2 mb-2 text-indigo-300">
-                  <FileCheck size={14} />
-                  <label className="block text-[10px] font-bold uppercase tracking-widest">
-                    Инструкция для сохранения результатов
-                  </label>
-                </div>
-                <textarea
-                  value={agentSummaryInstruction}
-                  onChange={(e) => setAgentSummaryInstruction(e.target.value)}
-                  className="w-full h-20 bg-black/20 border border-white/5 rounded-lg p-2 text-xs text-white/80 focus:ring-1 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all"
-                  placeholder="Инструкции для сохранения результатов..."
-                />
-              </section>
-
-              {/* Role */}
-              <section>
-                <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
-                  Роль
-                </label>
-                <div className="relative group">
-                  <select
-                    value={agentRole}
-                    onChange={(e) => setAgentRole(e.target.value)}
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pr-10 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner appearance-none cursor-pointer"
-                  >
-                    <option value="" className="bg-black text-white">Не выбрано</option>
-                    <option value="copywriter" className="bg-black text-white">Копирайтер</option>
-                    <option value="layout" className="bg-black text-white">Верстальщик</option>
-                    <option value="dsl" className="bg-black text-white">DSL</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
-              </section>
             </div>
 
             {/* Dialog Footer */}
-            <div className="p-6 border-t border-white/10 bg-black/20 backdrop-blur-xl shrink-0 flex gap-3">
+            <div className="p-3 sm:p-4 md:p-6 border-t border-white/10 bg-black/20 backdrop-blur-xl shrink-0 flex gap-2 sm:gap-3">
               <button
                 onClick={handleCloseAgentDialog}
-                className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-semibold text-sm transition-all"
+                className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-white/5 hover:bg-white/10 text-white rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm transition-all"
               >
                 Отмена
               </button>
               <button
                 onClick={handleSaveAgent}
                 disabled={isSavingAgent || !agentName.trim()}
-                className="flex-1 px-4 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 sm:gap-2"
               >
                 {isSavingAgent ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Сохранение...
+                    <Loader2 size={14} className="sm:w-4 sm:h-4 animate-spin" />
+                    <span className="hidden sm:inline">Сохранение...</span>
+                    <span className="sm:hidden">Сохранение</span>
                   </>
                 ) : (
                   'Сохранить'

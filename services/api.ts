@@ -368,7 +368,7 @@ export const api = {
   },
 
   async sendMessage(agentId: string, text: string, projectId?: string) {
-    return request<{ messages: ApiMessage[] }>(`/agents/${agentId}/messages`, {
+    return request<{ messages: ApiMessage[]; agentId?: string; templateId?: string }>(`/agents/${agentId}/messages`, {
       method: 'POST',
       body: JSON.stringify({ text, projectId }),
     });

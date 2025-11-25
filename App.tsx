@@ -5,7 +5,6 @@ import { Message, Role, LLMModel, MODELS, UploadedFile, Agent, User, Project, Pr
 import { MessageBubble } from './components/MessageBubble';
 import { MessageSkeleton } from './components/MessageSkeleton';
 import { ChatInput } from './components/ChatInput';
-import { SettingsPanel } from './components/SettingsPanel';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
 import { AuthPage } from './components/AuthPage';
@@ -118,9 +117,9 @@ export default function App() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summarySuccess, setSummarySuccess] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -160,12 +159,12 @@ export default function App() {
   const lastBootstrapTokenRef = useRef<string | null>(null);
 
   const activeAgent = useMemo(() => {
-    const allAgents = [...projectTypeAgents, ...agents];
+    // Теперь используем только projectTypeAgents
     if (!activeAgentId) {
-      return allAgents[0];
+      return projectTypeAgents[0];
     }
-    return allAgents.find((agent) => agent.id === activeAgentId) ?? allAgents[0];
-  }, [activeAgentId, agents, projectTypeAgents]);
+    return projectTypeAgents.find((agent) => agent.id === activeAgentId) ?? projectTypeAgents[0];
+  }, [activeAgentId, projectTypeAgents]);
 
   const messages = activeAgent ? chatHistories[activeAgent.id] ?? [] : [];
   // Документы проекта общие для всех агентов - всегда используем ключ 'all'
@@ -202,28 +201,6 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeAgent?.id, isLoading]);
 
-  // Отслеживаем появление новых агентов и открываем SettingsPanel
-  useEffect(() => {
-    // Пропускаем во время bootstrap, чтобы не открывать панель при начальной загрузке
-    if (isBootstrapping) {
-      return;
-    }
-    
-    const allAgents = [...projectTypeAgents, ...agents];
-    const currentAgentIds = new Set(allAgents.map(agent => agent.id));
-    
-    // Если есть активный агент и он новый (не был в отслеживаемом списке)
-    // И отслеживаемый список не был пустым (чтобы не срабатывать при первой загрузке)
-    if (activeAgentId && activeAgent && 
-        !trackedAgentsRef.current.has(activeAgentId) && 
-        trackedAgentsRef.current.size > 0) {
-      // Открываем SettingsPanel для нового агента
-      setIsSettingsOpen(true);
-    }
-    
-    // Обновляем список отслеживаемых агентов
-    trackedAgentsRef.current = currentAgentIds;
-  }, [activeAgentId, activeAgent, agents, projectTypeAgents, isBootstrapping]);
 
   const handleLogout = useCallback(() => {
     api.clearToken();
@@ -309,14 +286,12 @@ export default function App() {
           setAgents(mappedAgents);
           setProjectTypeAgents(mappedProjectTypeAgents);
           
-          // Выбираем активного агента (приоритет обычным агентам)
-          const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
+          // Выбираем активного агента из projectTypeAgents
           setActiveAgentId((prev) => {
-            if (prev && allAgents.some((agent) => agent.id === prev)) {
+            if (prev && mappedProjectTypeAgents.some((agent) => agent.id === prev)) {
               return prev;
             }
-            // Приоритет обычным агентам проекта
-            return mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null;
+            return mappedProjectTypeAgents[0]?.id ?? null;
           });
         } catch (error) {
           console.error('Failed to load agents in bootstrap', error);
@@ -402,6 +377,35 @@ export default function App() {
     }
   }, [currentUser, projects.length]);
 
+  // Проверка, является ли пользователь администратором
+  const isAdmin = currentUser && (currentUser.username === 'admin' || currentUser.role === 'admin');
+
+  // Функция для перезагрузки агентов текущего проекта
+  const reloadAgents = useCallback(async () => {
+    if (!activeProjectId) return;
+    
+    try {
+      const { agents: apiAgents, projectTypeAgents: apiProjectTypeAgents } = await api.getAgents(activeProjectId);
+      const mappedAgents = sortAgents(apiAgents.map(mapAgent));
+      const mappedProjectTypeAgents = apiProjectTypeAgents 
+        ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
+        : [];
+      setAgents(mappedAgents);
+      setProjectTypeAgents(mappedProjectTypeAgents);
+      
+      // Обновляем активного агента, если он все еще существует
+      const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
+      setActiveAgentId((prev) => {
+        if (prev && allAgents.some((agent) => agent.id === prev)) {
+          return prev;
+        }
+        return mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null;
+      });
+    } catch (error) {
+      console.error('Failed to reload agents', error);
+    }
+  }, [activeProjectId]);
+
   useEffect(() => {
     if (authToken) {
       bootstrap();
@@ -415,17 +419,8 @@ export default function App() {
     if (!currentUser || !activeAgent) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + K - открыть настройки агента
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsSettingsOpen(true);
-      }
-      
       // Escape - закрыть модальные окна
       if (e.key === 'Escape') {
-        if (isSettingsOpen) {
-          setIsSettingsOpen(false);
-        }
         if (isDocsOpen) {
           setIsDocsOpen(false);
         }
@@ -443,7 +438,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentUser, activeAgent, isSettingsOpen, isDocsOpen, isSidebarOpen]);
+  }, [currentUser, activeAgent, isDocsOpen, isSidebarOpen]);
 
   // Проверяем, находимся ли мы на странице админ-панели
   // ВАЖНО: Этот хук должен быть вызван ДО условного возврата, чтобы соблюдать правила хуков
@@ -453,6 +448,7 @@ export default function App() {
         setIsAdminOpen(true);
       } else if (window.location.hash === '' && isAdminOpen) {
         setIsAdminOpen(false);
+        setAdminInitialAgentId(undefined);
       }
     };
 
@@ -797,6 +793,12 @@ export default function App() {
   const handleSendMessage = async (text: string) => {
     if (!activeAgent || !text.trim() || isLoading) return;
 
+    // Проверяем наличие активного проекта
+    if (!activeProjectId) {
+      showAlert('Ошибка: не выбран активный проект', undefined, 'error', 3000);
+      return;
+    }
+
     setIsLoading(true);
     setSummarySuccess(false);
 
@@ -835,10 +837,30 @@ export default function App() {
     }, 100);
 
     try {
-      const response = await api.sendMessage(activeAgent.id, text.trim());
+      const response = await api.sendMessage(activeAgent.id, text.trim(), activeProjectId);
       const newMessages = response.messages.map(mapMessage);
       
+      // Если агент был создан из шаблона, получаем новый agentId
+      const actualAgentId = response.agentId || activeAgent.id;
+      
+      // Если агент был создан, обновляем activeAgentId и перезагружаем агентов
+      if (response.agentId && response.agentId !== activeAgent.id) {
+        setActiveAgentId(response.agentId);
+        // Перезагружаем агентов, чтобы новый агент появился в списке
+        if (activeProjectId) {
+          api.getAgents(activeProjectId).then(({ agents: apiAgents, projectTypeAgents: apiProjectTypeAgents }) => {
+            const mappedAgents = sortAgents(apiAgents.map(mapAgent));
+            const mappedProjectTypeAgents = apiProjectTypeAgents 
+              ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
+              : [];
+            setAgents(mappedAgents);
+            setProjectTypeAgents(mappedProjectTypeAgents);
+          }).catch(console.error);
+        }
+      }
+      
       // Заменяем временные сообщения на реальные сообщения из API
+      // Используем actualAgentId, так как сообщения привязаны к созданному агенту
       setChatHistories((prev) => {
         const currentMessages = prev[activeAgent.id] ?? [];
         // Удаляем временные сообщения (пользователя и загрузки)
@@ -846,10 +868,10 @@ export default function App() {
           (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
         );
         
-        // Добавляем реальные сообщения из API (они содержат корректные ID из базы данных)
+        // Добавляем реальные сообщения из API под правильным agentId
         return {
           ...prev,
-          [activeAgent.id]: [...messagesWithoutTemp, ...newMessages],
+          [actualAgentId]: [...messagesWithoutTemp, ...newMessages],
         };
       });
     } catch (error: any) {
@@ -1119,9 +1141,32 @@ export default function App() {
         role: agent.role,
       });
       const mapped = mapAgent(response.agent);
-      setAgents((prev) => sortAgents(prev.map((item) => (item.id === mapped.id ? mapped : item))));
+      
+      // Обновляем в списке агентов проекта
+      setAgents((prev) => {
+        const found = prev.find((a) => a.id === mapped.id);
+        if (found) {
+          return sortAgents(prev.map((item) => (item.id === mapped.id ? mapped : item)));
+        }
+        return prev;
+      });
+      
+      // Обновляем в списке агентов типа проекта, если это агент типа проекта
+      setProjectTypeAgents((prev) => {
+        const found = prev.find((a) => a.id === mapped.id);
+        if (found) {
+          return sortAgents(prev.map((item) => (item.id === mapped.id ? mapped : item)));
+        }
+        return prev;
+      });
+      
+      // Если это активный агент, обновляем его
+      if (activeAgentId === mapped.id) {
+        setActiveAgentId(mapped.id); // Это триггернет обновление через useMemo
+      }
     } catch (error) {
       console.error('Failed to update agent', error);
+      throw error;
     }
   };
 
@@ -1191,7 +1236,7 @@ export default function App() {
       
       try {
         const base64 = await readFileToBase64(file);
-        // Файлы, загруженные через SettingsPanel, помечаются как база знаний агента
+        // Файлы помечаются как база знаний агента
         const { file: uploaded } = await api.uploadFile(activeAgent.id, {
           name: file.name,
           mimeType: file.type || 'text/plain',
@@ -1370,11 +1415,16 @@ export default function App() {
   }
 
   if (isAdminOpen || window.location.hash === '#/admin') {
-    return <AdminPage onClose={() => {
-      setIsAdminOpen(false);
-      window.location.hash = '';
-      window.history.replaceState(null, '', window.location.pathname);
-    }} />;
+    return <AdminPage 
+      onClose={() => {
+        setIsAdminOpen(false);
+        setAdminInitialAgentId(undefined);
+        window.location.hash = '';
+        window.history.replaceState(null, '', window.location.pathname);
+      }}
+      initialAgentId={adminInitialAgentId}
+      onAgentUpdated={reloadAgents}
+    />;
   }
 
   return (
@@ -1399,7 +1449,10 @@ export default function App() {
         summarySuccess={summarySuccess}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onOpenAdmin={() => setIsAdminOpen(true)}
+        onOpenAdmin={() => {
+          setAdminInitialAgentId(undefined);
+          setIsAdminOpen(true);
+        }}
         documentsCount={projectDocuments.length}
       />
 
@@ -1446,13 +1499,19 @@ export default function App() {
                </div>
 
                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                  <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center hover:shadow-sm hover:bg-white/15"
-                    title="Agent Settings (⌘K)"
-                  >
-                    <Settings size={17} />
-                  </button>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => {
+                        window.location.hash = '#/admin';
+                        setAdminInitialAgentId(activeAgentId || undefined);
+                        setIsAdminOpen(true);
+                      }}
+                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center hover:shadow-sm hover:bg-white/15"
+                      title="Настройки агентов"
+                    >
+                      <Settings size={17} />
+                    </button>
+                  )}
                   <button 
                     onClick={handleClearChat}
                     className="p-2.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-red-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center hover:shadow-sm"
@@ -1494,19 +1553,6 @@ export default function App() {
           </>
         )}
       </main>
-
-      {activeAgent && (
-        <SettingsPanel 
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          activeAgent={activeAgent}
-          onUpdateAgent={handleUpdateAgent}
-          onFileUpload={handleFileUpload}
-          onRemoveFile={handleRemoveFile}
-          onApplyChanges={() => {}}
-          currentUser={currentUser}
-        />
-      )}
 
       <ProjectDocumentsModal 
         isOpen={isDocsOpen}

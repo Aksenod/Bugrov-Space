@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Settings, Loader2 } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { SettingsPanel } from './SettingsPanel';
 import { api } from '../services/api';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
@@ -58,7 +57,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
   const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
-  const [settingsAgentId, setSettingsAgentId] = useState<string | null>(null);
 
   // Helper function to check if agent has role
   const hasRole = (agentRole: string | undefined, roleName: string): boolean => {
@@ -344,13 +342,22 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         
         {/* Sidebar List */}
         <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-6 border-b border-white/10">
-            <h2 className="text-xl font-bold text-white flex items-center gap-3">
-              <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
-                <FileText size={20} />
+          <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between">
+            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-amber-500/20 rounded-xl text-amber-400">
+                <FileText size={18} className="sm:w-5 sm:h-5" />
               </div>
-              Documents
+              <span className="hidden sm:inline">Documents</span>
+              <span className="sm:hidden">Документы</span>
             </h2>
+            {/* Mobile Close Button */}
+            <button 
+              onClick={onClose} 
+              className="md:hidden p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              aria-label="Закрыть"
+            >
+              <X size={20} />
+            </button>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
@@ -474,17 +481,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                         {isGeneratingDSL && <Loader2 size={14} className="animate-spin" />}
                                         DSL
                                     </button>
-                                    <button 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setSettingsAgentId(dslAgent.id);
-                                        }}
-                                        className="p-1 text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10 rounded transition-colors"
-                                        title="Настройки агента DSL"
-                                    >
-                                        <Settings size={14} />
-                                    </button>
                                   </div>
                                 )}
                                 {verstkaAgent && (
@@ -499,17 +495,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                     >
                                         {isGeneratingVerstka && <Loader2 size={14} className="animate-spin" />}
                                         Верстка
-                                    </button>
-                                    <button 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setSettingsAgentId(verstkaAgent.id);
-                                        }}
-                                        className="p-1 text-cyan-400/60 hover:text-cyan-300 hover:bg-cyan-500/10 rounded transition-colors"
-                                        title="Настройки агента Верстка"
-                                    >
-                                        <Settings size={14} />
                                     </button>
                                   </div>
                                 )}
@@ -696,107 +681,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           )}
         </div>
 
-      {/* Agent Settings Panel - открывается поверх модального окна */}
-      {settingsAgentId && (() => {
-        const settingsAgent = agents.find(a => a.id === settingsAgentId);
-        if (!settingsAgent || !onUpdateAgent || !onRemoveAgentFile) return null;
-        
-        // Локальная функция для загрузки файлов с правильным agentId
-        const handleFileUploadForAgent = async (fileList: FileList) => {
-          if (!fileList.length) return;
-          
-          const uploads: UploadedFile[] = [];
-          const errors: string[] = [];
-          
-          const allowedExtensions = ['.txt', '.md'];
-          const allowedMimeTypes = ['text/plain', 'text/markdown'];
-          
-          for (let i = 0; i < fileList.length; i++) {
-            const file = fileList[i];
-            
-            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-            const isValidExtension = allowedExtensions.includes(fileExtension);
-            const isValidMimeType = !file.type || allowedMimeTypes.includes(file.type);
-            
-            if (!isValidExtension && !isValidMimeType) {
-              errors.push(`Файл ${file.name} не поддерживается. Разрешены только .txt и .md файлы.`);
-              continue;
-            }
-            
-            if (file.size > FILE_SIZE_LIMIT) {
-              errors.push(`Файл ${file.name} слишком большой (>2MB)`);
-              continue;
-            }
-            
-            try {
-              const base64 = await readFileToBase64(file);
-              const { file: uploaded } = await api.uploadFile(settingsAgentId, {
-                name: file.name,
-                mimeType: file.type || 'text/plain',
-                content: base64,
-                isKnowledgeBase: true,
-              });
-              
-              uploads.push({
-                id: uploaded.id,
-                name: uploaded.name,
-                type: uploaded.mimeType,
-                data: uploaded.content,
-                agentId: uploaded.agentId,
-                dslContent: uploaded.dslContent,
-                verstkaContent: uploaded.verstkaContent,
-              });
-            } catch (error: any) {
-              console.error('File upload failed', error);
-              errors.push(`Не удалось загрузить ${file.name}: ${error?.message || 'Неизвестная ошибка'}`);
-            }
-          }
-          
-          if (errors.length > 0) {
-            if (onShowAlert) {
-              onShowAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error');
-            } else {
-              // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
-              console.error(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
-            }
-          }
-          
-          if (uploads.length > 0) {
-            // Обновляем файлы агента через callback
-            if (onAgentFilesUpdate) {
-              const updatedAgent = agents.find(a => a.id === settingsAgentId);
-              if (updatedAgent) {
-                onAgentFilesUpdate(settingsAgentId, [...updatedAgent.files, ...uploads]);
-              }
-            }
-            if (onShowAlert) {
-              onShowAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success', 3000);
-            } else {
-              // Если onShowAlert не передан, логируем успех (но это не должно происходить)
-              console.log(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
-            }
-          } else if (errors.length === 0) {
-            if (onShowAlert) {
-              onShowAlert('Не удалось загрузить файлы', 'Ошибка', 'error');
-            } else {
-              // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
-              console.error('Не удалось загрузить файлы');
-            }
-          }
-        };
-        
-        return (
-          <SettingsPanel
-            isOpen={!!settingsAgentId}
-            onClose={() => setSettingsAgentId(null)}
-            activeAgent={settingsAgent}
-            onUpdateAgent={onUpdateAgent}
-            onFileUpload={handleFileUploadForAgent}
-            onRemoveFile={onRemoveAgentFile}
-            onApplyChanges={() => {}}
-          />
-        );
-      })()}
     </div>
   );
 };

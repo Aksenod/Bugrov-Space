@@ -85,14 +85,16 @@ router.get('/', async (req, res, next) => {
 
     // Загружаем агентов типа проекта, если проект найден
     // Используем связь many-to-many через ProjectTypeAgentProjectType
+    // ВАЖНО: возвращаем только агентов, которые связаны с типом проекта через ProjectTypeAgentProjectType
     let projectTypeAgents: any[] = [];
     if (project?.projectTypeId) {
       try {
         // Сначала находим связи через промежуточную таблицу
+        // Фильтруем строго по projectTypeId - только агенты, связанные с этим типом проекта
         const connections = await withRetry(
           () => (prisma as any).projectTypeAgentProjectType.findMany({
             where: {
-              projectTypeId: project.projectTypeId,
+              projectTypeId: project.projectTypeId, // Строгая фильтрация по типу проекта
             },
             include: {
               projectTypeAgent: true,
@@ -111,14 +113,41 @@ router.get('/', async (req, res, next) => {
           `GET /agents - find connections for ${project.projectTypeId}`
         ) as any[];
         
+        logger.debug({ 
+          projectTypeId: project.projectTypeId, 
+          connectionsCount: connections.length 
+        }, 'Found project type agent connections');
+        
         // Преобразуем данные в нужный формат
-        projectTypeAgents = connections.map((conn: any) => ({
-          ...conn.projectTypeAgent,
-          projectTypes: [{
-            projectType: conn.projectType,
-            order: conn.order,
-          }],
-        }));
+        // Фильтруем только агентов, которые действительно связаны с типом проекта
+        projectTypeAgents = connections
+          .filter((conn: any) => {
+            // Убеждаемся, что связь существует и projectTypeId совпадает
+            const isValid = conn.projectTypeAgent && 
+                           conn.projectType && 
+                           conn.projectType.id === project.projectTypeId;
+            if (!isValid) {
+              logger.warn({ 
+                connection: conn, 
+                projectTypeId: project.projectTypeId 
+              }, 'Filtered out invalid project type agent connection');
+            }
+            return isValid;
+          })
+          .map((conn: any) => ({
+            ...conn.projectTypeAgent,
+            order: conn.order, // Используем order из связи
+            projectTypes: [{
+              projectType: conn.projectType,
+              order: conn.order,
+            }],
+          }));
+        
+        logger.debug({ 
+          projectTypeId: project.projectTypeId, 
+          projectTypeAgentsCount: projectTypeAgents.length,
+          agentIds: projectTypeAgents.map((a: any) => a.id)
+        }, 'Filtered project type agents');
       } catch (error: any) {
         // Если таблица не существует или миграция не применена, просто возвращаем пустой массив
         if (error?.code === 'P2021' || 
@@ -148,8 +177,10 @@ router.get('/', async (req, res, next) => {
 
     logger.debug({ userId, agentsCount: agents.length, projectTypeAgentsCount: projectTypeAgents.length }, 'Agents loaded');
 
+    // Теперь возвращаем только projectTypeAgents, обычные агенты не нужны
+    // (экземпляры агентов создаются автоматически из шаблонов при первом использовании)
     res.json({ 
-      agents: agentsWithEmptyFiles,
+      agents: [], // Обычные агенты больше не используются
       projectTypeAgents: projectTypeAgents.length > 0 ? projectTypeAgents : undefined
     });
   } catch (error: any) {
@@ -380,31 +411,169 @@ const messageSchema = z.object({
 router.post('/:agentId/messages', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
+  
+  logger.info({ 
+    agentId, 
+    userId,
+    body: req.body,
+    hasProjectId: !!req.body?.projectId 
+  }, 'POST /agents/:agentId/messages - request received');
+  
   const parsed = messageSchema.safeParse(req.body);
   if (!parsed.success) {
+    logger.warn({ agentId, userId, validationError: parsed.error.flatten() }, 'Message validation failed');
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
   // Загружаем документы проекта (НЕ база знаний агентов)
   // projectId обязателен для изоляции проектов
   if (!parsed.data.projectId) {
+    logger.warn({ agentId, userId }, 'projectId is missing in request body');
     return res.status(400).json({ 
       error: 'projectId is required. Project isolation requires explicit project context.' 
     });
   }
 
   // Оптимизация: загружаем агента, агентов проекта и историю параллельно
-  const [agent, projectAgents, history] = await Promise.all([
-    withRetry(
-      () => prisma.agent.findFirst({
-        where: { id: agentId, userId },
-      }),
-      3,
-      `POST /agents/${agentId}/messages - find agent`
-    ),
+  let agent = await withRetry(
+    () => prisma.agent.findFirst({
+      where: { id: agentId, userId },
+    }),
+    3,
+    `POST /agents/${agentId}/messages - find agent`
+  );
+
+  // Если агент не найден, возможно это агент типа проекта (ProjectTypeAgent)
+  // В таком случае создаем экземпляр агента проекта из шаблона
+  if (!agent) {
+    try {
+      // Проверяем, существует ли ProjectTypeAgent с таким ID
+      const projectTypeAgent = await withRetry(
+        () => (prisma as any).projectTypeAgent.findUnique({
+          where: { id: agentId },
+        }),
+        3,
+        `POST /agents/${agentId}/messages - find project type agent`
+      );
+
+      if (projectTypeAgent) {
+        // Проверяем, что projectId определен (мы уже проверили выше, но TypeScript требует)
+        const projectId = parsed.data.projectId;
+        if (!projectId) {
+          return res.status(400).json({ error: 'projectId is required' });
+        }
+
+        // Проверяем, что проект принадлежит пользователю
+        const project = await withRetry(
+          () => prisma.project.findFirst({
+            where: { id: projectId, userId },
+          }),
+          3,
+          `POST /agents/${agentId}/messages - verify project ownership`
+        );
+
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const template = projectTypeAgent as any;
+        if (!template || !template.name) {
+          return res.status(404).json({ error: 'Invalid project type agent template' });
+        }
+
+        // Проверяем, не был ли уже создан агент из этого шаблона для данного проекта
+        // Ищем агента с таким же именем в проекте (чтобы избежать дубликатов)
+        const existingAgent = await withRetry(
+          () => prisma.agent.findFirst({
+            where: {
+              userId,
+              projectId: projectId,
+              name: template.name,
+            },
+          }),
+          3,
+          `POST /agents/${agentId}/messages - check existing agent from template`
+        );
+
+        if (existingAgent) {
+          // Используем существующий агент (чтобы не создавать дубликаты)
+          agent = existingAgent;
+          logger.debug({ 
+            agentId: existingAgent.id,
+            templateId: agentId,
+            projectId: projectId,
+            userId 
+          }, 'Using existing agent instance from ProjectTypeAgent template');
+        } else {
+          // Получаем следующий порядковый номер для агента в проекте
+          const nextOrder = await getNextOrderValue(userId);
+
+          // Создаем новый экземпляр агента проекта из шаблона
+          agent = await withRetry(
+            () => prisma.agent.create({
+              data: {
+                userId,
+                projectId: projectId,
+                name: template.name,
+                description: template.description ?? '',
+                systemInstruction: template.systemInstruction ?? '',
+                summaryInstruction: template.summaryInstruction ?? '',
+                model: template.model ?? 'gpt-5.1',
+                role: template.role ?? '',
+                order: nextOrder,
+              },
+            }),
+            3,
+            `POST /agents/${agentId}/messages - create agent from template`
+          );
+
+          logger.info({ 
+            newAgentId: agent.id,
+            templateId: agentId,
+            projectId: projectId, 
+            userId,
+            agentName: agent.name 
+          }, 'Created new agent instance from ProjectTypeAgent template');
+        }
+      } else {
+        logger.warn({ 
+          agentId, 
+          userId,
+          message: 'ProjectTypeAgent not found with this ID' 
+        }, 'ProjectTypeAgent not found');
+        return res.status(404).json({ error: 'Agent not found' });
+      }
+    } catch (error: any) {
+      // Если таблица ProjectTypeAgent не существует или другая ошибка
+      logger.error({ 
+        agentId, 
+        userId,
+        error: error.message, 
+        code: error.code,
+        stack: error.stack
+      }, 'Failed to check/create agent from template');
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+  }
+
+  // КРИТИЧНО: Проверяем, что agent установлен после всех операций
+  // Без этой проверки будет ошибка при использовании agent.id
+  if (!agent) {
+    logger.error({ 
+      agentId, 
+      userId,
+      projectId: parsed.data.projectId 
+    }, 'Agent is still undefined after creation attempt');
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  // Загружаем агентов проекта и историю (теперь agent точно существует)
+  // После создания нового агента нужно перезагрузить список projectAgents
+  const projectId = parsed.data.projectId!;
+  const [projectAgents, history] = await Promise.all([
     withRetry(
       () => prisma.agent.findMany({
-        where: { projectId: parsed.data.projectId },
+        where: { projectId: projectId },
         select: { id: true },
       }),
       3,
@@ -412,7 +581,7 @@ router.post('/:agentId/messages', async (req, res) => {
     ),
     withRetry(
       () => prisma.message.findMany({
-        where: { agentId },
+        where: { agentId: agent.id },
         orderBy: { createdAt: 'asc' },
         take: 50,
       }),
@@ -420,10 +589,6 @@ router.post('/:agentId/messages', async (req, res) => {
       `POST /agents/${agentId}/messages - find history`
     ),
   ]);
-
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
 
   const agentIds = projectAgents.map(a => a.id);
 
@@ -464,7 +629,7 @@ router.post('/:agentId/messages', async (req, res) => {
   const userMessage = await withRetry(
     () => prisma.message.create({
       data: {
-        agentId,
+        agentId: agent.id, // Используем ID созданного/найденного агента, а не ID шаблона
         userId,
         role: 'USER',
         text: parsed.data.text,
@@ -489,7 +654,7 @@ router.post('/:agentId/messages', async (req, res) => {
     const modelMessage = await withRetry(
       () => prisma.message.create({
         data: {
-          agentId,
+          agentId: agent.id, // Используем ID созданного/найденного агента, а не ID шаблона
           role: 'MODEL',
           text: responseText,
         },
@@ -498,7 +663,15 @@ router.post('/:agentId/messages', async (req, res) => {
       `POST /agents/${agentId}/messages - create model message`
     );
 
-    return res.json({ messages: [userMessage, modelMessage] });
+    // Если агент был создан из шаблона, возвращаем также новый agentId
+    // чтобы фронтенд мог обновить состояние
+    const response: any = { messages: [userMessage, modelMessage] };
+    if (agent.id !== agentId) {
+      response.agentId = agent.id; // Новый ID созданного агента
+      response.templateId = agentId; // ID шаблона для справки
+    }
+
+    return res.json(response);
   } catch (error) {
     logger.error({ 
       agentId, 
