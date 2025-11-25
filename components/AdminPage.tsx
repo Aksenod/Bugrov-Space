@@ -1,5 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCorners,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile } from '../services/api';
 import { LLMModel, MODELS, UploadedFile } from '../types';
 import { AlertDialog } from './AlertDialog';
@@ -11,6 +27,51 @@ interface AdminPageProps {
   onAgentUpdated?: () => void;
 }
 
+interface SortableAgentItemProps {
+  agent: ApiProjectTypeAgent;
+  index: number;
+}
+
+const SortableAgentItem: React.FC<SortableAgentItemProps> = ({ agent, index }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  } as React.CSSProperties;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors ${
+        isDragging ? 'opacity-50 z-20' : ''
+      }`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-white/40 hover:text-white/60 transition-colors"
+      >
+        <GripVertical size={14} className="sm:w-4 sm:h-4" />
+      </div>
+      <span className="text-xs sm:text-sm text-white/50 font-medium w-6 sm:w-8 text-center">
+        {index + 1}
+      </span>
+      <Bot size={14} className="sm:w-4 sm:h-4 text-indigo-400 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs sm:text-sm text-white font-medium truncate">
+          {agent.name}
+        </div>
+        {agent.description && (
+          <div className="text-[10px] sm:text-xs text-white/60 truncate mt-0.5">
+            {agent.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, onAgentUpdated }) => {
   const [activeTab, setActiveTab] = useState<'projectTypes' | 'agents'>('agents');
   
@@ -21,6 +82,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [newTypeName, setNewTypeName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [projectTypeAgents, setProjectTypeAgents] = useState<Map<string, ApiProjectTypeAgent[]>>(new Map());
+  const [loadingAgentsForType, setLoadingAgentsForType] = useState<Set<string>>(new Set());
+  const [reorderingTypeId, setReorderingTypeId] = useState<string | null>(null);
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  );
 
   // Agents state
   const [agents, setAgents] = useState<ApiProjectTypeAgent[]>([]);
@@ -232,10 +301,60 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     try {
       const { projectTypes: types } = await api.getProjectTypes();
       setProjectTypes(types);
+      // Загружаем агентов для каждого типа проекта
+      await loadAgentsForAllTypes(types);
     } catch (error) {
       console.error('Failed to load project types', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAgentsForAllTypes = async (types: ApiProjectType[]) => {
+    const agentsMap = new Map<string, ApiProjectTypeAgent[]>();
+    const loadingSet = new Set<string>();
+    
+    // Загружаем агентов для всех типов параллельно
+    const loadPromises = types.map(async (type) => {
+      loadingSet.add(type.id);
+      try {
+        const { agents } = await api.getProjectTypeAgents(type.id);
+        agentsMap.set(type.id, agents);
+      } catch (error) {
+        console.error(`Failed to load agents for project type ${type.id}`, error);
+        agentsMap.set(type.id, []);
+      } finally {
+        loadingSet.delete(type.id);
+      }
+    });
+    
+    await Promise.all(loadPromises);
+    setProjectTypeAgents(agentsMap);
+    setLoadingAgentsForType(loadingSet);
+  };
+
+  const loadAgentsForType = async (projectTypeId: string) => {
+    setLoadingAgentsForType(prev => new Set(prev).add(projectTypeId));
+    try {
+      const { agents } = await api.getProjectTypeAgents(projectTypeId);
+      setProjectTypeAgents(prev => {
+        const newMap = new Map(prev);
+        newMap.set(projectTypeId, agents);
+        return newMap;
+      });
+    } catch (error) {
+      console.error(`Failed to load agents for project type ${projectTypeId}`, error);
+      setProjectTypeAgents(prev => {
+        const newMap = new Map(prev);
+        newMap.set(projectTypeId, []);
+        return newMap;
+      });
+    } finally {
+      setLoadingAgentsForType(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(projectTypeId);
+        return newSet;
+      });
     }
   };
 
@@ -259,9 +378,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     if (!newTypeName.trim()) return;
     setIsCreating(true);
     try {
-      await api.createProjectType(newTypeName.trim());
+      const { projectType } = await api.createProjectType(newTypeName.trim());
       setNewTypeName('');
       await loadProjectTypes();
+      // Загружаем агентов для нового типа проекта
+      await loadAgentsForType(projectType.id);
     } catch (error) {
       console.error('Failed to create project type', error);
     } finally {
@@ -443,6 +564,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
         try {
           await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
+          // Обновляем агентов для всех затронутых типов проектов
+          const allAffectedTypes = new Set([
+            ...selectedProjectTypeIds,
+            ...(editingAgent.projectTypes?.map(pt => pt.id) || [])
+          ]);
+          await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
         } catch (error: any) {
           // Если ошибка при привязке типов проектов - логируем, но не блокируем сохранение
           console.warn('Failed to attach project types', error);
@@ -620,6 +747,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       });
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
       await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
+      // Обновляем агентов для всех затронутых типов проектов
+      const allAffectedTypes = new Set([
+        ...selectedProjectTypeIds,
+        ...(editingAgent.projectTypes?.map(pt => pt.id) || [])
+      ]);
+      await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
       await loadAgents();
       // Уведомляем родительский компонент об обновлении агента
       if (onAgentUpdated) {
@@ -676,6 +809,44 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         ? prev.filter(id => id !== projectTypeId)
         : [...prev, projectTypeId]
     );
+  };
+
+  const handleReorderAgents = async (projectTypeId: string, newOrder: ApiProjectTypeAgent[]) => {
+    setReorderingTypeId(projectTypeId);
+    try {
+      const orders = newOrder.map((agent, index) => ({
+        id: agent.id,
+        order: index,
+      }));
+      await api.reorderProjectTypeAgents(projectTypeId, orders);
+      // Обновляем локальное состояние
+      setProjectTypeAgents(prev => {
+        const newMap = new Map(prev);
+        newMap.set(projectTypeId, newOrder);
+        return newMap;
+      });
+    } catch (error: any) {
+      console.error('Failed to reorder agents', error);
+      showAlert(error?.message || 'Не удалось изменить порядок агентов', 'Ошибка', 'error');
+      // Перезагружаем агентов в случае ошибки
+      await loadAgentsForType(projectTypeId);
+    } finally {
+      setReorderingTypeId(null);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent, projectTypeId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const agents = projectTypeAgents.get(projectTypeId) || [];
+    const oldIndex = agents.findIndex((agent) => agent.id === active.id);
+    const newIndex = agents.findIndex((agent) => agent.id === over.id);
+    
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(agents, oldIndex, newIndex);
+    handleReorderAgents(projectTypeId, newOrder);
   };
 
   return (
@@ -749,61 +920,118 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                     <Loader2 size={24} className="animate-spin text-indigo-400" />
                   </div>
                 ) : (
-                  <div className="space-y-1.5 sm:space-y-2">
-                    {projectTypes.map((type) => (
-                      <div
-                        key={type.id}
-                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
-                      >
-                        {editingId === type.id ? (
-                          <>
-                            <input
-                              type="text"
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(type.id)}
-                              className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleSaveEdit(type.id)}
-                              className="px-2 sm:px-3 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors"
-                            >
-                              Сохранить
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingId(null);
-                                setEditingName('');
-                              }}
-                              className="px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs sm:text-sm transition-colors"
-                            >
-                              Отмена
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="flex-1 text-white text-sm sm:text-base font-medium">{type.name}</span>
-                            <button
-                              onClick={() => handleStartEdit(type)}
-                              className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
-                              title="Редактировать"
-                            >
-                              <Edit2 size={14} className="sm:w-4 sm:h-4" />
-                            </button>
-                            {type.id !== 'default' && (
-                              <button
-                                onClick={() => handleDelete(type.id, type.name)}
-                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                title="Удалить"
-                              >
-                                <Trash2 size={14} className="sm:w-4 sm:h-4" />
-                              </button>
+                  <div className="space-y-3 sm:space-y-4">
+                    {projectTypes.map((type) => {
+                      const agents = projectTypeAgents.get(type.id) || [];
+                      const isLoadingAgents = loadingAgentsForType.has(type.id);
+                      
+                      return (
+                        <div
+                          key={type.id}
+                          className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
+                        >
+                          {/* Project Type Header */}
+                          <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-4 hover:bg-white/10 transition-colors">
+                            {editingId === type.id ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(type.id)}
+                                  className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveEdit(type.id)}
+                                  className="px-2 sm:px-3 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors"
+                                >
+                                  Сохранить
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingId(null);
+                                    setEditingName('');
+                                  }}
+                                  className="px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs sm:text-sm transition-colors"
+                                >
+                                  Отмена
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex-1 text-white text-sm sm:text-base font-medium">
+                                  {type.name}
+                                  {agents.length > 0 && (
+                                    <span className="ml-2 text-xs text-white/50">
+                                      ({agents.length} {agents.length === 1 ? 'агент' : agents.length < 5 ? 'агента' : 'агентов'})
+                                    </span>
+                                  )}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEdit(type)}
+                                  className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                                  title="Редактировать"
+                                >
+                                  <Edit2 size={14} className="sm:w-4 sm:h-4" />
+                                </button>
+                                {type.id !== 'default' && (
+                                  <button
+                                    onClick={() => handleDelete(type.id, type.name)}
+                                    className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                                    title="Удалить"
+                                  >
+                                    <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                                  </button>
+                                )}
+                              </>
                             )}
-                          </>
-                        )}
-                      </div>
-                    ))}
+                          </div>
+                          
+                          {/* Agents List */}
+                          {!editingId && (
+                            <div className="px-2.5 sm:px-4 pb-2.5 sm:pb-4">
+                              {isLoadingAgents ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <Loader2 size={16} className="animate-spin text-indigo-400" />
+                                </div>
+                              ) : agents.length === 0 ? (
+                                <div className="text-xs sm:text-sm text-white/40 py-2 px-2">
+                                  Нет прикрепленных агентов
+                                </div>
+                              ) : (
+                                <DndContext
+                                  sensors={sensors}
+                                  collisionDetection={closestCorners}
+                                  onDragEnd={(e) => handleDragEnd(e, type.id)}
+                                >
+                                  <SortableContext
+                                    items={agents.map(a => a.id)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    <div className="space-y-1.5 sm:space-y-2 mt-2">
+                                      {agents.map((agent, index) => (
+                                        <SortableAgentItem
+                                          key={agent.id}
+                                          agent={agent}
+                                          index={index}
+                                        />
+                                      ))}
+                                    </div>
+                                  </SortableContext>
+                                </DndContext>
+                              )}
+                              {reorderingTypeId === type.id && (
+                                <div className="flex items-center justify-center py-2 mt-2">
+                                  <Loader2 size={14} className="animate-spin text-indigo-400 mr-2" />
+                                  <span className="text-xs text-white/60">Сохранение порядка...</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </>

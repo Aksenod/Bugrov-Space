@@ -11,6 +11,13 @@ const projectTypeSchema = z.object({
   name: z.string().min(1, 'Название типа проекта обязательно').max(50, 'Название типа проекта не может быть длиннее 50 символов'),
 });
 
+const reorderAgentsSchema = z.object({
+  orders: z.array(z.object({
+    id: z.string().min(1),
+    order: z.number().int(),
+  })).min(1),
+});
+
 // GET / - получить все типы проектов (публичный эндпоинт)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const projectTypes = await withRetry(
@@ -232,6 +239,78 @@ router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
   }));
 
   res.json({ agents });
+}));
+
+// POST /:id/agents/reorder - изменить порядок агентов типа проекта
+router.post('/:id/agents/reorder', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Проверяем, что тип проекта существует
+  const projectType = await withRetry(
+    () => prisma.projectType.findUnique({
+      where: { id },
+    }),
+    3,
+    `POST /project-types/${id}/agents/reorder - find projectType`
+  );
+
+  if (!projectType) {
+    return res.status(404).json({ error: 'Тип проекта не найден' });
+  }
+
+  // Валидация входных данных
+  const parsed = reorderAgentsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const errorMessages = parsed.error.issues.map((err) => {
+      if (err.path.length > 0) {
+        return `${err.path.join('.')}: ${err.message}`;
+      }
+      return err.message;
+    }).join(', ');
+    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+  }
+
+  const orders = parsed.data.orders;
+  const agentIds = orders.map((order) => order.id);
+
+  // Проверяем, что все агенты привязаны к этому типу проекта
+  const agentConnections = await withRetry(
+    () => (prisma as any).projectTypeAgentProjectType.findMany({
+      where: {
+        projectTypeId: id,
+        projectTypeAgentId: { in: agentIds },
+      },
+      select: { projectTypeAgentId: true },
+    }),
+    3,
+    `POST /project-types/${id}/agents/reorder - find connections`
+  ) as any[];
+
+  if (agentConnections.length !== agentIds.length) {
+    return res.status(400).json({ 
+      error: 'Один или несколько агентов не привязаны к этому типу проекта' 
+    });
+  }
+
+  // Обновляем порядок для каждого агента
+  const updates = orders.map(({ id: agentId, order }) =>
+    (prisma as any).projectTypeAgentProjectType.updateMany({
+      where: {
+        projectTypeId: id,
+        projectTypeAgentId: agentId,
+      },
+      data: { order },
+    })
+  );
+
+  await withRetry(
+    () => prisma.$transaction(updates),
+    3,
+    `POST /project-types/${id}/agents/reorder - transaction`
+  );
+
+  logger.info({ projectTypeId: id, ordersCount: orders.length }, 'Project type agents reordered');
+  res.json({ success: true });
 }));
 
 export default router;
