@@ -495,6 +495,8 @@ router.get('/:agentId/messages', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
 
+  logger.info({ agentId, userId }, 'GET /agents/:agentId/messages - request received');
+
   // Пытаемся найти агента, но если это ProjectTypeAgent без экземпляра - возвращаем пустой массив
   const agent = await withRetry(
     () => prisma.agent.findFirst({
@@ -505,6 +507,7 @@ router.get('/:agentId/messages', async (req, res) => {
   );
 
   if (!agent) {
+    logger.debug({ agentId, userId }, 'Agent not found, checking if ProjectTypeAgent');
     // Проверяем, является ли это ProjectTypeAgent (шаблон без экземпляра)
     // Если да - возвращаем пустой массив (сообщений еще нет)
     try {
@@ -517,11 +520,15 @@ router.get('/:agentId/messages', async (req, res) => {
       );
 
       if (projectTypeAgent) {
+        const template = projectTypeAgent as any;
+        logger.debug({ agentId, userId, templateName: template?.name }, 'Found ProjectTypeAgent, returning empty messages array');
         // Это шаблон, который еще не имеет экземпляра - возвращаем пустой массив
         return res.json({ messages: [] });
+      } else {
+        logger.warn({ agentId, userId }, 'Agent not found and not a ProjectTypeAgent');
       }
-    } catch (error) {
-      // Игнорируем ошибки при проверке ProjectTypeAgent
+    } catch (error: any) {
+      logger.error({ agentId, userId, error: error.message, code: error.code }, 'Error checking ProjectTypeAgent');
     }
 
     return res.status(404).json({ error: 'Agent not found' });

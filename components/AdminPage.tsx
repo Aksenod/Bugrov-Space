@@ -45,7 +45,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoOpenedRef = useRef(false); // Флаг для отслеживания автоматического открытия
+  const onAgentUpdatedRef = useRef(onAgentUpdated); // Храним актуальную версию callback
   const STORAGE_KEY = 'admin_agent_draft';
+  
+  // Обновляем ref при изменении callback
+  useEffect(() => {
+    onAgentUpdatedRef.current = onAgentUpdated;
+  }, [onAgentUpdated]);
 
   // Dialog states
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -132,10 +138,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     if (initialAgentId && !isAgentDialogOpen && !hasAutoOpenedRef.current) {
       hasAutoOpenedRef.current = true; // Помечаем сразу, чтобы не открывать дважды
       
+      let isMounted = true; // Флаг для отслеживания монтирования компонента
+      
       const loadAndOpenAgent = async () => {
         try {
           // Загружаем агента напрямую по ID
           const { agent } = await api.getAgent(initialAgentId);
+          
+          // Проверяем, что компонент все еще смонтирован
+          if (!isMounted) return;
           
           // Загружаем типы проектов для этого агента
           let projectTypes: Array<{ id: string; name: string; order?: number }> = [];
@@ -145,6 +156,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           } catch (error) {
             console.warn('Failed to load project types for agent', error);
           }
+          
+          // Проверяем, что компонент все еще смонтирован
+          if (!isMounted) return;
           
           // Загружаем файлы агента
           let agentFilesData: UploadedFile[] = [];
@@ -160,6 +174,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           } catch (error) {
             console.error('Failed to load agent files', error);
           }
+          
+          // Проверяем, что компонент все еще смонтирован перед установкой состояния
+          if (!isMounted) return;
           
           // Подготавливаем агента с типами проектов
           const agentWithProjectTypes = {
@@ -182,11 +199,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           console.error('Failed to load agent directly', error);
           // Если не удалось загрузить агента напрямую, сбрасываем флаг
           // чтобы резервный вариант мог попытаться найти его в списке
-          hasAutoOpenedRef.current = false;
+          if (isMounted) {
+            hasAutoOpenedRef.current = false;
+          }
         }
       };
       
       loadAndOpenAgent();
+      
+      // Cleanup функция для предотвращения обновления состояния после размонтирования
+      return () => {
+        isMounted = false;
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAgentId, isAgentDialogOpen]);
@@ -426,8 +450,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         // Обновляем список агентов
         await loadAgents();
         // Уведомляем родительский компонент об обновлении агента
-        if (onAgentUpdated) {
-          onAgentUpdated();
+        // Используем ref для получения актуальной версии callback
+        if (onAgentUpdatedRef.current) {
+          onAgentUpdatedRef.current();
         }
       } catch (error: any) {
         console.error('Auto-save failed', error);
@@ -447,7 +472,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       autoSaveAgent();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, selectedProjectTypeIds, editingAgent?.id]);
+  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, selectedProjectTypeIds, editingAgent?.id, onAgentUpdated]);
 
   // Восстанавливаем из localStorage при открытии диалога
   useEffect(() => {
