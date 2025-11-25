@@ -203,54 +203,35 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Создаем файл с agentId = projectTypeAgentId
-  // Примечание: используем прямой SQL запрос с временным отключением FK constraint
+  // Примечание: используем prisma.file.create в транзакции с временным отключением FK constraint
   // для вставки записи, так как File.agentId формально должен ссылаться на Agent.id
   try {
-    // Используем Prisma.sql для безопасной параметризации запросов
     const fileData = await prisma.$transaction(async (tx) => {
       // Временно отключаем проверку FK для текущей сессии
       await tx.$executeRawUnsafe(`SET session_replication_role = 'replica'`);
       
       try {
-        // Вставляем файл используя Prisma.sql для безопасной параметризации
-        const insertQuery = Prisma.sql`
-          INSERT INTO "File" ("id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt")
-          VALUES (gen_random_uuid()::text, ${id}::text, ${parsed.data.name}, ${parsed.data.mimeType}, ${parsed.data.content}, ${parsed.data.isKnowledgeBase ?? false}, NOW())
-        `;
-        await tx.$executeRaw(insertQuery);
+        // Используем prisma.file.create напрямую - это безопаснее и проще
+        const file = await tx.file.create({
+          data: {
+            agentId: id, // Используем projectTypeAgentId как agentId
+            name: parsed.data.name,
+            mimeType: parsed.data.mimeType,
+            content: parsed.data.content,
+            isKnowledgeBase: parsed.data.isKnowledgeBase ?? false,
+          },
+        });
         
         // Возвращаем проверку FK
         await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
         
-        // Получаем созданный файл используя Prisma.sql
-        const selectQuery = Prisma.sql`
-          SELECT "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
-          FROM "File"
-          WHERE "agentId" = ${id}::text AND "name" = ${parsed.data.name}
-          ORDER BY "createdAt" DESC
-          LIMIT 1
-        `;
-        const createdFile = await tx.$queryRaw<Array<{
-          id: string;
-          agentId: string;
-          name: string;
-          mimeType: string;
-          content: string;
-          isKnowledgeBase: boolean;
-          createdAt: Date;
-        }>>(selectQuery);
-        
-        return Array.isArray(createdFile) && createdFile.length > 0 ? createdFile[0] : null;
+        return file;
       } catch (error) {
         // Восстанавливаем проверку FK в случае ошибки
         await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
         throw error;
       }
     });
-
-    if (!fileData) {
-      return res.status(500).json({ error: 'Не удалось создать файл' });
-    }
 
     logger.debug({ 
       fileId: fileData.id, 
