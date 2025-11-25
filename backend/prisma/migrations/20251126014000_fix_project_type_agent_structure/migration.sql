@@ -21,11 +21,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ProjectTypeAgentProjectType_projectTypeAgentI
 INSERT INTO "ProjectTypeAgentProjectType" ("id", "projectTypeAgentId", "projectTypeId", "order", "createdAt")
 SELECT 
     -- Генерируем cuid-подобный ID (24 символа)
-    lower(substr(md5(random()::text || clock_timestamp()::text), 1, 24)) as id,
-    "id" as "projectTypeAgentId",
+    lower(substr(md5(random()::text || clock_timestamp()::text), 1, 24)),
+    "id",
     "projectTypeId",
-    0 as "order",
-    CURRENT_TIMESTAMP as "createdAt"
+    0,
+    CURRENT_TIMESTAMP
 FROM "ProjectTypeAgent"
 WHERE "projectTypeId" IS NOT NULL
 ON CONFLICT DO NOTHING;
