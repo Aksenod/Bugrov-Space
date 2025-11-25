@@ -500,7 +500,7 @@ export default function App() {
 
   const ensureSummaryLoaded = useCallback(
     async (agentId: string) => {
-      if (!agentId) return;
+      if (!agentId || !activeProjectId) return;
       
       // Документы проекта общие для всех агентов - загружаем с ключом 'all'
       const PROJECT_DOCS_KEY = 'all';
@@ -514,8 +514,8 @@ export default function App() {
       
       try {
         // Используем agentId для запроса, но бэкенд вернет все файлы пользователя
-        console.log(`[Frontend] Loading project documents for agent: ${agentId}`);
-        const { files } = await api.getSummaryFiles(agentId);
+        console.log(`[Frontend] Loading project documents for agent: ${agentId}, project: ${activeProjectId}`);
+        const { files } = await api.getSummaryFiles(agentId, activeProjectId);
         console.log(`[Frontend] ✅ Loaded project documents (ALL files from all agents):`, files.length, 'files');
         console.log(`[Frontend] File details:`, files.map(f => ({
           id: f.id,
@@ -548,7 +548,7 @@ export default function App() {
         console.error('[Frontend] Failed to load project documents:', error);
       }
     },
-    [],
+    [activeProjectId],
   );
 
   // Оптимизация: загружаем документы проекта только после завершения bootstrap
