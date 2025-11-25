@@ -203,29 +203,49 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Создаем файл с agentId = projectTypeAgentId
-  // Примечание: используем prisma.file.create в транзакции с временным отключением FK constraint
+  // Примечание: используем прямой SQL запрос с временным отключением FK constraint
   // для вставки записи, так как File.agentId формально должен ссылаться на Agent.id
   try {
+    // Функция для экранирования SQL строк
+    const escapeSqlString = (str: string): string => {
+      return str.replace(/'/g, "''").replace(/\\/g, '\\\\');
+    };
+    
+    const escapedAgentId = escapeSqlString(id);
+    const escapedName = escapeSqlString(parsed.data.name);
+    const escapedMimeType = escapeSqlString(parsed.data.mimeType);
+    const escapedContent = escapeSqlString(parsed.data.content);
+    const isKnowledgeBaseValue = parsed.data.isKnowledgeBase ?? false;
+    
     const fileData = await prisma.$transaction(async (tx) => {
       // Временно отключаем проверку FK для текущей сессии
       await tx.$executeRawUnsafe(`SET session_replication_role = 'replica'`);
       
       try {
-        // Используем prisma.file.create напрямую - это безопаснее и проще
-        const file = await tx.file.create({
-          data: {
-            agentId: id, // Используем projectTypeAgentId как agentId
-            name: parsed.data.name,
-            mimeType: parsed.data.mimeType,
-            content: parsed.data.content,
-            isKnowledgeBase: parsed.data.isKnowledgeBase ?? false,
-          },
-        });
+        // Вставляем файл и сразу получаем его обратно через RETURNING
+        // Используем $queryRawUnsafe потому что Prisma.sql может не работать с очень большими строками
+        const result = await tx.$queryRawUnsafe<Array<{
+          id: string;
+          agentId: string;
+          name: string;
+          mimeType: string;
+          content: string;
+          isKnowledgeBase: boolean;
+          createdAt: Date;
+        }>>(`
+          INSERT INTO "File" ("id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt")
+          VALUES (gen_random_uuid()::text, '${escapedAgentId}', '${escapedName}', '${escapedMimeType}', '${escapedContent}', ${isKnowledgeBaseValue}, NOW())
+          RETURNING "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
+        `);
         
         // Возвращаем проверку FK
         await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
         
-        return file;
+        if (!Array.isArray(result) || result.length === 0) {
+          throw new Error('Failed to create file - no data returned');
+        }
+        
+        return result[0];
       } catch (error) {
         // Восстанавливаем проверку FK в случае ошибки
         await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
