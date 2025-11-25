@@ -1,8 +1,65 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
+
+// Динамический импорт для оптимизации - загружается только при необходимости
+let SyntaxHighlighter: any = null;
+let vscDarkPlus: any = null;
+
+const loadSyntaxHighlighter = async () => {
+  if (!SyntaxHighlighter) {
+    const module = await import('react-syntax-highlighter');
+    SyntaxHighlighter = module.Prism;
+  }
+  if (!vscDarkPlus) {
+    const styleModule = await import('react-syntax-highlighter/dist/esm/styles/prism');
+    vscDarkPlus = styleModule.vscDarkPlus;
+  }
+  return { SyntaxHighlighter, vscDarkPlus };
+};
+
+// Компонент-обертка для SyntaxHighlighter с динамической загрузкой
+const SyntaxHighlighterWrapper: React.FC<{ language: string; children: string; [key: string]: any }> = ({ language, children, ...props }) => {
+  const [isReady, setIsReady] = React.useState(false);
+  const [highlighter, setHighlighter] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    
+    loadSyntaxHighlighter().then(({ SyntaxHighlighter: SH, vscDarkPlus: style }) => {
+      if (mounted) {
+        setHighlighter({ Component: SH, style });
+        setIsReady(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!isReady || !highlighter) {
+    return (
+      <div className="bg-slate-800/80 p-3 rounded border border-slate-700/50">
+        <code className="text-amber-200 font-mono text-sm whitespace-pre-wrap">
+          {children}
+        </code>
+      </div>
+    );
+  }
+
+  const { Component, style } = highlighter;
+  return (
+    <Component
+      style={style}
+      language={language}
+      PreTag="div"
+      {...props}
+    >
+      {children}
+    </Component>
+  );
+};
 
 interface MarkdownRendererProps {
   content: string;
@@ -17,14 +74,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
             return !inline && match ? (
-              <SyntaxHighlighter
-                style={vscDarkPlus}
-                language={match[1]}
-                PreTag="div"
-                {...props}
-              >
+              <SyntaxHighlighterWrapper language={match[1]} {...props}>
                 {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
+              </SyntaxHighlighterWrapper>
             ) : (
               <code className={`${className} bg-slate-800/80 px-1.5 py-0.5 rounded text-amber-200 font-mono text-sm border border-slate-700/50`} {...props}>
                 {children}

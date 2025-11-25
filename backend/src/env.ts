@@ -45,12 +45,9 @@ for (const key of required) {
 const getCorsOrigin = (): string | string[] => {
   const corsOrigin = process.env.CORS_ORIGIN;
   if (!corsOrigin) {
-    // В dev режиме разрешаем localhost, в prod разрешаем GitHub Pages и все origins для совместимости
-    if (process.env.NODE_ENV === 'production') {
-      // Разрешаем все origins в production для GitHub Pages (так как могут быть разные поддомены)
-      return '*';
-    }
-    return ['http://localhost:3000', 'http://localhost:5173'];
+    // ВСЕГДА разрешаем все origins (бэкенд работает только на Render, не на localhost)
+    // Это нужно для GitHub Pages и разных поддоменов
+    return '*';
   }
   const origins = corsOrigin.split(',').map(origin => origin.trim());
   // Если указан '*', возвращаем его для разрешения всех origins

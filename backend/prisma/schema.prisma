@@ -31,7 +31,7 @@ model ProjectType {
   updatedAt DateTime @updatedAt
 
   projects Project[]
-  agents   ProjectTypeAgent[]
+  agentTypes ProjectTypeAgentProjectType[]
 }
 
 model Project {
@@ -46,6 +46,9 @@ model Project {
   user         User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   projectType  ProjectType @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
   agents       Agent[]
+
+  @@index([userId])
+  @@index([userId, createdAt])  // Оптимизация для запросов с сортировкой по createdAt
 }
 
 model Agent {
@@ -66,22 +69,41 @@ model Agent {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   messages  Message[]
   files     File[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([userId, projectId])
 }
 
 model ProjectTypeAgent {
   id                 String   @id @default(cuid())
-  projectTypeId      String
   name               String
   description        String   @default("")
   systemInstruction  String   @default("")
   summaryInstruction String   @default("")
   model              String   @default("gpt-5.1")
   role               String?  @default("")
-  order              Int      @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  projectType ProjectType @relation(fields: [projectTypeId], references: [id], onDelete: Cascade)
+  projectTypes ProjectTypeAgentProjectType[]
+
+  @@index([name])
+}
+
+model ProjectTypeAgentProjectType {
+  id                 String   @id @default(cuid())
+  projectTypeAgentId String
+  projectTypeId      String
+  order              Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  projectTypeAgent ProjectTypeAgent @relation(fields: [projectTypeAgentId], references: [id], onDelete: Cascade)
+  projectType       ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectTypeAgentId, projectTypeId])
+  @@index([projectTypeAgentId])
+  @@index([projectTypeId])
 }
 
 model Message {
@@ -94,6 +116,9 @@ model Message {
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
   user  User? @relation(fields: [userId], references: [id])
+
+  @@index([agentId])
+  @@index([agentId, createdAt])  // Оптимизация для запросов с сортировкой по createdAt
 }
 
 model File {
@@ -106,5 +131,9 @@ model File {
   createdAt      DateTime @default(now())
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([agentId, isKnowledgeBase])
+  @@index([agentId, createdAt])  // Оптимизация для запросов с сортировкой по createdAt
 }
 

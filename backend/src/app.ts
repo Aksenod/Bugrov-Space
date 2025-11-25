@@ -8,13 +8,26 @@ import { prisma } from './db/prisma';
 
 const app = express();
 
+// Настраиваем trust proxy для правильной работы за прокси (Render.com, Heroku и т.д.)
+// Это позволяет Express правильно определять IP клиента через заголовки X-Forwarded-For
+app.set('trust proxy', 1);
+
 // Middleware для логирования всех запросов
+// В продакшене логируем только ошибки и предупреждения, в dev - все запросы
 app.use((req, res, next) => {
   const start = Date.now();
   
   res.on('finish', () => {
     const duration = Date.now() - start;
+    const isProduction = env.nodeEnv === 'production';
     const logLevel = res.statusCode >= 400 ? 'error' : res.statusCode >= 300 ? 'warn' : 'info';
+    
+    // Временно логируем все запросы для диагностики
+    // В продакшене логируем только ошибки и предупреждения, в dev - все
+    // if (isProduction && res.statusCode < 300) {
+    //   return; // Пропускаем успешные запросы в продакшене
+    // }
+    
     logger[logLevel]({
       method: req.method,
       path: req.path,

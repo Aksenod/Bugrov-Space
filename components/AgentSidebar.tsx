@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Agent, User, Project } from '../types';
-import { Bot, FileText, PenTool, Hash, Briefcase, Plus, FolderOpen, Save, CheckCircle, Loader2, LogOut, User as UserIcon, Trash2, Settings } from 'lucide-react';
+import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Trash2, Settings } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 
 interface AgentSidebarProps {
@@ -29,7 +29,6 @@ interface AgentSidebarProps {
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
   onEditProject: (project: Project) => void;
-  onAddAgent: () => void;
   onDeleteAgent: (id: string) => void;
   onReorderAgents: (agentIds: string[]) => void;
   isOpen: boolean;
@@ -54,7 +53,6 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   onSelectProject,
   onCreateProject,
   onEditProject,
-  onAddAgent,
   onDeleteAgent,
   onReorderAgents,
   isOpen,
@@ -222,23 +220,10 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
               </div>
             ))
           )}
-
-          {/* Add Agent Button - только для администраторов */}
-          {isAdmin && (
-            <button
-              onClick={onAddAgent}
-              className="w-full flex items-center gap-3 p-2.5 mt-3 rounded-xl border border-white/10 border-dashed hover:border-indigo-400/50 hover:bg-indigo-500/10 text-white/40 hover:text-indigo-300 transition-all group"
-            >
-              <div className="p-1.5 rounded-lg bg-white/5 group-hover:bg-indigo-500/20 transition-colors">
-                 <Plus size={16} />
-              </div>
-              <span className="font-medium text-xs">Add Agent</span>
-            </button>
-          )}
         </div>
 
         {/* Project Space & User Section */}
-        <div className="flex-shrink-0 flex flex-col gap-1 p-2 border-t border-white/5 bg-white/[0.02]">
+        <div className="flex-shrink-0 flex flex-col gap-1 p-2 border-t border-white/5">
              
              {/* Documents */}
              <div className="relative group">
@@ -307,6 +292,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                     {onOpenAdmin && isAdmin && (
                       <button 
                         onClick={() => {
+                          window.location.hash = '#/admin';
                           onOpenAdmin();
                           onCloseMobile();
                         }}

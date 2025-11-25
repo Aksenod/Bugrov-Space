@@ -43,7 +43,7 @@ authRouter.post('/register', authRateLimiter, async (req, res, next) => {
     
     const existing = await withRetry(
       () => prisma.user.findUnique({ where: { username } }),
-      3,
+      2,
       'register-check-existing'
     );
     if (existing) {
@@ -59,7 +59,7 @@ authRouter.post('/register', authRateLimiter, async (req, res, next) => {
           passwordHash,
         },
       }),
-      3,
+      2,
       'register-create-user'
     );
 
@@ -107,7 +107,7 @@ authRouter.post('/login', authRateLimiter, async (req, res, next) => {
     
     const user = await withRetry(
       () => prisma.user.findUnique({ where: { username } }),
-      3,
+      2,
       'login-find-user'
     );
     if (!user) {
@@ -164,7 +164,7 @@ authRouter.post('/reset', authRateLimiter, async (req, res, next) => {
     
     const user = await withRetry(
       () => prisma.user.findUnique({ where: { username } }),
-      3,
+      2,
       'reset-find-user'
     );
 
@@ -179,7 +179,7 @@ authRouter.post('/reset', authRateLimiter, async (req, res, next) => {
         where: { id: user.id },
         data: { passwordHash },
       }),
-      3,
+      2,
       'reset-update-password'
     );
 
@@ -208,7 +208,7 @@ authRouter.get('/me', authMiddleware, async (req, res, next) => {
           role: true,
         },
       }),
-      3,
+      2,
       'me-find-user'
     );
 

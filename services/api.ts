@@ -78,24 +78,119 @@ const parseError = async (response: Response) => {
   }
 };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: getHeaders(init.headers as Record<string, string>),
-  });
+// Таймаут для всех запросов (10 секунд)
+const REQUEST_TIMEOUT = 10000;
 
-  if (!response.ok) {
-    const message = await parseError(response);
-    const error = new Error(message || 'Request failed') as Error & { status?: number };
-    error.status = response.status; // Добавляем HTTP статус к ошибке
+// Глобальная блокировка запросов после получения 429
+let rateLimitBlockedUntil: number | null = null;
+const RATE_LIMIT_BLOCK_DURATION = 60 * 1000; // Блокируем на 60 секунд после получения 429
+
+// Функция для задержки
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // Проверяем, не заблокированы ли мы из-за rate limit
+  // Исключаем auth роуты из блокировки - пользователь должен всегда иметь возможность залогиниться
+  const isAuthRoute = path === '/auth/login' || path === '/auth/register' || path === '/auth/reset';
+  if (!isAuthRoute && rateLimitBlockedUntil && Date.now() < rateLimitBlockedUntil) {
+    const remainingSeconds = Math.ceil((rateLimitBlockedUntil - Date.now()) / 1000);
+    const error = new Error(`Rate limit exceeded. Please wait ${remainingSeconds} seconds before trying again.`) as Error & { status?: number; isRateLimit?: boolean };
+    error.status = 429;
+    error.isRateLimit = true;
     throw error;
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  // Создаем AbortController для таймаута
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-  return (await response.json()) as T;
+  const url = `${API_BASE_URL}${path}`;
+  const startTime = Date.now();
+  
+  try {
+    console.log(`[API] Request: ${init.method || 'GET'} ${url}`);
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: getHeaders(init.headers as Record<string, string>),
+    });
+    
+    const duration = Date.now() - startTime;
+    console.log(`[API] Response: ${response.status} in ${duration}ms`);
+
+    clearTimeout(timeoutId);
+
+    // Если получили 429 - блокируем все запросы на некоторое время
+    // НО не блокируем, если это auth роут - пользователь должен иметь возможность залогиниться
+    if (response.status === 429 && !isAuthRoute) {
+      rateLimitBlockedUntil = Date.now() + RATE_LIMIT_BLOCK_DURATION;
+      console.warn(`[API] Rate limit hit! Blocking all requests for ${RATE_LIMIT_BLOCK_DURATION / 1000} seconds`);
+      const message = await parseError(response);
+      const error = new Error(message || 'Too many requests from this IP, please try again later.') as Error & { status?: number; isRateLimit?: boolean };
+      error.status = 429;
+      error.isRateLimit = true;
+      throw error;
+    }
+    
+    // Если 429 на auth роуте - просто пробрасываем ошибку без блокировки
+    if (response.status === 429 && isAuthRoute) {
+      const message = await parseError(response);
+      const error = new Error(message || 'Too many requests from this IP, please try again later.') as Error & { status?: number; isRateLimit?: boolean };
+      error.status = 429;
+      error.isRateLimit = true;
+      throw error;
+    }
+
+    if (!response.ok) {
+      const message = await parseError(response);
+      const error = new Error(message || 'Request failed') as Error & { status?: number };
+      error.status = response.status; // Добавляем HTTP статус к ошибке
+      throw error;
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    const duration = Date.now() - startTime;
+    
+    // Если это 429 ошибка - устанавливаем блокировку (но не для auth роутов)
+    if (error.status === 429 && !isAuthRoute) {
+      rateLimitBlockedUntil = Date.now() + RATE_LIMIT_BLOCK_DURATION;
+      console.warn(`[API] Rate limit error! Blocking all requests for ${RATE_LIMIT_BLOCK_DURATION / 1000} seconds`);
+    }
+    
+    // Если уже заблокированы - не логируем как ошибку
+    if (error.isRateLimit && rateLimitBlockedUntil && Date.now() < rateLimitBlockedUntil) {
+      throw error;
+    }
+    
+    console.error(`[API] Error after ${duration}ms:`, error.name, error.message);
+    
+    // Если запрос был отменен из-за таймаута
+    if (error.name === 'AbortError' || controller.signal.aborted) {
+      console.error(`[API] Request timeout: ${url}`);
+      const timeoutError = new Error('Request timeout: запрос превысил время ожидания (10 секунд). Сервер может быть перегружен или недоступен.') as Error & { status?: number; isTimeout?: boolean };
+      timeoutError.status = 408;
+      timeoutError.isTimeout = true;
+      throw timeoutError;
+    }
+    
+    // Обработка сетевых ошибок
+    if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.message?.includes('Network request failed')) {
+      console.error(`[API] Network error: ${url}`);
+      const networkError = new Error('Network error: не удалось подключиться к серверу. Проверьте подключение к интернету.') as Error & { status?: number; isNetworkError?: boolean };
+      networkError.status = 0;
+      networkError.isNetworkError = true;
+      throw networkError;
+    }
+    
+    // Пробрасываем другие ошибки
+    throw error;
+  }
 }
 
 export interface ApiUser {
@@ -139,14 +234,15 @@ export interface ApiProjectType {
 
 export interface ApiProjectTypeAgent {
   id: string;
-  projectTypeId: string;
+  projectTypeId?: string; // Для обратной совместимости
   name: string;
   description: string;
   systemInstruction: string;
   summaryInstruction: string;
   model: string;
   role?: string;
-  order: number;
+  order?: number;
+  projectTypes?: Array<{ id: string; name: string; order?: number }>; // Новое поле для связи многие-ко-многим
   createdAt?: string;
   updatedAt?: string;
 }
@@ -184,6 +280,19 @@ export const api = {
   getToken: () => authToken,
   setToken,
   clearToken: () => setToken(null),
+  clearRateLimitBlock: () => {
+    rateLimitBlockedUntil = null;
+    console.log('[API] Rate limit block cleared');
+  },
+  isRateLimitBlocked: () => {
+    return rateLimitBlockedUntil !== null && Date.now() < rateLimitBlockedUntil;
+  },
+  getRateLimitBlockRemaining: () => {
+    if (!rateLimitBlockedUntil || Date.now() >= rateLimitBlockedUntil) {
+      return 0;
+    }
+    return Math.ceil((rateLimitBlockedUntil - Date.now()) / 1000);
+  },
 
   async register(payload: { username: string; password: string }) {
     return request<{ token: string; user: ApiUser; agents: ApiAgent[] }>('/auth/register', {
@@ -401,6 +510,62 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ orders }),
     });
+  },
+
+  // Admin agents API (агенты-шаблоны)
+  async getAllAgents() {
+    return request<{ agents: ApiProjectTypeAgent[] }>('/admin/agents');
+  },
+
+  async getAgent(agentId: string) {
+    return request<{ agent: ApiProjectTypeAgent }>(`/admin/agents/${agentId}`);
+  },
+
+  async createAgentTemplate(payload: {
+    name: string;
+    description?: string;
+    systemInstruction?: string;
+    summaryInstruction?: string;
+    model?: string;
+    role?: string;
+  }) {
+    return request<{ agent: ApiProjectTypeAgent }>('/admin/agents', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateAgentTemplate(agentId: string, payload: {
+    name?: string;
+    description?: string;
+    systemInstruction?: string;
+    summaryInstruction?: string;
+    model?: string;
+    role?: string;
+  }) {
+    return request<{ agent: ApiProjectTypeAgent }>(`/admin/agents/${agentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteAgentTemplate(agentId: string) {
+    return request<void>(`/admin/agents/${agentId}`, { method: 'DELETE' });
+  },
+
+  async getAgentProjectTypes(agentId: string) {
+    return request<{ projectTypes: Array<{ id: string; name: string; order?: number }> }>(`/admin/agents/${agentId}/project-types`);
+  },
+
+  async attachAgentToProjectTypes(agentId: string, projectTypeIds: string[]) {
+    return request<{ success: boolean }>(`/admin/agents/${agentId}/project-types`, {
+      method: 'POST',
+      body: JSON.stringify({ projectTypeIds }),
+    });
+  },
+
+  async detachAgentFromProjectType(agentId: string, projectTypeId: string) {
+    return request<void>(`/admin/agents/${agentId}/project-types/${projectTypeId}`, { method: 'DELETE' });
   },
 };
 

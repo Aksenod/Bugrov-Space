@@ -25,7 +25,7 @@ PORT=4000
 DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 OPENAI_API_KEY=your_openai_key
 JWT_SECRET=some_long_secret
-CORS_ORIGIN=https://bugrov.space,http://localhost:3000
+CORS_ORIGIN=https://bugrov.space
 ```
 
 **Важно для PostgreSQL:**

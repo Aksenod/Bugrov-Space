@@ -23,36 +23,78 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     let agents: any[];
     
     try {
-      agents = await withRetry(
-        () => (prisma as any).projectTypeAgent.findMany({
-          include: {
-            projectTypes: {
-              include: {
-                projectType: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
+      // Загружаем агентов и их связи через промежуточную таблицу
+      const [agentsList, connections] = await Promise.all([
+        withRetry(
+          () => (prisma as any).projectTypeAgent.findMany({
+            orderBy: {
+              createdAt: 'desc',
+            },
+          }),
+          3,
+          'GET /admin/agents - find agents'
+        ) as Promise<any[]>,
+        withRetry(
+          () => (prisma as any).projectTypeAgentProjectType.findMany({
+            include: {
+              projectType: {
+                select: {
+                  id: true,
+                  name: true,
                 },
               },
-              orderBy: {
-                order: 'asc',
-              },
             },
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-        3,
-        'GET /admin/agents'
-      ) as any[];
+            orderBy: {
+              order: 'asc',
+            },
+          }),
+          3,
+          'GET /admin/agents - find connections'
+        ) as Promise<any[]>,
+      ]);
+      
+      // Группируем связи по agentId
+      const connectionsByAgentId = connections.reduce((acc: any, conn: any) => {
+        if (!acc[conn.projectTypeAgentId]) {
+          acc[conn.projectTypeAgentId] = [];
+        }
+        acc[conn.projectTypeAgentId].push({
+          projectType: conn.projectType,
+          order: conn.order,
+        });
+        return acc;
+      }, {});
+
+      // Преобразуем данные для удобства фронтенда
+      const agentsWithProjectTypes = agentsList.map((agent: any) => ({
+        id: agent.id,
+        name: agent.name,
+        description: agent.description || '',
+        systemInstruction: agent.systemInstruction || '',
+        summaryInstruction: agent.summaryInstruction || '',
+        model: agent.model || 'gpt-5.1',
+        role: agent.role || '',
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+        projectTypes: (connectionsByAgentId[agent.id] || []).map((pt: any) => ({
+          id: pt?.projectType?.id || '',
+          name: pt?.projectType?.name || '',
+          order: pt?.order || 0,
+        })),
+      }));
+      
+      agents = agentsWithProjectTypes;
     } catch (error: any) {
       // Если таблица не существует (миграция не применена), пробуем без include
-      if (error?.code === 'P2021' || error?.message?.includes('does not exist') || error?.message?.includes('relation') || error?.message?.includes('column')) {
+      if (error?.code === 'P2021' || 
+          error?.message?.includes('does not exist') || 
+          error?.message?.includes('relation') || 
+          error?.message?.includes('column') ||
+          error?.message?.includes('Unknown argument') ||
+          error?.message?.includes('Unknown field')) {
         logger.warn({ error: error.message, code: error.code }, 'ProjectTypeAgentProjectType table may not exist, trying without relations');
         try {
-          agents = await withRetry(
+          const agentsList = await withRetry(
             () => (prisma as any).projectTypeAgent.findMany({
               orderBy: {
                 createdAt: 'desc',
@@ -61,6 +103,19 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
             3,
             'GET /admin/agents - without relations'
           ) as any[];
+          
+          agents = agentsList.map((agent: any) => ({
+            id: agent.id,
+            name: agent.name,
+            description: agent.description || '',
+            systemInstruction: agent.systemInstruction || '',
+            summaryInstruction: agent.summaryInstruction || '',
+            model: agent.model || 'gpt-5.1',
+            role: agent.role || '',
+            createdAt: agent.createdAt,
+            updatedAt: agent.updatedAt,
+            projectTypes: [],
+          }));
         } catch (innerError: any) {
           // Если и основная таблица не существует, возвращаем пустой массив
           if (innerError?.code === 'P2021' || innerError?.message?.includes('does not exist') || innerError?.message?.includes('relation')) {
@@ -74,23 +129,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       }
     }
 
-    // Преобразуем данные для удобства фронтенда
-    const agentsWithProjectTypes = agents.map((agent: any) => ({
-      id: agent.id,
-      name: agent.name,
-      description: agent.description || '',
-      systemInstruction: agent.systemInstruction || '',
-      summaryInstruction: agent.summaryInstruction || '',
-      model: agent.model || 'gpt-5.1',
-      role: agent.role || '',
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      projectTypes: (agent.projectTypes || []).map((pt: any) => ({
-        id: pt?.projectType?.id || pt?.projectTypeId,
-        name: pt?.projectType?.name || '',
-        order: pt?.order || 0,
-      })),
-    }));
+    // Преобразуем данные для удобства фронтенда (если еще не преобразовано)
+    const agentsWithProjectTypes = agents;
 
     logger.debug({ agentsCount: agentsWithProjectTypes.length }, 'Admin agents fetched');
     res.json({ agents: agentsWithProjectTypes });
@@ -125,28 +165,33 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const agent = await withRetry(
-    () => (prisma as any).projectTypeAgent.findUnique({
-      where: { id },
-      include: {
-        projectTypes: {
-          include: {
-            projectType: {
-              select: {
-                id: true,
-                name: true,
-              },
+  const [agent, connections] = await Promise.all([
+    withRetry(
+      () => (prisma as any).projectTypeAgent.findUnique({
+        where: { id },
+      }),
+      3,
+      `GET /admin/agents/${id} - find agent`
+    ) as Promise<any>,
+    withRetry(
+      () => (prisma as any).projectTypeAgentProjectType.findMany({
+        where: { projectTypeAgentId: id },
+        include: {
+          projectType: {
+            select: {
+              id: true,
+              name: true,
             },
           },
-          orderBy: {
-            order: 'asc',
-          },
         },
-      },
-    }),
-    3,
-    `GET /admin/agents/${id}`
-  ) as any;
+        orderBy: {
+          order: 'asc',
+        },
+      }),
+      3,
+      `GET /admin/agents/${id} - find connections`
+    ) as Promise<any[]>,
+  ]);
 
   if (!agent) {
     return res.status(404).json({ error: 'Агент не найден' });
@@ -162,8 +207,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     role: agent.role || '',
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
-    projectTypes: (agent.projectTypes || []).map((pt: any) => ({
-      id: pt?.projectType?.id || pt?.projectTypeId,
+    projectTypes: (connections || []).map((pt: any) => ({
+      id: pt?.projectType?.id || '',
       name: pt?.projectType?.name || '',
       order: pt?.order || 0,
     })),
@@ -332,35 +377,40 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 router.get('/:id/project-types', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const agent = await withRetry(
-    () => (prisma as any).projectTypeAgent.findUnique({
-      where: { id },
-      include: {
-        projectTypes: {
-          include: {
-            projectType: {
-              select: {
-                id: true,
-                name: true,
-              },
+  const [agent, connections] = await Promise.all([
+    withRetry(
+      () => (prisma as any).projectTypeAgent.findUnique({
+        where: { id },
+      }),
+      3,
+      `GET /admin/agents/${id}/project-types - find agent`
+    ) as Promise<any>,
+    withRetry(
+      () => (prisma as any).projectTypeAgentProjectType.findMany({
+        where: { projectTypeAgentId: id },
+        include: {
+          projectType: {
+            select: {
+              id: true,
+              name: true,
             },
           },
-          orderBy: {
-            order: 'asc',
-          },
         },
-      },
-    }),
-    3,
-    `GET /admin/agents/${id}/project-types`
-  ) as any;
+        orderBy: {
+          order: 'asc',
+        },
+      }),
+      3,
+      `GET /admin/agents/${id}/project-types - find connections`
+    ) as Promise<any[]>,
+  ]);
 
   if (!agent) {
     return res.status(404).json({ error: 'Агент не найден' });
   }
 
-  const projectTypes = (agent.projectTypes || []).map((pt: any) => ({
-    id: pt?.projectType?.id || pt?.projectTypeId,
+  const projectTypes = (connections || []).map((pt: any) => ({
+    id: pt?.projectType?.id || '',
     name: pt?.projectType?.name || '',
     order: pt?.order || 0,
   }));

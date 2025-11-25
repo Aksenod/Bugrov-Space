@@ -19,17 +19,16 @@ function isConnectionError(error: any): boolean {
 
 /**
  * Задержка перед повторной попыткой (экспоненциальная)
- * Для продакшена (особенно Render.com free tier) увеличиваем задержки,
- * так как БД может быть в спящем режиме
+ * Оптимизировано для более быстрого ответа при ошибках
  */
 function getRetryDelay(attempt: number): number {
   const isProduction = process.env.NODE_ENV === 'production';
   if (isProduction) {
-    // Для продакшена: 1s, 2s, 4s, 8s (максимум 8 секунд)
-    return Math.min(1000 * Math.pow(2, attempt), 8000);
+    // Для продакшена: 200ms, 400ms, 800ms, 1600ms (максимум 2 секунды)
+    return Math.min(200 * Math.pow(2, attempt), 2000);
   } else {
-    // Для разработки: 500ms, 1000ms, 2000ms
-    return Math.min(500 * Math.pow(2, attempt), 2000);
+    // Для разработки: 100ms, 200ms, 400ms
+    return Math.min(100 * Math.pow(2, attempt), 500);
   }
 }
 
@@ -69,9 +68,10 @@ export async function withRetry<T>(
   maxRetries: number = 3,
   operationName?: string
 ): Promise<T> {
-  // Для продакшена увеличиваем количество попыток (особенно для Render.com free tier)
+  // Для продакшена используем стандартное количество попыток (не увеличиваем)
+  // Это ускоряет отдачу ошибок пользователю
   const isProduction = process.env.NODE_ENV === 'production';
-  const actualMaxRetries = isProduction ? Math.max(maxRetries, 5) : maxRetries;
+  const actualMaxRetries = isProduction ? Math.max(maxRetries, 2) : maxRetries; // Уменьшено с 3 до 2 для более быстрого ответа
   let lastError: any;
 
   for (let attempt = 0; attempt < actualMaxRetries; attempt++) {

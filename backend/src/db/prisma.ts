@@ -5,40 +5,28 @@ import { logger } from '../utils/logger';
 function enhanceDatabaseUrl(url: string | undefined): string | undefined {
   if (!url) return url;
   
-  // Если URL уже содержит параметры, проверяем каждый параметр отдельно
+  // Если URL уже содержит параметры, перезаписываем их нашими оптимизированными значениями
   if (url.includes('?')) {
     const urlObj = new URL(url);
-    // Добавляем только те параметры, которых еще нет
-    if (!urlObj.searchParams.has('connection_limit')) {
-      urlObj.searchParams.set('connection_limit', '5'); // Уменьшаем для free tier
-    }
-    if (!urlObj.searchParams.has('pool_timeout')) {
-      urlObj.searchParams.set('pool_timeout', '10');
-    }
-    if (!urlObj.searchParams.has('connect_timeout')) {
-      urlObj.searchParams.set('connect_timeout', '10');
-    }
-    if (!urlObj.searchParams.has('statement_timeout')) {
-      urlObj.searchParams.set('statement_timeout', '20000'); // 20 секунд
-    }
+    // Перезаписываем параметры нашими оптимизированными значениями
+    urlObj.searchParams.set('connection_limit', '20'); // Увеличено для параллельных запросов
+    urlObj.searchParams.set('pool_timeout', '5'); // Увеличено для медленных подключений
+    urlObj.searchParams.set('connect_timeout', '5'); // Увеличено для медленных подключений
+    urlObj.searchParams.set('statement_timeout', '3000'); // Уменьшено до 3 секунд для быстрого ответа
     // Добавляем параметры для keep-alive соединений
-    if (!urlObj.searchParams.has('keepalive')) {
-      urlObj.searchParams.set('keepalive', 'true');
-    }
-    if (!urlObj.searchParams.has('keepalive_idle')) {
-      urlObj.searchParams.set('keepalive_idle', '600'); // 10 минут
-    }
+    urlObj.searchParams.set('keepalive', 'true');
+    urlObj.searchParams.set('keepalive_idle', '600'); // 10 минут
     return urlObj.toString();
   }
   
   // Добавляем параметры для более стабильного подключения к удаленной БД
-  // connection_limit: максимальное количество соединений в пуле (уменьшено для free tier)
-  // pool_timeout: таймаут ожидания соединения из пула (в секундах)
-  // connect_timeout: таймаут установки соединения (в секундах)
-  // statement_timeout: таймаут выполнения запроса (в миллисекундах)
+  // connection_limit: максимальное количество соединений в пуле (увеличено для параллельных запросов)
+  // pool_timeout: таймаут ожидания соединения из пула (в секундах) - увеличено до 5s
+  // connect_timeout: таймаут установки соединения (в секундах) - увеличено до 5s
+  // statement_timeout: таймаут выполнения запроса (в миллисекундах) - уменьшено до 3s для быстрого ответа
   // keepalive: включить keep-alive для соединений
   // keepalive_idle: время простоя перед отправкой keep-alive (в секундах)
-  return `${url}?connection_limit=5&pool_timeout=10&connect_timeout=10&statement_timeout=20000&keepalive=true&keepalive_idle=600`;
+  return `${url}?connection_limit=20&pool_timeout=5&connect_timeout=5&statement_timeout=3000&keepalive=true&keepalive_idle=600`;
 }
 
 export const prisma = new PrismaClient({

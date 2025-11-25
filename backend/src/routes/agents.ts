@@ -88,43 +88,45 @@ router.get('/', async (req, res, next) => {
     let projectTypeAgents: any[] = [];
     if (project?.projectTypeId) {
       try {
-        projectTypeAgents = await withRetry(
-          () => (prisma as any).projectTypeAgent.findMany({
+        // Сначала находим связи через промежуточную таблицу
+        const connections = await withRetry(
+          () => (prisma as any).projectTypeAgentProjectType.findMany({
             where: {
-              projectTypes: {
-                some: {
-                  projectTypeId: project.projectTypeId,
-                },
-              },
+              projectTypeId: project.projectTypeId,
             },
             include: {
-              projectTypes: {
-                include: {
-                  projectType: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
-                },
-                orderBy: {
-                  order: 'asc',
+              projectTypeAgent: true,
+              projectType: {
+                select: {
+                  id: true,
+                  name: true,
                 },
               },
             },
             orderBy: {
-              createdAt: 'asc',
+              order: 'asc',
             },
           }),
           3,
-          `GET /agents - find projectTypeAgents for ${project.projectTypeId}`
-        );
+          `GET /agents - find connections for ${project.projectTypeId}`
+        ) as any[];
+        
+        // Преобразуем данные в нужный формат
+        projectTypeAgents = connections.map((conn: any) => ({
+          ...conn.projectTypeAgent,
+          projectTypes: [{
+            projectType: conn.projectType,
+            order: conn.order,
+          }],
+        }));
       } catch (error: any) {
         // Если таблица не существует или миграция не применена, просто возвращаем пустой массив
         if (error?.code === 'P2021' || 
             error?.message?.includes('does not exist') || 
             error?.message?.includes('relation') ||
-            error?.message?.includes('column')) {
+            error?.message?.includes('column') ||
+            error?.message?.includes('Unknown argument') ||
+            error?.message?.includes('Unknown field')) {
           logger.warn({ 
             projectTypeId: project.projectTypeId, 
             error: error.message, 

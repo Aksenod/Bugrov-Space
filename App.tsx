@@ -155,6 +155,9 @@ export default function App() {
   const loadedAgentsRef = useRef(new Set<string>());
   const loadedSummaryRef = useRef(new Set<string>());
   const previousAgentsRef = useRef<Agent[] | null>(null);
+  const trackedAgentsRef = useRef<Set<string>>(new Set());
+  const bootstrapInProgressRef = useRef(false);
+  const lastBootstrapTokenRef = useRef<string | null>(null);
 
   const activeAgent = useMemo(() => {
     const allAgents = [...projectTypeAgents, ...agents];
@@ -199,6 +202,29 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeAgent?.id, isLoading]);
 
+  // Отслеживаем появление новых агентов и открываем SettingsPanel
+  useEffect(() => {
+    // Пропускаем во время bootstrap, чтобы не открывать панель при начальной загрузке
+    if (isBootstrapping) {
+      return;
+    }
+    
+    const allAgents = [...projectTypeAgents, ...agents];
+    const currentAgentIds = new Set(allAgents.map(agent => agent.id));
+    
+    // Если есть активный агент и он новый (не был в отслеживаемом списке)
+    // И отслеживаемый список не был пустым (чтобы не срабатывать при первой загрузке)
+    if (activeAgentId && activeAgent && 
+        !trackedAgentsRef.current.has(activeAgentId) && 
+        trackedAgentsRef.current.size > 0) {
+      // Открываем SettingsPanel для нового агента
+      setIsSettingsOpen(true);
+    }
+    
+    // Обновляем список отслеживаемых агентов
+    trackedAgentsRef.current = currentAgentIds;
+  }, [activeAgentId, activeAgent, agents, projectTypeAgents, isBootstrapping]);
+
   const handleLogout = useCallback(() => {
     api.clearToken();
     setAuthToken(null);
@@ -210,19 +236,37 @@ export default function App() {
     loadedAgentsRef.current.clear();
     loadedSummaryRef.current.clear();
     setSummaryDocuments({});
+    lastBootstrapTokenRef.current = null;
+    bootstrapInProgressRef.current = false;
   }, []);
 
   const bootstrap = useCallback(async () => {
-      if (!api.getToken()) {
+      const token = api.getToken();
+      if (!token) {
       setCurrentUser(null);
       setProjects([]);
       setActiveProjectId(null);
       setAgents([]);
       setProjectTypeAgents([]);
       setActiveAgentId(null);
+      lastBootstrapTokenRef.current = null;
       return;
     }
 
+    // Предотвращаем параллельные вызовы bootstrap
+    if (bootstrapInProgressRef.current) {
+      console.log('[Bootstrap] Already in progress, skipping...');
+      return;
+    }
+
+    // Если bootstrap уже был выполнен с тем же токеном, пропускаем
+    if (lastBootstrapTokenRef.current === token && currentUser && projects.length > 0) {
+      console.log('[Bootstrap] Already bootstrapped with this token, skipping...');
+      return;
+    }
+
+    bootstrapInProgressRef.current = true;
+    lastBootstrapTokenRef.current = token;
     setIsBootstrapping(true);
     try {
       // Загружаем пользователя, проекты и типы проектов параллельно
@@ -298,6 +342,7 @@ export default function App() {
       const isDbError = error?.status === 503 || error?.status === 500 || 
                        error?.message?.includes('Database') || 
                        error?.message?.includes('Can\'t reach database');
+      const isRateLimitError = error?.status === 429;
       
       // Если ошибка авторизации - выкидываем пользователя
       if (isAuthError) {
@@ -313,35 +358,49 @@ export default function App() {
         loadedAgentsRef.current.clear();
         loadedSummaryRef.current.clear();
         setSummaryDocuments({});
-      } else if (isDbError) {
-        // Если ошибка базы данных - оставляем пользователя залогиненным, но с пустыми данными
+        lastBootstrapTokenRef.current = null;
+      } else if (isDbError || isRateLimitError) {
+        // Если ошибка базы данных или rate limit - оставляем пользователя залогиненным, но с пустыми данными
         // Пользователь может попробовать обновить страницу позже
-        console.warn('Database temporarily unavailable, keeping user logged in');
-        setProjects([]);
-        setActiveProjectId(null);
-        setAgents([]);
-        setProjectTypeAgents([]);
-        setActiveAgentId(null);
-        setChatHistories({});
-        loadedAgentsRef.current.clear();
-        loadedSummaryRef.current.clear();
-        setSummaryDocuments({});
+        if (isRateLimitError) {
+          const errorMessage = error?.message || 'Превышен лимит запросов. Пожалуйста, подождите минуту и обновите страницу.';
+          showAlert(errorMessage, 'Превышен лимит запросов', 'warning', 10000);
+        } else {
+          console.warn('Database temporarily unavailable, keeping user logged in');
+        }
+        // Не очищаем данные, если они уже были загружены - пользователь может продолжать работать
+        // Очищаем только если это первая загрузка
+        if (!currentUser && projects.length === 0) {
+          setProjects([]);
+          setActiveProjectId(null);
+          setAgents([]);
+          setProjectTypeAgents([]);
+          setActiveAgentId(null);
+          setChatHistories({});
+          loadedAgentsRef.current.clear();
+          loadedSummaryRef.current.clear();
+          setSummaryDocuments({});
+        }
       } else {
         // Для других ошибок - также оставляем пользователя залогиненным
-        setProjects([]);
-        setActiveProjectId(null);
-        setAgents([]);
-        setProjectTypeAgents([]);
-        setActiveAgentId(null);
-        setChatHistories({});
-        loadedAgentsRef.current.clear();
-        loadedSummaryRef.current.clear();
-        setSummaryDocuments({});
+        // Не очищаем данные, если они уже были загружены
+        if (!currentUser && projects.length === 0) {
+          setProjects([]);
+          setActiveProjectId(null);
+          setAgents([]);
+          setProjectTypeAgents([]);
+          setActiveAgentId(null);
+          setChatHistories({});
+          loadedAgentsRef.current.clear();
+          loadedSummaryRef.current.clear();
+          setSummaryDocuments({});
+        }
       }
     } finally {
       setIsBootstrapping(false);
+      bootstrapInProgressRef.current = false;
     }
-  }, []);
+  }, [currentUser, projects.length]);
 
   useEffect(() => {
     if (authToken) {
@@ -385,6 +444,28 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentUser, activeAgent, isSettingsOpen, isDocsOpen, isSidebarOpen]);
+
+  // Проверяем, находимся ли мы на странице админ-панели
+  // ВАЖНО: Этот хук должен быть вызван ДО условного возврата, чтобы соблюдать правила хуков
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#/admin') {
+        setIsAdminOpen(true);
+      } else if (window.location.hash === '' && isAdminOpen) {
+        setIsAdminOpen(false);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Проверяем при монтировании
+    if (window.location.hash === '#/admin') {
+      setIsAdminOpen(true);
+    }
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [isAdminOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
@@ -873,31 +954,6 @@ export default function App() {
     }
   };
 
-  const handleAddAgent = async () => {
-    if (!activeProjectId) {
-      showAlert('Сначала выберите или создайте проект', 'warning');
-      return;
-    }
-    try {
-      const response = await api.createAgent({
-        name: 'Новый Агент',
-        description: 'Специализированная роль',
-        systemInstruction: 'Ты полезный помощник.',
-        summaryInstruction: 'Сделай краткий вывод.',
-        model: LLMModel.GPT51,
-        role: '',
-        projectId: activeProjectId,
-      });
-      const mapped = mapAgent(response.agent);
-      setAgents((prev) => sortAgents([...prev, mapped]));
-      setActiveAgentId(mapped.id);
-      setIsSidebarOpen(false);
-      setIsSettingsOpen(true);
-    } catch (error) {
-      console.error('Failed to create agent', error);
-      showAlert('Ошибка при создании агента', 'error');
-    }
-  };
 
   const handleSelectProject = useCallback(async (projectId: string) => {
     setActiveProjectId(projectId);
@@ -914,6 +970,10 @@ export default function App() {
       // Приоритет обычным агентам проекта
       const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
       setActiveAgentId(mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null);
+      
+      // Обновляем список отслеживаемых агентов
+      trackedAgentsRef.current = new Set(allAgents.map(agent => agent.id));
+      
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
       setChatHistories({});
@@ -941,8 +1001,14 @@ export default function App() {
           : [];
         setAgents(mappedAgents);
         setProjectTypeAgents(mappedProjectTypeAgents);
+        
         // Приоритет обычным агентам проекта, но также проверяем агентов типа проекта
-        setActiveAgentId(mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null);
+        const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
+        const selectedAgentId = mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null;
+        setActiveAgentId(selectedAgentId);
+        
+        // Обновляем список отслеживаемых агентов
+        trackedAgentsRef.current = new Set(allAgents.map(agent => agent.id));
       } catch (error) {
         // Если агентов нет - это нормально, просто оставляем пустой список
         console.log('No agents in new project, this is expected');
@@ -1303,8 +1369,12 @@ export default function App() {
     return authView;
   }
 
-  if (isAdminOpen) {
-    return <AdminPage onClose={() => setIsAdminOpen(false)} />;
+  if (isAdminOpen || window.location.hash === '#/admin') {
+    return <AdminPage onClose={() => {
+      setIsAdminOpen(false);
+      window.location.hash = '';
+      window.history.replaceState(null, '', window.location.pathname);
+    }} />;
   }
 
   return (
@@ -1319,7 +1389,6 @@ export default function App() {
         onSelectProject={handleSelectProject}
         onCreateProject={() => setIsCreateProjectOpen(true)}
         onEditProject={handleEditProject}
-        onAddAgent={handleAddAgent}
         onDeleteAgent={handleDeleteAgent}
         onReorderAgents={handleReorderAgents}
         isOpen={isSidebarOpen}
@@ -1336,7 +1405,7 @@ export default function App() {
 
       <main className="flex-1 flex flex-col relative h-full w-full overflow-hidden transition-all duration-300">
         {!activeAgent ? (
-          // Если нет агента, показываем экран создания агента внутри рабочей области
+          // Если нет агента, показываем пустой экран
           <div className="flex-1 flex items-center justify-center bg-black text-white px-4">
             <div className="text-center space-y-6 max-w-md">
               <div className="relative">
@@ -1344,15 +1413,9 @@ export default function App() {
                 <Bot size={80} className="relative mx-auto animate-bot" />
               </div>
               <div>
-                <p className="text-xl font-bold mb-2">Создайте первого агента</p>
-                <p className="text-sm text-white/60">Начните работу, создав вашего первого AI агента</p>
+                <p className="text-xl font-bold mb-2">Нет доступных агентов</p>
+                <p className="text-sm text-white/60">Агенты будут доступны после настройки проекта</p>
               </div>
-              <button
-                className="px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
-                onClick={handleAddAgent}
-              >
-                Создать агента
-              </button>
             </div>
           </div>
         ) : (
@@ -1372,7 +1435,7 @@ export default function App() {
                           {activeAgent.name}
                         </h2>
                         
-                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all duration-300 shadow-sm backdrop-blur-sm flex-shrink-0 ${modelBadgeClass}`}>
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all duration-300 shadow-sm flex-shrink-0 ${modelBadgeClass}`}>
                           <ModelBadgeIcon size={12} className={isUltraModel ? 'text-emerald-300' : isGPT5Mini ? 'text-emerald-400' : isMiniModel ? 'text-amber-400' : 'text-pink-400'} />
                           <span className="text-[10px] font-bold uppercase tracking-wider">
                             {modelBadgeLabel}
@@ -1537,7 +1600,7 @@ export default function App() {
         title={alertDialog.title}
         message={alertDialog.message}
         variant={alertDialog.variant}
-        duration={alertDialog.variant === 'success' ? 3000 : alertDialog.variant === 'error' ? 5000 : 4000}
+        duration={3000}
       />
 
       <CreateProjectDialog

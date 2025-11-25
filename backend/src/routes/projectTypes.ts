@@ -201,10 +201,13 @@ router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Тип проекта не найден' });
   }
 
-  // Загружаем агентов типа проекта
-  const agents = await withRetry(
-    () => (prisma as any).projectTypeAgent.findMany({
+  // Загружаем агентов типа проекта через промежуточную таблицу
+  const agentConnections = await withRetry(
+    () => (prisma as any).projectTypeAgentProjectType.findMany({
       where: { projectTypeId: id },
+      include: {
+        projectTypeAgent: true,
+      },
       orderBy: [
         { order: 'asc' },
         { createdAt: 'asc' },
@@ -212,7 +215,21 @@ router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
     }),
     3,
     `GET /project-types/${id}/agents - find agents`
-  );
+  ) as any[];
+
+  // Преобразуем в формат, совместимый со старым API
+  const agents = agentConnections.map((connection: any) => ({
+    id: connection.projectTypeAgent.id,
+    name: connection.projectTypeAgent.name,
+    description: connection.projectTypeAgent.description,
+    systemInstruction: connection.projectTypeAgent.systemInstruction,
+    summaryInstruction: connection.projectTypeAgent.summaryInstruction,
+    model: connection.projectTypeAgent.model,
+    role: connection.projectTypeAgent.role,
+    order: connection.order,
+    createdAt: connection.projectTypeAgent.createdAt,
+    updatedAt: connection.projectTypeAgent.updatedAt,
+  }));
 
   res.json({ agents });
 }));

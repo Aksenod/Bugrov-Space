@@ -207,12 +207,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         'danger'
       );
     } else {
-      // Fallback на старый confirm
-      if (!confirm('Удалить этот документ?')) return;
-      onRemoveFile(fileId);
-      if (selectedFileId === fileId) {
-        setSelectedFileId(null);
-      }
+      // Если onShowConfirm не передан, используем alert как fallback (но это не должно происходить)
+      console.warn('onShowConfirm not provided, cannot show confirmation dialog');
     }
   };
 
@@ -228,7 +224,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       if (onShowAlert) {
         onShowAlert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`, 'Ошибка', 'error');
       } else {
-        alert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
+        // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
+        console.error(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
       }
       return;
     }
@@ -283,7 +280,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       if (onShowAlert) {
         onShowAlert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
       } else {
-        alert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
+        // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
+        console.error(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
       }
     } finally {
       setIsGeneratingDSL(false);
@@ -342,26 +340,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
-      <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity"
-        onClick={onClose}
-      />
-      
-      <div className="relative w-full max-w-6xl h-[90vh] sm:h-[85vh] bg-gradient-to-br from-black/50 via-black/40 to-indigo-950/30 backdrop-blur-3xl border border-white/10 rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] shadow-amber-500/10 flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-300 m-2 sm:m-0">
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex flex-col md:flex-row overflow-hidden">
         
         {/* Sidebar List */}
-        <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-white/5 ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-6 border-b border-white/10 flex items-center justify-between">
+        <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-6 border-b border-white/10">
             <h2 className="text-xl font-bold text-white flex items-center gap-3">
               <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
                 <FileText size={20} />
               </div>
               Documents
             </h2>
-            <button onClick={onClose} className="md:hidden text-white/50">
-              <X size={24} />
-            </button>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
@@ -404,7 +393,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         </div>
 
         {/* Preview Area */}
-        <div className={`flex-1 flex flex-col bg-black/20 relative ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 flex flex-col bg-black/30 relative ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
           
           {/* Mobile Header for Preview */}
           <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-black/40 backdrop-blur-md">
@@ -414,18 +403,21 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
             <span className="font-medium truncate text-white">
               {selectedFile ? getDocumentDisplayName(selectedFile) : ''}
             </span>
+            <button onClick={onClose} className="ml-auto p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+              <X size={20} />
+            </button>
           </div>
 
           {/* Desktop Close Button */}
-          <div className="absolute top-6 right-6 z-10 hidden md:flex gap-2">
-             <button onClick={onClose} className="p-2.5 bg-black/40 backdrop-blur-md hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-colors border border-white/5">
+          <div className="absolute top-6 right-6 z-10 hidden md:block">
+             <button onClick={onClose} className="p-2.5 bg-black/60 backdrop-blur-md hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors border border-white/10 shadow-lg">
                 <X size={20} />
              </button>
           </div>
 
           {selectedFile ? (
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
-              <div className="max-w-4xl mx-auto w-full">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 scrollbar-thin">
+              <div className="max-w-6xl mx-auto w-full">
                  <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
@@ -704,8 +696,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           )}
         </div>
 
-      </div>
-
       {/* Agent Settings Panel - открывается поверх модального окна */}
       {settingsAgentId && (() => {
         const settingsAgent = agents.find(a => a.id === settingsAgentId);
@@ -766,7 +756,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
             if (onShowAlert) {
               onShowAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error');
             } else {
-              alert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
+              // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
+              console.error(`Ошибки при загрузке файлов:\n${errors.join('\n')}`);
             }
           }
           
@@ -779,15 +770,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
               }
             }
             if (onShowAlert) {
-              onShowAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success');
+              onShowAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success', 3000);
             } else {
-              alert(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
+              // Если onShowAlert не передан, логируем успех (но это не должно происходить)
+              console.log(`Успешно загружено файлов в базу знаний: ${uploads.length}`);
             }
           } else if (errors.length === 0) {
             if (onShowAlert) {
               onShowAlert('Не удалось загрузить файлы', 'Ошибка', 'error');
             } else {
-              alert('Не удалось загрузить файлы');
+              // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
+              console.error('Не удалось загрузить файлы');
             }
           }
         };

@@ -38,7 +38,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [projectTypeAgents, setProjectTypeAgents] = useState<ApiProjectTypeAgent[]>([]);
   const [isLoadingTypes, setIsLoadingTypes] = useState(false);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
-  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   
   // Local state for editing
   const [name, setName] = useState(activeAgent.name);
@@ -115,40 +114,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
   
-  const handleCreateProjectTypeAgent = async () => {
-    if (!selectedProjectTypeId) return;
-    
-    setIsCreatingAgent(true);
-    try {
-      await api.createProjectTypeAgent(selectedProjectTypeId, {
-        name: 'Новый агент',
-        description: '',
-        systemInstruction: '',
-        summaryInstruction: '',
-        model: 'gpt-5.1',
-        role: '',
-      });
-      
-      await loadProjectTypeAgents(selectedProjectTypeId);
-    } catch (error) {
-      console.error('Failed to create project type agent', error);
-    } finally {
-      setIsCreatingAgent(false);
-    }
-  };
-  
-  const handleDeleteProjectTypeAgent = async (agentId: string) => {
-    if (!selectedProjectTypeId) return;
-    
-    if (!confirm('Удалить этого агента?')) return;
-    
-    try {
-      await api.deleteProjectTypeAgent(selectedProjectTypeId, agentId);
-      await loadProjectTypeAgents(selectedProjectTypeId);
-    } catch (error) {
-      console.error('Failed to delete project type agent', error);
-    }
-  };
+  // Удалено: создание и удаление агентов теперь только в админ-панели
   const resolveModel = (value: Agent['model']): LLMModel => {
     if (value === LLMModel.GPT51) return LLMModel.GPT51;
     if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
@@ -315,6 +281,73 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
              </div>
           </section>
 
+          {/* Knowledge Base Section - перемещено выше для лучшей видимости */}
+          <section className="bg-gradient-to-br from-emerald-900/20 to-teal-900/10 p-4 rounded-xl border border-emerald-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Brain size={16} className="text-emerald-300" />
+                <label className="block text-[10px] font-bold text-emerald-300 uppercase tracking-widest">
+                  Knowledge Base
+                </label>
+              </div>
+              <span className="px-2 py-1 bg-emerald-500/20 rounded-full text-[9px] text-emerald-300 font-semibold">
+                {activeAgent.files.filter(file => !file.name.startsWith('Summary')).length} files
+              </span>
+            </div>
+            
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              className="border-2 border-dashed border-emerald-500/30 hover:border-emerald-400/60 hover:bg-emerald-500/10 bg-emerald-500/5 rounded-xl p-6 text-center cursor-pointer transition-all group mb-3"
+            >
+              <Upload className="mx-auto h-7 w-7 text-emerald-300/70 group-hover:text-emerald-300 mb-2 transition-colors duration-300" />
+              <p className="text-xs font-medium text-emerald-200/80 group-hover:text-emerald-200 transition-colors mb-1">
+                Drop files here or click to upload
+              </p>
+              <p className="text-[10px] text-emerald-300/50">
+                .txt, .md files only
+              </p>
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden" 
+                multiple
+                accept=".txt,.md"
+              />
+            </div>
+
+            {/* File List */}
+            {(() => {
+              const knowledgeBaseFiles = activeAgent.files.filter(file => !file.name.startsWith('Summary'));
+              return knowledgeBaseFiles.length > 0 && (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {knowledgeBaseFiles.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between p-2.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors">
+                      <div className="flex items-center gap-2.5 overflow-hidden flex-1 min-w-0">
+                        <div className="bg-emerald-500/30 p-1.5 rounded text-emerald-200 shrink-0">
+                          <FileText size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-white truncate">{file.name}</p>
+                          <p className="text-[9px] text-emerald-300/60 uppercase tracking-wider">{file.type.split('/')[1] || 'FILE'}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => onRemoveFile(file.id)}
+                        className="p-1.5 text-emerald-300/50 hover:text-red-400 transition-colors rounded hover:bg-red-500/10 shrink-0"
+                        title="Удалить файл"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </section>
+
           {/* Roles Section */}
           <section>
             <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
@@ -373,64 +406,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               placeholder="Instructions for saving results..."
             />
           </section>
-
-          {/* Document Base Section */}
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                Knowledge Base
-              </label>
-              <span className="px-1.5 py-0.5 bg-white/10 rounded-full text-[9px] text-white/60">{activeAgent.files.filter(file => !file.name.startsWith('Summary')).length} files</span>
-            </div>
-            
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              className="border border-dashed border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/5 bg-white/5 rounded-xl p-6 text-center cursor-pointer transition-all group mb-3"
-            >
-              <Upload className="mx-auto h-6 w-6 text-white/30 group-hover:text-indigo-400 mb-1.5 transition-colors duration-300" />
-              <p className="text-xs text-white/60 group-hover:text-white transition-colors">
-                Drop files here
-              </p>
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden" 
-                multiple
-                accept=".txt,.md"
-              />
-            </div>
-
-            {/* File List */}
-            {(() => {
-              const knowledgeBaseFiles = activeAgent.files.filter(file => !file.name.startsWith('Summary'));
-              return knowledgeBaseFiles.length > 0 && (
-                <div className="space-y-1.5">
-                  {knowledgeBaseFiles.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between p-2.5 bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
-                      <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="bg-indigo-500/20 p-1.5 rounded text-indigo-300">
-                          <FileText size={14} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-white truncate">{file.name}</p>
-                          <p className="text-[9px] text-white/40 uppercase tracking-wider">{file.type.split('/')[1] || 'FILE'}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => onRemoveFile(file.id)}
-                        className="p-1.5 text-white/30 hover:text-red-400 transition-colors rounded hover:bg-red-500/10"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </section>
             </>
           ) : (
             /* Project Type Agents Management */
@@ -462,14 +437,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     <label className="block text-[10px] font-bold text-white/40 uppercase tracking-widest">
                       Агенты типа проекта
                     </label>
-                    <button
-                      onClick={handleCreateProjectTypeAgent}
-                      disabled={isCreatingAgent}
-                      className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-all disabled:opacity-50"
-                      title="Добавить агента"
-                    >
-                      <Plus size={14} />
-                    </button>
+                    <div className="text-[9px] text-white/40 italic">
+                      Управление в админ-панели
+                    </div>
                   </div>
                   
                   {isLoadingAgents ? (
@@ -483,21 +453,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       {projectTypeAgents.map((agent) => (
                         <div
                           key={agent.id}
-                          className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                          className="p-3 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-white truncate">{agent.name}</div>
-                            {agent.description && (
-                              <div className="text-xs text-white/60 truncate mt-1">{agent.description}</div>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => handleDeleteProjectTypeAgent(agent.id)}
-                            className="p-1.5 text-white/30 hover:text-red-400 transition-colors rounded hover:bg-red-500/10 ml-2"
-                            title="Удалить"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div className="text-sm font-semibold text-white truncate">{agent.name}</div>
+                          {agent.description && (
+                            <div className="text-xs text-white/60 truncate mt-1">{agent.description}</div>
+                          )}
                         </div>
                       ))}
                     </div>
