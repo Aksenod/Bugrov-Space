@@ -19,7 +19,7 @@ const agentTemplateSchema = z.object({
 // GET / - получить все агенты-шаблоны
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const agents = await withRetry(
-    () => prisma.projectTypeAgent.findMany({
+    () => (prisma as any).projectTypeAgent.findMany({
       include: {
         projectTypes: {
           include: {
@@ -70,7 +70,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const agent = await withRetry(
-    () => prisma.projectTypeAgent.findUnique({
+    () => (prisma as any).projectTypeAgent.findUnique({
       where: { id },
       include: {
         projectTypes: {
@@ -132,7 +132,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { name, description, systemInstruction, summaryInstruction, model, role } = parsed.data;
 
   const agent = await withRetry(
-    () => prisma.projectTypeAgent.create({
+    () => (prisma as any).projectTypeAgent.create({
       data: {
         name,
         description: description || '',
@@ -167,7 +167,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 
   // Проверяем, что агент существует
   const existing = await withRetry(
-    () => prisma.projectTypeAgent.findUnique({
+    () => (prisma as any).projectTypeAgent.findUnique({
       where: { id },
     }),
     3,
@@ -179,7 +179,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   }
 
   const updated = await withRetry(
-    () => prisma.projectTypeAgent.update({
+    () => (prisma as any).projectTypeAgent.update({
       where: { id },
       data: parsed.data,
     }),
@@ -197,7 +197,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 
   // Проверяем, что агент существует
   const existing = await withRetry(
-    () => prisma.projectTypeAgent.findUnique({
+    () => (prisma as any).projectTypeAgent.findUnique({
       where: { id },
     }),
     3,
@@ -209,7 +209,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   }
 
   await withRetry(
-    () => prisma.projectTypeAgent.delete({
+    () => (prisma as any).projectTypeAgent.delete({
       where: { id },
     }),
     3,
@@ -225,7 +225,7 @@ router.get('/:id/project-types', asyncHandler(async (req: Request, res: Response
   const { id } = req.params;
 
   const agent = await withRetry(
-    () => prisma.projectTypeAgent.findUnique({
+    () => (prisma as any).projectTypeAgent.findUnique({
       where: { id },
       include: {
         projectTypes: {
@@ -283,7 +283,7 @@ router.post('/:id/project-types', asyncHandler(async (req: Request, res: Respons
 
   // Проверяем, что агент существует
   const agent = await withRetry(
-    () => prisma.projectTypeAgent.findUnique({
+    () => (prisma as any).projectTypeAgent.findUnique({
       where: { id },
     }),
     3,
@@ -311,7 +311,7 @@ router.post('/:id/project-types', asyncHandler(async (req: Request, res: Respons
 
   // Удаляем существующие связи
   await withRetry(
-    () => prisma.projectTypeAgentProjectType.deleteMany({
+    () => (prisma as any).projectTypeAgentProjectType.deleteMany({
       where: { projectTypeAgentId: id },
     }),
     3,
@@ -326,7 +326,7 @@ router.post('/:id/project-types', asyncHandler(async (req: Request, res: Respons
   }));
 
   await withRetry(
-    () => prisma.projectTypeAgentProjectType.createMany({
+    () => (prisma as any).projectTypeAgentProjectType.createMany({
       data: connections,
     }),
     3,
@@ -343,7 +343,7 @@ router.delete('/:id/project-types/:projectTypeId', asyncHandler(async (req: Requ
 
   // Проверяем, что агент существует
   const agent = await withRetry(
-    () => prisma.projectTypeAgent.findUnique({
+    () => (prisma as any).projectTypeAgent.findUnique({
       where: { id },
     }),
     3,
@@ -356,7 +356,7 @@ router.delete('/:id/project-types/:projectTypeId', asyncHandler(async (req: Requ
 
   // Удаляем связь
   await withRetry(
-    () => prisma.projectTypeAgentProjectType.deleteMany({
+    () => (prisma as any).projectTypeAgentProjectType.deleteMany({
       where: {
         projectTypeAgentId: id,
         projectTypeId,
