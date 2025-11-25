@@ -31,26 +31,13 @@ const shouldApplyRateLimit = (): boolean => {
   return true;
 };
 
-// Общий rate limiter для всех API запросов
-// Увеличен лимит, так как на Render.com все запросы могут идти через один прокси
-export const apiRateLimiter = (req: Request, res: Response, next: NextFunction) => {
-  // Если rate limiting отключен - просто пропускаем
+// Создаем rate limiter один раз при инициализации модуля, а не при каждом запросе
+const createApiRateLimiter = () => {
   if (!shouldApplyRateLimit()) {
-    return next();
+    return (req: Request, res: Response, next: NextFunction) => next();
   }
 
-  // Пропускаем rate limiting для GET запросов (они менее опасны)
-  if (req.method === 'GET') {
-    return next();
-  }
-
-  // Пропускаем rate limiting для /auth/me - он уже защищен authMiddleware
-  if (req.path === '/auth/me') {
-    return next();
-  }
-
-  // Применяем rate limiting только для POST/PUT/DELETE запросов
-  const limiter = rateLimit({
+  return rateLimit({
     windowMs: 15 * 60 * 1000, // 15 минут
     max: env.nodeEnv === 'production' ? 10000 : 1000, // Значительно увеличен лимит для продакшена
     message: { 
@@ -64,8 +51,25 @@ export const apiRateLimiter = (req: Request, res: Response, next: NextFunction) 
       trustProxy: false, // Отключаем проверку, так как используем кастомную функцию getClientIp
     },
   });
+};
 
-  return limiter(req, res, next);
+// Общий rate limiter для всех API запросов
+// Увеличен лимит, так как на Render.com все запросы могут идти через один прокси
+const apiRateLimiterInstance = createApiRateLimiter();
+
+export const apiRateLimiter = (req: Request, res: Response, next: NextFunction) => {
+  // Пропускаем rate limiting для GET запросов (они менее опасны)
+  if (req.method === 'GET') {
+    return next();
+  }
+
+  // Пропускаем rate limiting для /auth/me - он уже защищен authMiddleware
+  if (req.path === '/auth/me') {
+    return next();
+  }
+
+  // Применяем rate limiting только для POST/PUT/DELETE запросов
+  return apiRateLimiterInstance(req, res, next);
 };
 
 // Строгий rate limiter для аутентификации (защита от brute force)
