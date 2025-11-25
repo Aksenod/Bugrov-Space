@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 import { env } from '../env';
+import { logger } from '../utils/logger';
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -60,10 +61,7 @@ export function errorHandler(
       // P1001: Can't reach database server
       // P1002: The database server at {host}:{port} was reached but timed out
       // P1017: Server has closed the connection
-      console.error('[Prisma Connection Error]', {
-        code: err.code,
-        message: err.message,
-      });
+      logger.error({ code: err.code, message: err.message }, 'Prisma connection error');
       return res.status(503).json({
         error: 'Database connection error',
         message: env.nodeEnv === 'development' 
@@ -73,7 +71,7 @@ export function errorHandler(
     }
     if (err.code === 'P2003') {
       // Foreign key constraint failed
-      console.error('[Prisma Foreign Key Error]', err);
+      logger.error({ code: err.code, message: err.message, meta: err.meta }, 'Prisma foreign key error');
       return res.status(400).json({
         error: 'Database constraint error',
         message: env.nodeEnv === 'development' 
@@ -81,12 +79,19 @@ export function errorHandler(
           : 'Invalid data provided',
       });
     }
+    // P2021: Table does not exist
+    if (err.code === 'P2021') {
+      logger.error({ code: err.code, message: err.message, meta: err.meta }, 'Prisma table does not exist');
+      return res.status(500).json({
+        error: 'Database table does not exist',
+        message: env.nodeEnv === 'development' 
+          ? `Table does not exist (${err.code}): ${err.message}. Please run migrations.` 
+          : 'Database migration required. Please contact administrator.',
+      });
+    }
+    
     // Log unexpected Prisma errors
-    console.error('[Prisma Error]', {
-      code: err.code,
-      message: err.message,
-      meta: err.meta,
-    });
+    logger.error({ code: err.code, message: err.message, meta: err.meta }, 'Unexpected Prisma error');
     return res.status(500).json({
       error: 'Database error',
       message: env.nodeEnv === 'development' 
@@ -97,7 +102,7 @@ export function errorHandler(
 
   // Prisma connection errors
   if (err instanceof Prisma.PrismaClientInitializationError) {
-    console.error('[Prisma Connection Error]', err);
+    logger.error({ message: err.message, stack: err.stack }, 'Prisma client initialization error');
     return res.status(503).json({
       error: 'Database connection error',
       message: env.nodeEnv === 'development' 
@@ -115,12 +120,12 @@ export function errorHandler(
   }
 
   // Unexpected errors - log in development, hide in production
-  console.error('[Unexpected Error]', {
+  logger.error({
     message: err.message,
     stack: err.stack,
     url: req.url,
     method: req.method,
-  });
+  }, 'Unexpected error');
 
   return res.status(500).json({
     error: 'Internal server error',

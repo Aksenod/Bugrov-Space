@@ -4,6 +4,7 @@ import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { withRetry } from '../utils/prismaRetry';
+import { env } from '../env';
 
 const router = Router();
 
@@ -94,7 +95,28 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     logger.debug({ agentsCount: agentsWithProjectTypes.length }, 'Admin agents fetched');
     res.json({ agents: agentsWithProjectTypes });
   } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, code: error.code, meta: error.meta }, 'GET /admin/agents error');
+    // Детальное логирование для диагностики
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack, 
+      code: error.code, 
+      meta: error.meta,
+      name: error.name,
+      cause: error.cause
+    }, 'GET /admin/agents error');
+    
+    // Если это ошибка Prisma о несуществующей таблице, возвращаем понятное сообщение
+    if (error?.code === 'P2021' || 
+        error?.message?.includes('does not exist') || 
+        error?.message?.includes('relation') ||
+        error?.message?.includes('column')) {
+      return res.status(500).json({
+        error: 'Database migration required',
+        message: 'The database tables have not been created. Please ensure migrations are applied.',
+        details: env.nodeEnv === 'development' ? error.message : undefined
+      });
+    }
+    
     throw error;
   }
 }));
@@ -184,13 +206,28 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       );
     } catch (error: any) {
       // Если таблица не существует (миграция не применена)
-      if (error?.code === 'P2021' || error?.message?.includes('does not exist') || error?.message?.includes('relation')) {
-        logger.error({ error: error.message, code: error.code }, 'ProjectTypeAgent table does not exist. Migration may not be applied.');
+      if (error?.code === 'P2021' || 
+          error?.message?.includes('does not exist') || 
+          error?.message?.includes('relation') ||
+          error?.message?.includes('column')) {
+        logger.error({ 
+          error: error.message, 
+          code: error.code,
+          meta: error.meta,
+          stack: error.stack 
+        }, 'ProjectTypeAgent table does not exist. Migration may not be applied.');
         return res.status(500).json({ 
-          error: 'Database migration not applied. Please check server logs and ensure migrations are deployed.',
-          details: error.message 
+          error: 'Database migration not applied',
+          message: 'The ProjectTypeAgent table does not exist. Please ensure migrations are deployed.',
+          details: env.nodeEnv === 'development' ? error.message : undefined
         });
       }
+      logger.error({ 
+        error: error.message, 
+        code: error.code,
+        meta: error.meta,
+        stack: error.stack 
+      }, 'POST /admin/agents - unexpected error');
       throw error;
     }
 
