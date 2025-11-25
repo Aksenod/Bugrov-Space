@@ -44,6 +44,8 @@ const getOrCreateAgentFromTemplate = async (
   userId: string,
   projectId?: string
 ): Promise<any | null> => {
+  logger.debug({ agentId, userId, projectId }, 'getOrCreateAgentFromTemplate - starting');
+  
   // Сначала пытаемся найти агента в таблице Agent
   let agent = await withRetry(
     () => prisma.agent.findFirst({
@@ -54,8 +56,11 @@ const getOrCreateAgentFromTemplate = async (
   );
 
   if (agent) {
+    logger.debug({ agentId: agent.id, agentName: agent.name }, 'getOrCreateAgentFromTemplate - found existing agent');
     return agent;
   }
+
+  logger.debug({ agentId }, 'getOrCreateAgentFromTemplate - agent not found, checking ProjectTypeAgent');
 
   // Если агент не найден, проверяем, является ли это ProjectTypeAgent
   try {
@@ -68,12 +73,17 @@ const getOrCreateAgentFromTemplate = async (
     );
 
     if (!projectTypeAgent) {
+      logger.debug({ agentId }, 'getOrCreateAgentFromTemplate - not a ProjectTypeAgent either');
       return null; // Не ProjectTypeAgent и не Agent
     }
+
+    const template = projectTypeAgent as any;
+    logger.debug({ agentId, templateName: template?.name }, 'getOrCreateAgentFromTemplate - found ProjectTypeAgent template');
 
     // Если это ProjectTypeAgent, но projectId не указан - возвращаем null
     // (не можем создать экземпляр без projectId)
     if (!projectId) {
+      logger.debug({ agentId, templateName: template?.name }, 'getOrCreateAgentFromTemplate - projectId not provided, cannot create instance');
       return null;
     }
 
@@ -87,11 +97,14 @@ const getOrCreateAgentFromTemplate = async (
     );
 
     if (!project) {
+      logger.warn({ agentId, projectId, userId }, 'getOrCreateAgentFromTemplate - project not found or does not belong to user');
       return null;
     }
 
-    const template = projectTypeAgent as any;
+    logger.debug({ agentId, projectId, templateName: template?.name }, 'getOrCreateAgentFromTemplate - project verified, checking for existing agent instance');
+
     if (!template || !template.name) {
+      logger.warn({ agentId, template }, 'getOrCreateAgentFromTemplate - invalid template data (missing name)');
       return null;
     }
 
@@ -109,8 +122,16 @@ const getOrCreateAgentFromTemplate = async (
     );
 
     if (existingAgent) {
+      logger.debug({ 
+        agentId: existingAgent.id,
+        templateId: agentId,
+        templateName: template.name,
+        projectId 
+      }, 'getOrCreateAgentFromTemplate - found existing agent instance from template');
       return existingAgent;
     }
+
+    logger.debug({ agentId, templateName: template.name, projectId }, 'getOrCreateAgentFromTemplate - no existing instance found, creating new one');
 
     // Создаем новый экземпляр агента проекта из шаблона
     const nextOrder = await getNextOrderValue(userId);
@@ -139,15 +160,18 @@ const getOrCreateAgentFromTemplate = async (
       projectId: projectId,
       userId,
       agentName: agent.name 
-    }, 'Created new agent instance from ProjectTypeAgent template');
+    }, 'getOrCreateAgentFromTemplate - created new agent instance from ProjectTypeAgent template');
 
     return agent;
   } catch (error: any) {
     logger.error({ 
       agentId,
+      userId,
+      projectId,
       error: error.message,
-      code: error.code 
-    }, 'Failed to get or create agent from template');
+      code: error.code,
+      stack: error.stack 
+    }, 'getOrCreateAgentFromTemplate - failed to get or create agent from template');
     return null;
   }
 };
@@ -494,54 +518,70 @@ router.delete('/:agentId', async (req, res) => {
 router.get('/:agentId/messages', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
+  const projectId = req.query.projectId as string | undefined;
 
-  logger.info({ agentId, userId }, 'GET /agents/:agentId/messages - request received');
+  logger.info({ 
+    agentId, 
+    userId,
+    projectId,
+    hasProjectId: !!projectId 
+  }, 'GET /agents/:agentId/messages - request received');
 
-  // Пытаемся найти агента, но если это ProjectTypeAgent без экземпляра - возвращаем пустой массив
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({
-      where: { id: agentId, userId },
-    }),
-    3,
-    `GET /agents/${agentId}/messages - find agent`
-  );
+  // Используем функцию для получения или создания агента из шаблона
+  // Если projectId не указан, функция вернет null для ProjectTypeAgent
+  let agent = null;
+  
+  if (projectId) {
+    // Если projectId указан, пытаемся получить или создать агента из шаблона
+    agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
+  } else {
+    // Если projectId не указан, сначала пытаемся найти существующего агента
+    agent = await withRetry(
+      () => prisma.agent.findFirst({
+        where: { id: agentId, userId },
+      }),
+      3,
+      `GET /agents/${agentId}/messages - find agent`
+    );
+
+    // Если агент не найден, проверяем, является ли это ProjectTypeAgent
+    // В этом случае возвращаем пустой массив (сообщений еще нет, т.к. нет экземпляра)
+    if (!agent) {
+      try {
+        const projectTypeAgent = await withRetry(
+          () => (prisma as any).projectTypeAgent.findUnique({
+            where: { id: agentId },
+          }),
+          3,
+          `GET /agents/${agentId}/messages - check if ProjectTypeAgent`
+        );
+
+        if (projectTypeAgent) {
+          logger.debug({ agentId, userId }, 'ProjectTypeAgent template found, returning empty messages array (no projectId provided)');
+          return res.json({ messages: [] });
+        }
+      } catch (error: any) {
+        logger.error({ agentId, userId, error: error.message, code: error.code }, 'Error checking ProjectTypeAgent');
+      }
+    }
+  }
 
   if (!agent) {
-    logger.debug({ agentId, userId }, 'Agent not found, checking if ProjectTypeAgent');
-    // Проверяем, является ли это ProjectTypeAgent (шаблон без экземпляра)
-    // Если да - возвращаем пустой массив (сообщений еще нет)
-    try {
-      const projectTypeAgent = await withRetry(
-        () => (prisma as any).projectTypeAgent.findUnique({
-          where: { id: agentId },
-        }),
-        3,
-        `GET /agents/${agentId}/messages - check if ProjectTypeAgent`
-      );
-
-      if (projectTypeAgent) {
-        const template = projectTypeAgent as any;
-        logger.debug({ agentId, userId, templateName: template?.name }, 'Found ProjectTypeAgent, returning empty messages array');
-        // Это шаблон, который еще не имеет экземпляра - возвращаем пустой массив
-        return res.json({ messages: [] });
-      } else {
-        logger.warn({ agentId, userId }, 'Agent not found and not a ProjectTypeAgent');
-      }
-    } catch (error: any) {
-      logger.error({ agentId, userId, error: error.message, code: error.code }, 'Error checking ProjectTypeAgent');
-    }
-
+    logger.warn({ agentId, userId, projectId }, 'Agent not found and not a ProjectTypeAgent');
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  // Загружаем сообщения для найденного или созданного агента
   const messages = await withRetry(
     () => prisma.message.findMany({
-      where: { agentId: agent.id }, // Используем ID созданного агента
+      where: { agentId: agent.id },
       orderBy: { createdAt: 'asc' },
     }),
     3,
     `GET /agents/${agentId}/messages - find messages`
   );
+
+  logger.debug({ agentId: agent.id, messagesCount: messages.length }, 'Messages loaded successfully');
 
   res.json({ messages });
 });
@@ -848,11 +888,20 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
   const projectId = req.query.projectId as string | undefined;
   try {
     const userId = req.userId!;
+    
+    logger.info({ 
+      agentId, 
+      userId,
+      projectId,
+      hasProjectId: !!projectId 
+    }, 'GET /agents/:agentId/files/summary - request received');
+    
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     if (!projectId) {
+      logger.warn({ agentId, userId }, 'projectId query parameter is missing');
       return res.status(400).json({ 
         error: 'projectId query parameter is required. Project isolation requires explicit project context.' 
       });
@@ -862,6 +911,7 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
     const agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
 
     if (!agent) {
+      logger.warn({ agentId, userId, projectId }, 'Agent not found and not a ProjectTypeAgent');
       return res.status(404).json({ error: 'Agent not found' });
     }
 
