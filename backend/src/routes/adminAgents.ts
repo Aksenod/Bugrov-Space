@@ -19,30 +19,59 @@ const agentTemplateSchema = z.object({
 // GET / - получить все агенты-шаблоны
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   try {
-    const agents = await withRetry(
-      () => (prisma as any).projectTypeAgent.findMany({
-        include: {
-          projectTypes: {
-            include: {
-              projectType: {
-                select: {
-                  id: true,
-                  name: true,
+    let agents: any[];
+    
+    try {
+      agents = await withRetry(
+        () => (prisma as any).projectTypeAgent.findMany({
+          include: {
+            projectTypes: {
+              include: {
+                projectType: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
                 },
               },
-            },
-            orderBy: {
-              order: 'asc',
+              orderBy: {
+                order: 'asc',
+              },
             },
           },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
-      3,
-      'GET /admin/agents'
-    ) as any[];
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+        3,
+        'GET /admin/agents'
+      ) as any[];
+    } catch (error: any) {
+      // Если таблица не существует (миграция не применена), пробуем без include
+      if (error?.code === 'P2021' || error?.message?.includes('does not exist') || error?.message?.includes('relation') || error?.message?.includes('column')) {
+        logger.warn({ error: error.message, code: error.code }, 'ProjectTypeAgentProjectType table may not exist, trying without relations');
+        try {
+          agents = await withRetry(
+            () => (prisma as any).projectTypeAgent.findMany({
+              orderBy: {
+                createdAt: 'desc',
+              },
+            }),
+            3,
+            'GET /admin/agents - without relations'
+          ) as any[];
+        } catch (innerError: any) {
+          // Если и основная таблица не существует, возвращаем пустой массив
+          if (innerError?.code === 'P2021' || innerError?.message?.includes('does not exist') || innerError?.message?.includes('relation')) {
+            logger.warn('ProjectTypeAgent table does not exist, returning empty array');
+            return res.json({ agents: [] });
+          }
+          throw innerError;
+        }
+      } else {
+        throw error;
+      }
+    }
 
     // Преобразуем данные для удобства фронтенда
     const agentsWithProjectTypes = agents.map((agent: any) => ({
@@ -65,7 +94,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     logger.debug({ agentsCount: agentsWithProjectTypes.length }, 'Admin agents fetched');
     res.json({ agents: agentsWithProjectTypes });
   } catch (error: any) {
-    logger.error({ error: error.message, stack: error.stack, code: error.code }, 'GET /admin/agents error');
+    logger.error({ error: error.message, stack: error.stack, code: error.code, meta: error.meta }, 'GET /admin/agents error');
     throw error;
   }
 }));
@@ -137,20 +166,33 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 
     const { name, description, systemInstruction, summaryInstruction, model, role } = parsed.data;
 
-    const agent = await withRetry(
-      () => (prisma as any).projectTypeAgent.create({
-        data: {
-          name,
-          description: description || '',
-          systemInstruction: systemInstruction || '',
-          summaryInstruction: summaryInstruction || '',
-          model: model || 'gpt-5.1',
-          role: role || '',
-        },
-      }),
-      3,
-      'POST /admin/agents - create'
-    );
+    let agent: any;
+    try {
+      agent = await withRetry(
+        () => (prisma as any).projectTypeAgent.create({
+          data: {
+            name,
+            description: description || '',
+            systemInstruction: systemInstruction || '',
+            summaryInstruction: summaryInstruction || '',
+            model: model || 'gpt-5.1',
+            role: role || '',
+          },
+        }),
+        3,
+        'POST /admin/agents - create'
+      );
+    } catch (error: any) {
+      // Если таблица не существует (миграция не применена)
+      if (error?.code === 'P2021' || error?.message?.includes('does not exist') || error?.message?.includes('relation')) {
+        logger.error({ error: error.message, code: error.code }, 'ProjectTypeAgent table does not exist. Migration may not be applied.');
+        return res.status(500).json({ 
+          error: 'Database migration not applied. Please check server logs and ensure migrations are deployed.',
+          details: error.message 
+        });
+      }
+      throw error;
+    }
 
     logger.info({ agentId: (agent as any).id, name }, 'Admin agent created');
     res.status(201).json({ agent });

@@ -120,9 +120,16 @@ router.get('/', async (req, res, next) => {
           `GET /agents - find projectTypeAgents for ${project.projectTypeId}`
         );
       } catch (error: any) {
-        // Если таблица не существует, просто возвращаем пустой массив
-        if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
-          logger.warn({ projectTypeId: project.projectTypeId }, 'ProjectTypeAgent table does not exist, returning empty array');
+        // Если таблица не существует или миграция не применена, просто возвращаем пустой массив
+        if (error?.code === 'P2021' || 
+            error?.message?.includes('does not exist') || 
+            error?.message?.includes('relation') ||
+            error?.message?.includes('column')) {
+          logger.warn({ 
+            projectTypeId: project.projectTypeId, 
+            error: error.message, 
+            code: error.code 
+          }, 'ProjectTypeAgent or ProjectTypeAgentProjectType table may not exist (migration not applied), returning empty array');
           projectTypeAgents = [];
         } else {
           logger.error({ error: error.message, stack: error.stack, code: error.code }, 'GET /agents - error loading projectTypeAgents');
