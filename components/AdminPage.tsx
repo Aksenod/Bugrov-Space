@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical, ChevronDown } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -85,6 +85,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [projectTypeAgents, setProjectTypeAgents] = useState<Map<string, ApiProjectTypeAgent[]>>(new Map());
   const [loadingAgentsForType, setLoadingAgentsForType] = useState<Set<string>>(new Set());
   const [reorderingTypeId, setReorderingTypeId] = useState<string | null>(null);
+  const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
   
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -669,7 +670,33 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         });
       } catch (error: any) {
         console.error('File upload failed', error);
-        errors.push(`Не удалось загрузить ${file.name}: ${error?.message || 'Неизвестная ошибка'}`);
+        // Детальное логирование ошибки
+        const errorMessage = error?.message || 'Неизвестная ошибка';
+        const errorStatus = error?.status || error?.statusCode || 'unknown';
+        console.error('Upload error details:', {
+          fileName: file.name,
+          errorMessage,
+          errorStatus,
+          errorName: error?.name,
+          errorCode: error?.code,
+          fullError: error,
+        });
+        
+        // Формируем понятное сообщение об ошибке для пользователя
+        let userMessage = `Не удалось загрузить ${file.name}`;
+        if (errorStatus === 500) {
+          userMessage += ': Ошибка сервера. Возможно, миграция базы данных не применена.';
+        } else if (errorStatus === 404) {
+          userMessage += ': Агент не найден.';
+        } else if (errorStatus === 401 || errorStatus === 403) {
+          userMessage += ': Недостаточно прав доступа.';
+        } else if (errorMessage) {
+          userMessage += `: ${errorMessage}`;
+        } else {
+          userMessage += ': Неизвестная ошибка. Проверьте консоль браузера.';
+        }
+        
+        errors.push(userMessage);
       }
     }
 
@@ -678,7 +705,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     }
 
     if (uploads.length > 0) {
+      // Добавляем загруженные файлы в список
       setAgentFiles(prev => [...prev, ...uploads]);
+      
+      // Перезагружаем файлы с сервера для получения актуального списка
+      try {
+        const { files: refreshedFiles } = await api.getAdminAgentFiles(editingAgent.id);
+        setAgentFiles(refreshedFiles.map(file => ({
+          id: file.id,
+          name: file.name,
+          type: file.mimeType,
+          data: file.content,
+          agentId: file.agentId,
+        })));
+        console.log(`[AdminPage] Reloaded ${refreshedFiles.length} files after upload`);
+      } catch (error: any) {
+        console.error('[AdminPage] Failed to reload files after upload', error);
+        // Не показываем ошибку пользователю, так как файлы уже добавлены в состояние
+      }
+      
       showAlert(`Успешно загружено файлов: ${uploads.length}`, 'Успех', 'success', 3000);
     }
     
@@ -849,11 +894,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     handleReorderAgents(projectTypeId, newOrder);
   };
 
+  const toggleCollapse = (typeId: string) => {
+    setCollapsedTypes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(typeId)) {
+        newSet.delete(typeId);
+      } else {
+        newSet.add(typeId);
+      }
+      return newSet;
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-black to-indigo-950/20 overflow-x-hidden">
-      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-6 max-w-6xl w-full">
+    <div className="min-h-screen bg-gradient-to-br from-black via-black to-indigo-950/20 overflow-x-hidden flex flex-col">
+      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-6 max-w-6xl w-full flex flex-col flex-1 min-h-0">
         {/* Header */}
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-4 sm:mb-6 shrink-0">
           <div className="flex justify-between items-center mb-3 sm:mb-4">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Админ-панель</h1>
             <button
@@ -891,7 +948,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           </div>
 
           {/* Content */}
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
             {activeTab === 'projectTypes' ? (
               <>
                 {/* Create Form */}
@@ -960,6 +1017,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                               </>
                             ) : (
                               <>
+                                <button
+                                  onClick={() => toggleCollapse(type.id)}
+                                  className="p-1 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/10 transition-all"
+                                  title={collapsedTypes.has(type.id) ? 'Развернуть' : 'Свернуть'}
+                                >
+                                  <ChevronDown 
+                                    size={16} 
+                                    className={`sm:w-5 sm:h-5 transition-transform duration-200 ${
+                                      collapsedTypes.has(type.id) ? '-rotate-90' : ''
+                                    }`}
+                                  />
+                                </button>
                                 <span className="flex-1 text-white text-sm sm:text-base font-medium">
                                   {type.name}
                                   {agents.length > 0 && (
@@ -989,7 +1058,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                           </div>
                           
                           {/* Agents List */}
-                          {!editingId && (
+                          {!editingId && !collapsedTypes.has(type.id) && (
                             <div className="px-2.5 sm:px-4 pb-2.5 sm:pb-4">
                               {isLoadingAgents ? (
                                 <div className="flex items-center justify-center py-4">

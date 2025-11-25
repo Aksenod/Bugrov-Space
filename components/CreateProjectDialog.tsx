@@ -20,7 +20,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [description, setDescription] = useState('');
   const [projectTypeId, setProjectTypeId] = useState('');
   const [projectTypes, setProjectTypes] = useState<ProjectType[]>(initialProjectTypes);
+  const [projectTypesWithAgents, setProjectTypesWithAgents] = useState<Set<string>>(new Set());
   const [isLoadingTypes, setIsLoadingTypes] = useState(false);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -40,10 +42,8 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       if (initialProjectTypes.length > 0) {
         setProjectTypes(initialProjectTypes);
         setIsLoadingTypes(false);
-        // Автоматически выбираем первый тип, если ничего не выбрано
-        if (!projectTypeId && initialProjectTypes.length > 0) {
-          setProjectTypeId(initialProjectTypes[0].id);
-        }
+        // Загружаем агентов для всех типов проектов
+        loadAgentsForProjectTypes(initialProjectTypes);
       } else {
         // Загружаем типы проектов только если они не переданы
         loadProjectTypes();
@@ -55,7 +55,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       setProjectTypeId('');
       setError(null);
       setProjectTypes([]);
+      setProjectTypesWithAgents(new Set());
       setIsLoadingTypes(false);
+      setIsLoadingAgents(false);
       // Отменяем любые активные запросы
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -77,9 +79,8 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   useEffect(() => {
     if (initialProjectTypes.length > 0) {
       setProjectTypes(initialProjectTypes);
-      if (!projectTypeId && initialProjectTypes.length > 0) {
-        setProjectTypeId(initialProjectTypes[0].id);
-      }
+      // Загружаем агентов для всех типов проектов
+      loadAgentsForProjectTypes(initialProjectTypes);
     }
   }, [initialProjectTypes]);
 
@@ -122,17 +123,8 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       // Проверяем еще раз перед обновлением состояния (критично!)
       if (!abortController.signal.aborted && isMountedRef.current && isOpenRef.current) {
         setProjectTypes(mappedTypes);
-        // Автоматически выбираем первый тип, если он есть и ничего не выбрано
-        // Используем функциональную форму setState для безопасности
-        if (mappedTypes.length > 0) {
-          setProjectTypeId((prev) => {
-            // Дополнительная проверка перед установкой значения
-            if (!isMountedRef.current || !isOpenRef.current) {
-              return prev; // Не обновляем, если диалог закрыт
-            }
-            return prev || mappedTypes[0].id;
-          });
-        }
+        // Загружаем агентов для всех типов проектов
+        loadAgentsForProjectTypes(mappedTypes);
       }
     } catch (err: any) {
       // Игнорируем ошибки отмены запроса
@@ -158,6 +150,67 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     }
   };
 
+  const loadAgentsForProjectTypes = async (types: ProjectType[]) => {
+    // Проверяем, что диалог еще открыт
+    if (!isOpenRef.current || !isMountedRef.current) {
+      return;
+    }
+
+    try {
+      setIsLoadingAgents(true);
+      
+      // Загружаем агентов для всех типов проектов параллельно
+      const agentPromises = types.map(async (type) => {
+        try {
+          const { agents } = await api.getProjectTypeAgents(type.id);
+          return { projectTypeId: type.id, hasAgents: agents.length > 0 };
+        } catch (err) {
+          // Игнорируем ошибки для отдельных типов проектов
+          console.warn(`Failed to load agents for project type ${type.id}`, err);
+          return { projectTypeId: type.id, hasAgents: false };
+        }
+      });
+
+      const results = await Promise.all(agentPromises);
+      
+      // Проверяем, что диалог еще открыт перед обновлением состояния
+      if (!isMountedRef.current || !isOpenRef.current) {
+        return;
+      }
+
+      // Создаем Set с ID типов проектов, у которых есть агенты
+      const typesWithAgents = new Set<string>();
+      results.forEach((result) => {
+        if (result.hasAgents) {
+          typesWithAgents.add(result.projectTypeId);
+        }
+      });
+
+      setProjectTypesWithAgents(typesWithAgents);
+
+      // Автоматически выбираем первый тип с агентами, если ничего не выбрано
+      // Используем функциональную форму setState для получения актуального значения
+      setProjectTypeId((currentId) => {
+        if (!currentId && typesWithAgents.size > 0) {
+          const firstTypeWithAgents = types.find((type) => typesWithAgents.has(type.id));
+          if (firstTypeWithAgents) {
+            return firstTypeWithAgents.id;
+          }
+        } else if (currentId && !typesWithAgents.has(currentId)) {
+          // Если выбранный тип не имеет агентов, сбрасываем выбор
+          return '';
+        }
+        return currentId;
+      });
+    } catch (err: any) {
+      console.error('Failed to load agents for project types', err);
+    } finally {
+      if (isMountedRef.current && isOpenRef.current) {
+        setIsLoadingAgents(false);
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,6 +229,12 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
     if (!projectTypeId) {
       setError('Тип проекта обязателен');
+      return;
+    }
+
+    // Проверяем, что у выбранного типа проекта есть агенты
+    if (!projectTypesWithAgents.has(projectTypeId)) {
+      setError('Выбранный тип проекта не имеет агентов. Пожалуйста, выберите другой тип проекта.');
       return;
     }
 
@@ -253,7 +312,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             <label htmlFor="projectType" className="block text-sm font-semibold text-white/90 mb-2">
               Тип проекта <span className="text-red-400">*</span>
             </label>
-            {isLoadingTypes ? (
+            {isLoadingTypes || isLoadingAgents ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 size={20} className="animate-spin text-indigo-400" />
               </div>
@@ -261,7 +320,16 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               <select
                 id="projectType"
                 value={projectTypeId}
-                onChange={(e) => setProjectTypeId(e.target.value)}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  // Проверяем, что у выбранного типа есть агенты
+                  if (projectTypesWithAgents.has(selectedId)) {
+                    setProjectTypeId(selectedId);
+                    setError(null);
+                  } else {
+                    setError('Выбранный тип проекта не имеет агентов. Пожалуйста, выберите другой тип проекта.');
+                  }
+                }}
                 disabled={isLoading || projectTypes.length === 0}
                 className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer [&>option]:bg-black [&>option]:text-white"
                 style={{
@@ -280,11 +348,18 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                         Выберите тип проекта
                       </option>
                     )}
-                    {projectTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
+                    {projectTypes.map((type) => {
+                      const hasAgents = projectTypesWithAgents.has(type.id);
+                      return (
+                        <option 
+                          key={type.id} 
+                          value={type.id}
+                          disabled={!hasAgents}
+                        >
+                          {type.name}{!hasAgents ? ' (скоро)' : ''}
+                        </option>
+                      );
+                    })}
                   </>
                 )}
               </select>
@@ -319,7 +394,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isLoading || !name.trim() || !projectTypeId || isLoadingTypes}
+              disabled={isLoading || !name.trim() || !projectTypeId || isLoadingTypes || isLoadingAgents || !projectTypesWithAgents.has(projectTypeId)}
               className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Создание...' : 'Создать'}

@@ -205,6 +205,37 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
   // Создаем файл для агента-шаблона
   // Используем поле projectTypeAgentId для связи с ProjectTypeAgent
   try {
+    logger.debug({ 
+      agentId: id, 
+      fileName: parsed.data.name,
+      fileSize: parsed.data.content.length,
+      isKnowledgeBase: parsed.data.isKnowledgeBase ?? false
+    }, 'Attempting to create file for ProjectTypeAgent');
+
+    // Проверяем, что поле projectTypeAgentId доступно в схеме Prisma
+    // Это проверка для диагностики проблем с миграциями
+    try {
+      const testQuery = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'File' 
+        AND column_name = 'projectTypeAgentId'
+        LIMIT 1
+      `;
+      if (!testQuery || (Array.isArray(testQuery) && testQuery.length === 0)) {
+        logger.error({ agentId: id }, 'Column projectTypeAgentId does not exist in File table - migration may not be applied');
+        return res.status(500).json({ 
+          error: 'Ошибка базы данных: поле projectTypeAgentId не найдено в таблице File. Миграция базы данных не применена. Обратитесь к администратору.' 
+        });
+      }
+      logger.debug({ agentId: id }, 'Column projectTypeAgentId exists in File table');
+    } catch (schemaCheckError: any) {
+      logger.warn({ 
+        agentId: id, 
+        error: schemaCheckError.message 
+      }, 'Could not verify column existence, proceeding anyway');
+    }
+
     const file = await withRetry(
       () => prisma.file.create({
         data: {
@@ -225,9 +256,38 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
     logger.debug({ 
       fileId: fileData.id, 
       fileName: fileData.name, 
-      projectTypeAgentId: fileData.projectTypeAgentId, 
-      isKnowledgeBase: fileData.isKnowledgeBase 
-    }, 'File created for ProjectTypeAgent');
+      projectTypeAgentId: fileData.projectTypeAgentId,
+      agentId: fileData.agentId,
+      isKnowledgeBase: fileData.isKnowledgeBase,
+      createdAt: fileData.createdAt
+    }, 'File created successfully for ProjectTypeAgent');
+
+    // Проверяем, что файл действительно создан
+    const verifyFile = await withRetry(
+      () => prisma.file.findUnique({
+        where: { id: fileData.id },
+        select: {
+          id: true,
+          agentId: true,
+          projectTypeAgentId: true,
+          name: true,
+        },
+      }),
+      3,
+      `POST /admin/agents/${id}/files - verify file`
+    );
+
+    if (!verifyFile) {
+      logger.error({ fileId: fileData.id }, 'File was not created in database after create operation');
+      return res.status(500).json({ error: 'Не удалось создать файл. Файл не найден после создания.' });
+    }
+
+    logger.info({ 
+      fileId: fileData.id, 
+      fileName: fileData.name, 
+      projectTypeAgentId: fileData.projectTypeAgentId,
+      verified: true
+    }, 'File created and verified for ProjectTypeAgent');
 
     res.status(201).json({ 
       file: {
@@ -241,7 +301,47 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    logger.error({ agentId: id, error: error.message, stack: error.stack }, 'POST /admin/agents/:id/files error');
+    // Детальное логирование ошибки Prisma
+    const errorDetails: any = {
+      agentId: id,
+      fileName: parsed.data.name,
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
+      errorMeta: error.meta,
+      stack: error.stack,
+    };
+
+    // Проверяем, является ли это ошибкой Prisma
+    if (error.code) {
+      errorDetails.prismaErrorCode = error.code;
+      errorDetails.prismaErrorMeta = error.meta;
+      
+      // Специальная обработка для ошибки о несуществующем поле
+      if (error.message?.includes('Unknown field') || error.message?.includes('projectTypeAgentId')) {
+        logger.error(errorDetails, 'POST /admin/agents/:id/files error - field projectTypeAgentId may not exist in database schema');
+        return res.status(500).json({ 
+          error: 'Ошибка базы данных: поле projectTypeAgentId не найдено. Возможно, миграция не применена. Обратитесь к администратору.' 
+        });
+      }
+
+      // Обработка ошибки внешнего ключа
+      if (error.code === 'P2003') {
+        logger.error(errorDetails, 'POST /admin/agents/:id/files error - foreign key constraint violation');
+        return res.status(400).json({ 
+          error: 'Ошибка: агент-шаблон не найден или некорректный ID.' 
+        });
+      }
+
+      // Обработка других ошибок Prisma
+      logger.error(errorDetails, 'POST /admin/agents/:id/files error - Prisma error');
+      return res.status(500).json({ 
+        error: `Ошибка базы данных: ${error.message || 'Неизвестная ошибка'}. Код ошибки: ${error.code}` 
+      });
+    }
+
+    // Обработка обычных ошибок
+    logger.error(errorDetails, 'POST /admin/agents/:id/files error - unknown error');
     throw error;
   }
 }));
