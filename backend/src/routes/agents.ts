@@ -837,13 +837,58 @@ router.get('/:agentId/files', async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const agent = await withRetry(
+    // Сначала пытаемся найти обычного агента
+    let agent = await withRetry(
       () => prisma.agent.findFirst({
         where: { id: agentId, userId },
       }),
       3,
       `GET /agents/${agentId}/files - find agent`
     );
+
+    // Если агент не найден, проверяем, является ли это ProjectTypeAgent шаблоном
+    // Для ProjectTypeAgent файлы хранятся с agentId = projectTypeAgentId
+    if (!agent) {
+      try {
+        const projectTypeAgent = await withRetry(
+          () => (prisma as any).projectTypeAgent.findUnique({
+            where: { id: agentId },
+          }),
+          3,
+          `GET /agents/${agentId}/files - check if ProjectTypeAgent`
+        );
+
+        if (projectTypeAgent) {
+          // Для ProjectTypeAgent шаблонов файлы хранятся с agentId = projectTypeAgentId
+          // Используем прямой SQL запрос, так как File.agentId формально ссылается на Agent.id
+          // Экранируем agentId для безопасности (как в adminAgents.ts)
+          const escapedAgentId = agentId.replace(/'/g, "''");
+          const files = await (prisma as any).$queryRawUnsafe(`
+            SELECT "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
+            FROM "File"
+            WHERE "agentId" = '${escapedAgentId}' 
+              AND "isKnowledgeBase" = true
+              AND "name" NOT LIKE 'Summary%'
+            ORDER BY "createdAt" DESC
+          `);
+
+          logger.debug({ agentId, filesCount: Array.isArray(files) ? files.length : 0 }, 'Files fetched for ProjectTypeAgent template');
+          return res.json({ 
+            files: Array.isArray(files) ? files.map((file: any) => ({
+              id: file.id,
+              agentId: file.agentId,
+              name: file.name,
+              mimeType: file.mimeType,
+              content: file.content,
+              isKnowledgeBase: file.isKnowledgeBase,
+              createdAt: file.createdAt,
+            })) : []
+          });
+        }
+      } catch (error: any) {
+        logger.error({ agentId, userId, error: error.message, code: error.code }, 'Error checking ProjectTypeAgent for files');
+      }
+    }
 
     if (!agent) {
       return res.status(404).json({ error: 'Agent not found' });
@@ -981,8 +1026,12 @@ router.delete('/files/:fileId', async (req, res) => {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  if (file.agent.userId !== userId) {
-    logger.warn({ fileId, fileUserId: file.agent.userId, currentUserId: userId }, 'Attempt to delete file belonging to different user');
+  if (!file.agent || file.agent.userId !== userId) {
+    if (!file.agent) {
+      logger.warn({ fileId, userId }, 'File does not belong to an agent (possibly ProjectTypeAgent file)');
+    } else {
+      logger.warn({ fileId, fileUserId: file.agent.userId, currentUserId: userId }, 'Attempt to delete file belonging to different user');
+    }
     return res.status(403).json({ error: 'Access denied. File belongs to different user.' });
   }
 
@@ -1029,7 +1078,10 @@ router.delete('/:agentId/files/:fileId', async (req, res) => {
 
   // Проверяем, что файл принадлежит любому агенту этого пользователя
   // Если userId агента файла совпадает с userId запрашивающего агента - можно удалять
-  if (file.agent.userId !== userId) {
+  if (!file.agent || file.agent.userId !== userId) {
+    if (!file.agent) {
+      logger.warn({ fileId, agentId, userId }, 'File does not belong to an agent (possibly ProjectTypeAgent file)');
+    }
     return res.status(403).json({ error: 'Access denied. File belongs to different user.' });
   }
 
@@ -1046,23 +1098,36 @@ router.delete('/:agentId/files/:fileId', async (req, res) => {
 router.post('/:agentId/summary', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
+  const projectId = req.query.projectId as string | undefined;
 
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({
-      where: { id: agentId, userId },
-      include: { files: true },
-    }),
-    3,
-    `POST /agents/${agentId}/summary - find agent`
-  );
+  logger.info({ 
+    agentId, 
+    userId,
+    projectId,
+    hasProjectId: !!projectId 
+  }, 'POST /agents/:agentId/summary - request received');
+
+  if (!projectId) {
+    logger.warn({ agentId, userId }, 'projectId query parameter is missing');
+    return res.status(400).json({ 
+      error: 'projectId query parameter is required. Project isolation requires explicit project context.' 
+    });
+  }
+
+  // Используем функцию для получения или создания агента из шаблона
+  const agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
 
   if (!agent) {
+    logger.warn({ agentId, userId, projectId }, 'Agent not found and not a ProjectTypeAgent');
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  // Используем ID созданного/найденного агента для загрузки сообщений
+  const actualAgentId = agent.id;
+
   const messages = await withRetry(
     () => prisma.message.findMany({
-      where: { agentId },
+      where: { agentId: actualAgentId },
       orderBy: { createdAt: 'asc' },
     }),
     3,
@@ -1080,7 +1145,7 @@ router.post('/:agentId/summary', async (req, res) => {
     .join('\n\n');
 
   try {
-    logger.debug({ agentId, userId, messagesCount: messages.length }, 'Generating summary');
+    logger.debug({ agentId: actualAgentId, userId, messagesCount: messages.length }, 'Generating summary');
 
     const summaryText = await generateSummaryContent(agent, transcript);
     const fileName = `Summary - ${agent.name} - ${new Date().toLocaleString()}`;
@@ -1088,7 +1153,7 @@ router.post('/:agentId/summary', async (req, res) => {
     const file = await withRetry(
       () => prisma.file.create({
         data: {
-          agentId,
+          agentId: actualAgentId, // Используем ID созданного/найденного агента
           name: fileName,
           mimeType: 'text/markdown',
           content: Buffer.from(summaryText, 'utf-8').toString('base64'),
@@ -1109,7 +1174,7 @@ router.post('/:agentId/summary', async (req, res) => {
     res.status(201).json({ file });
   } catch (error) {
     logger.error({ 
-      agentId, 
+      agentId: actualAgentId, 
       userId, 
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined 

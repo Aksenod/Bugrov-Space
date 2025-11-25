@@ -113,6 +113,8 @@ export default function App() {
   const [projectTypeAgents, setProjectTypeAgents] = useState<Agent[]>([]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [chatHistories, setChatHistories] = useState<Record<string, Message[]>>({});
+  // Маппинг между ID шаблона и ID реального агента проекта
+  const [templateToRealAgentMap, setTemplateToRealAgentMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summarySuccess, setSummarySuccess] = useState(false);
@@ -159,14 +161,70 @@ export default function App() {
   const lastBootstrapTokenRef = useRef<string | null>(null);
 
   const activeAgent = useMemo(() => {
-    // Теперь используем только projectTypeAgents
     if (!activeAgentId) {
       return projectTypeAgents[0];
     }
-    return projectTypeAgents.find((agent) => agent.id === activeAgentId) ?? projectTypeAgents[0];
-  }, [activeAgentId, projectTypeAgents]);
+    
+    // Сначала проверяем, является ли activeAgentId ID шаблона
+    const templateAgent = projectTypeAgents.find((agent) => agent.id === activeAgentId);
+    if (templateAgent) {
+      return templateAgent;
+    }
+    
+    // Если это не шаблон, проверяем, есть ли реальный агент с таким ID
+    const realAgent = agents.find((agent) => agent.id === activeAgentId);
+    if (realAgent) {
+      return realAgent;
+    }
+    
+    // Если не нашли, возможно это реальный агент, который еще не загружен
+    // Проверяем маппинг: возможно activeAgentId - это реальный агент, нужно найти соответствующий шаблон
+    const templateId = Object.keys(templateToRealAgentMap).find(
+      (templateId) => templateToRealAgentMap[templateId] === activeAgentId
+    );
+    if (templateId) {
+      const mappedTemplate = projectTypeAgents.find((agent) => agent.id === templateId);
+      if (mappedTemplate) {
+        return mappedTemplate;
+      }
+    }
+    
+    // Если ничего не найдено, возвращаем первый шаблон
+    return projectTypeAgents[0];
+  }, [activeAgentId, projectTypeAgents, agents, templateToRealAgentMap]);
 
-  const messages = activeAgent ? chatHistories[activeAgent.id] ?? [] : [];
+  // Получаем реальный ID агента для загрузки сообщений
+  const realAgentIdForMessages = useMemo(() => {
+    if (!activeAgentId) return null;
+    
+    // Если activeAgentId - это ID шаблона, проверяем маппинг
+    if (templateToRealAgentMap[activeAgentId]) {
+      const realId = templateToRealAgentMap[activeAgentId];
+      console.log(`[realAgentIdForMessages] Template ${activeAgentId} mapped to real agent ${realId}`);
+      return realId;
+    }
+    
+    // Если activeAgentId - это уже ID реального агента, проверяем обратный маппинг
+    const templateId = Object.keys(templateToRealAgentMap).find(
+      (templateId) => templateToRealAgentMap[templateId] === activeAgentId
+    );
+    if (templateId) {
+      console.log(`[realAgentIdForMessages] ActiveAgentId ${activeAgentId} is already a real agent`);
+      return activeAgentId; // Это уже реальный ID
+    }
+    
+    // Проверяем, есть ли реальный агент с таким ID
+    if (agents.find((agent) => agent.id === activeAgentId)) {
+      console.log(`[realAgentIdForMessages] ActiveAgentId ${activeAgentId} found in agents list`);
+      return activeAgentId;
+    }
+    
+    // Иначе используем сам activeAgentId (возможно, это шаблон, сообщений еще нет)
+    console.log(`[realAgentIdForMessages] Using activeAgentId as-is (template, no messages yet): ${activeAgentId}`);
+    return activeAgentId;
+  }, [activeAgentId, templateToRealAgentMap, agents]);
+
+  const messages = realAgentIdForMessages ? chatHistories[realAgentIdForMessages] ?? [] : [];
   // Документы проекта общие для всех агентов - всегда используем ключ 'all'
   const projectDocuments = summaryDocuments['all'] ?? [];
   
@@ -174,14 +232,12 @@ export default function App() {
   useEffect(() => {
     if (activeAgent) {
       console.log(`[Frontend] Active agent changed: ${activeAgent.name} (${activeAgent.id})`);
+      console.log(`[Frontend] activeAgentId: ${activeAgentId}`);
+      console.log(`[Frontend] realAgentIdForMessages: ${realAgentIdForMessages}`);
+      console.log(`[Frontend] templateToRealAgentMap:`, templateToRealAgentMap);
       console.log(`[Frontend] Project documents count: ${projectDocuments.length}`);
-      console.log(`[Frontend] Project documents:`, projectDocuments.map(d => ({
-        id: d.id,
-        name: d.name,
-        agentId: d.agentId,
-      })));
     }
-  }, [activeAgent?.id, projectDocuments.length]);
+  }, [activeAgent?.id, activeAgentId, realAgentIdForMessages, templateToRealAgentMap, projectDocuments.length]);
   const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT51;
   const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
@@ -210,6 +266,7 @@ export default function App() {
     setProjectTypeAgents([]);
     setActiveAgentId(null);
     setChatHistories({});
+    setTemplateToRealAgentMap({});
     loadedAgentsRef.current.clear();
     loadedSummaryRef.current.clear();
     setSummaryDocuments({});
@@ -286,12 +343,38 @@ export default function App() {
           setAgents(mappedAgents);
           setProjectTypeAgents(mappedProjectTypeAgents);
           
+          // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
+          const newMapping: Record<string, string> = {};
+          mappedProjectTypeAgents.forEach((template) => {
+            const realAgent = mappedAgents.find((agent) => agent.name === template.name);
+            if (realAgent) {
+              newMapping[template.id] = realAgent.id;
+            }
+          });
+          setTemplateToRealAgentMap(newMapping);
+          
           // Выбираем активного агента из projectTypeAgents
+          // НЕ меняем activeAgentId, если он уже установлен и соответствует шаблону
           setActiveAgentId((prev) => {
+            // Если prev - это ID шаблона и он существует в списке, оставляем его
             if (prev && mappedProjectTypeAgents.some((agent) => agent.id === prev)) {
+              console.log(`[Bootstrap] Keeping activeAgentId as template: ${prev}`);
               return prev;
             }
-            return mappedProjectTypeAgents[0]?.id ?? null;
+            // Проверяем, может быть prev - это ID реального агента
+            const realAgent = mappedAgents.find((agent) => agent.id === prev);
+            if (realAgent) {
+              // Находим соответствующий шаблон
+              const template = mappedProjectTypeAgents.find((t) => t.name === realAgent.name);
+              if (template) {
+                console.log(`[Bootstrap] Mapping real agent ${prev} to template ${template.id}`);
+                return template.id; // Возвращаем ID шаблона, чтобы отображался правильный агент
+              }
+            }
+            // Если ничего не найдено, выбираем первый шаблон
+            const firstTemplateId = mappedProjectTypeAgents[0]?.id ?? null;
+            console.log(`[Bootstrap] Selecting first template as activeAgentId: ${firstTemplateId}`);
+            return firstTemplateId;
           });
         } catch (error) {
           console.error('Failed to load agents in bootstrap', error);
@@ -308,6 +391,7 @@ export default function App() {
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
       setChatHistories({});
+      setTemplateToRealAgentMap({});
       setSummaryDocuments({});
     } catch (error: any) {
       console.error('Bootstrap failed', error);
@@ -330,6 +414,7 @@ export default function App() {
         setProjectTypeAgents([]);
         setActiveAgentId(null);
         setChatHistories({});
+        setTemplateToRealAgentMap({});
         loadedAgentsRef.current.clear();
         loadedSummaryRef.current.clear();
         setSummaryDocuments({});
@@ -352,6 +437,7 @@ export default function App() {
           setProjectTypeAgents([]);
           setActiveAgentId(null);
           setChatHistories({});
+          setTemplateToRealAgentMap({});
           loadedAgentsRef.current.clear();
           loadedSummaryRef.current.clear();
           setSummaryDocuments({});
@@ -366,6 +452,7 @@ export default function App() {
           setProjectTypeAgents([]);
           setActiveAgentId(null);
           setChatHistories({});
+          setTemplateToRealAgentMap({});
           loadedAgentsRef.current.clear();
           loadedSummaryRef.current.clear();
           setSummaryDocuments({});
@@ -470,7 +557,7 @@ export default function App() {
       }
       loadedAgentsRef.current.add(agentId);
       try {
-        const { messages: apiMessages } = await api.getMessages(agentId);
+        const { messages: apiMessages } = await api.getMessages(agentId, activeProjectId || undefined);
         setChatHistories((prev) => ({
           ...prev,
           [agentId]: apiMessages.map(mapMessage),
@@ -479,20 +566,21 @@ export default function App() {
         console.error('Failed to load messages', error);
       }
     },
-    [],
+    [activeProjectId],
   );
 
   // Оптимизация: загружаем сообщения только после завершения bootstrap
   // и только для активного агента (не для всех сразу)
   useEffect(() => {
-    if (activeAgent && !isBootstrapping) {
+    if (realAgentIdForMessages && !isBootstrapping) {
+      console.log(`[useEffect messages] Loading messages for realAgentId: ${realAgentIdForMessages}, activeAgentId: ${activeAgentId}`);
       // Небольшая задержка, чтобы интерфейс успел отрендериться
       const timer = setTimeout(() => {
-        ensureMessagesLoaded(activeAgent.id);
+        ensureMessagesLoaded(realAgentIdForMessages);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [activeAgent?.id, isBootstrapping, ensureMessagesLoaded]);
+  }, [realAgentIdForMessages, isBootstrapping, ensureMessagesLoaded, activeAgentId]);
 
   const ensureSummaryLoaded = useCallback(
     async (agentId: string) => {
@@ -551,7 +639,7 @@ export default function App() {
   // и только для активного агента (не для всех сразу)
   useEffect(() => {
     // Не загружаем во время bootstrap
-    if (isBootstrapping || !activeAgent?.id) {
+    if (isBootstrapping || !realAgentIdForMessages) {
       return;
     }
 
@@ -560,12 +648,12 @@ export default function App() {
     const timer = setTimeout(() => {
       // Сбрасываем кеш, чтобы гарантировать загрузку всех документов всех агентов
       loadedSummaryRef.current.delete('all');
-      console.log(`[Frontend] useEffect: Переключение на агента ${activeAgent.id}, сброс кеша и загрузка документов`);
-      ensureSummaryLoaded(activeAgent.id);
+      console.log(`[Frontend] useEffect: Переключение на агента ${realAgentIdForMessages}, сброс кеша и загрузка документов`);
+      ensureSummaryLoaded(realAgentIdForMessages);
     }, 200); // Небольшая задержка для лучшего UX
 
     return () => clearTimeout(timer);
-  }, [isBootstrapping, activeAgent?.id, ensureSummaryLoaded]);
+  }, [isBootstrapping, realAgentIdForMessages, ensureSummaryLoaded]);
 
   const getErrorMessage = (error: any): string => {
     if (typeof error === 'string') {
@@ -726,6 +814,7 @@ export default function App() {
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
       setChatHistories({});
+      setTemplateToRealAgentMap({});
       setSummaryDocuments({});
       
       // Пытаемся загрузить данные (но не критично, если не получится)
@@ -822,10 +911,14 @@ export default function App() {
     };
 
     // Добавляем оба временных сообщения сразу после отправки
+    // Используем realAgentIdForMessages, если он есть (для отображения в правильном чате)
+    // Иначе используем ID шаблона
+    const displayAgentId = realAgentIdForMessages || activeAgent.id;
+    console.log(`[handleSendMessage] Adding temp messages under agentId: ${displayAgentId} (template: ${activeAgent.id}, real: ${realAgentIdForMessages})`);
     setChatHistories((prev) => ({
       ...prev,
-      [activeAgent.id]: [
-        ...(prev[activeAgent.id] ?? []),
+      [displayAgentId]: [
+        ...(prev[displayAgentId] ?? []),
         tempUserMessage,
         loadingMessage,
       ],
@@ -842,10 +935,25 @@ export default function App() {
       
       // Если агент был создан из шаблона, получаем новый agentId
       const actualAgentId = response.agentId || activeAgent.id;
+      const templateId = activeAgent.id;
       
-      // Если агент был создан, обновляем activeAgentId и перезагружаем агентов
+      console.log(`[handleSendMessage] Template ID: ${templateId}, Actual Agent ID: ${actualAgentId}, Current activeAgentId: ${activeAgentId}`);
+      
+      // Если агент был создан из шаблона, сохраняем маппинг
+      // ВАЖНО: НЕ меняем activeAgentId - оставляем ID шаблона, маппинг используется для получения реального ID
       if (response.agentId && response.agentId !== activeAgent.id) {
-        setActiveAgentId(response.agentId);
+        console.log(`[handleSendMessage] Creating mapping: ${templateId} -> ${response.agentId}`);
+        
+        // Сохраняем маппинг между ID шаблона и ID реального агента
+        setTemplateToRealAgentMap((prev) => {
+          const updated = {
+            ...prev,
+            [templateId]: response.agentId!,
+          };
+          console.log(`[handleSendMessage] Updated mapping:`, updated);
+          return updated;
+        });
+        
         // Перезагружаем агентов, чтобы новый агент появился в списке
         if (activeProjectId) {
           api.getAgents(activeProjectId).then(({ agents: apiAgents, projectTypeAgents: apiProjectTypeAgents }) => {
@@ -855,6 +963,24 @@ export default function App() {
               : [];
             setAgents(mappedAgents);
             setProjectTypeAgents(mappedProjectTypeAgents);
+            
+            // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
+            // Объединяем с существующим маппингом, чтобы не потерять только что добавленный
+            setTemplateToRealAgentMap((prev) => {
+              const newMapping: Record<string, string> = { ...prev };
+              mappedProjectTypeAgents.forEach((template) => {
+                const realAgent = mappedAgents.find((agent) => agent.name === template.name);
+                if (realAgent) {
+                  newMapping[template.id] = realAgent.id;
+                }
+              });
+              console.log(`[handleSendMessage] Restored mapping after reload:`, newMapping);
+              return newMapping;
+            });
+            
+            // Убеждаемся, что activeAgentId остается ID шаблона (не меняем его)
+            // Если активный агент был шаблоном, он должен остаться шаблоном
+            console.log(`[handleSendMessage] ActiveAgentId should remain: ${templateId}`);
           }).catch(console.error);
         }
       }
@@ -862,36 +988,61 @@ export default function App() {
       // Заменяем временные сообщения на реальные сообщения из API
       // Используем actualAgentId, так как сообщения привязаны к созданному агенту
       setChatHistories((prev) => {
-        const currentMessages = prev[activeAgent.id] ?? [];
-        // Удаляем временные сообщения (пользователя и загрузки)
-        const messagesWithoutTemp = currentMessages.filter(
+        // Удаляем временные сообщения из истории шаблона, если они там есть
+        const templateMessages = prev[templateId] ?? [];
+        const templateMessagesWithoutTemp = templateMessages.filter(
           (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
         );
+        
+        // Удаляем временные сообщения из истории реального агента, если они там есть
+        const realAgentMessages = prev[actualAgentId] ?? [];
+        const realAgentMessagesWithoutTemp = realAgentMessages.filter(
+          (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
+        );
+        
+        // Объединяем сообщения, убирая дубликаты
+        const existingMessages = [...templateMessagesWithoutTemp, ...realAgentMessagesWithoutTemp];
+        const existingMessageIds = new Set(existingMessages.map((m) => m.id));
+        const newMessagesToAdd = newMessages.filter((m) => !existingMessageIds.has(m.id));
         
         // Добавляем реальные сообщения из API под правильным agentId
         return {
           ...prev,
-          [actualAgentId]: [...messagesWithoutTemp, ...newMessages],
+          [templateId]: templateMessagesWithoutTemp, // Очищаем историю шаблона от временных сообщений
+          [actualAgentId]: [...existingMessages, ...newMessagesToAdd],
         };
       });
+      
+      // Помечаем, что сообщения для этого агента загружены
+      if (actualAgentId) {
+        loadedAgentsRef.current.add(actualAgentId);
+      }
     } catch (error: any) {
       console.error('Chat error', error);
       
       // Удаляем временное сообщение загрузки и добавляем сообщение об ошибке
       // Сообщение пользователя оставляем как есть
+      // Используем тот же displayAgentId, под которым были добавлены временные сообщения
+      const errorDisplayAgentId = realAgentIdForMessages || activeAgent.id;
+      console.log(`[handleSendMessage error] Adding error message under agentId: ${errorDisplayAgentId}`);
       setChatHistories((prev) => {
-        const currentMessages = prev[activeAgent.id] ?? [];
-        // Удаляем только временное сообщение загрузки, сообщение пользователя оставляем
-        const messagesWithoutLoading = currentMessages.filter(
-          (msg) => msg.id !== loadingMessageId
+        // Удаляем временные сообщения из обоих мест (шаблон и реальный агент)
+        const templateMessages = prev[activeAgent.id] ?? [];
+        const realAgentMessages = prev[errorDisplayAgentId] ?? [];
+        const allMessages = [...templateMessages, ...realAgentMessages];
+        const messagesWithoutLoading = allMessages.filter(
+          (msg) => msg.id !== loadingMessageId && msg.id !== tempUserMessageId
         );
         
+        // Добавляем сообщение пользователя и ошибку
         const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
         
         return {
           ...prev,
-          [activeAgent.id]: [
+          [activeAgent.id]: [], // Очищаем шаблон
+          [errorDisplayAgentId]: [
             ...messagesWithoutLoading,
+            tempUserMessage, // Добавляем сообщение пользователя
             {
               id: `error-${Date.now()}`,
               role: Role.MODEL,
@@ -908,15 +1059,15 @@ export default function App() {
   };
 
   const handleClearChat = async () => {
-    if (!activeAgent) return;
+    if (!activeAgent || !realAgentIdForMessages) return;
     showConfirm(
       'Очистить историю чата?',
       'Все сообщения в этом чате будут удалены.\nЭто действие нельзя отменить.',
       async () => {
         try {
-          await api.clearMessages(activeAgent.id);
-          setChatHistories((prev) => ({ ...prev, [activeAgent.id]: [] }));
-          loadedAgentsRef.current.delete(activeAgent.id);
+          await api.clearMessages(realAgentIdForMessages);
+          setChatHistories((prev) => ({ ...prev, [realAgentIdForMessages]: [] }));
+          loadedAgentsRef.current.delete(realAgentIdForMessages);
           setSummarySuccess(false);
           showAlert('История чата успешно очищена', undefined, 'success', 3000);
         } catch (error: any) {
@@ -929,16 +1080,17 @@ export default function App() {
   };
 
   const handleGenerateSummary = async () => {
-    if (!activeAgent || messages.length < 1) return;
+    if (!activeAgent || !realAgentIdForMessages || messages.length < 1 || !activeProjectId) return;
     setIsGeneratingSummary(true);
     try {
       console.log('[Frontend] handleGenerateSummary called:', {
-        agentId: activeAgent.id,
+        agentId: realAgentIdForMessages,
         agentName: activeAgent.name,
         messagesCount: messages.length,
+        projectId: activeProjectId,
       });
       
-      const { file } = await api.generateSummary(activeAgent.id);
+      const { file } = await api.generateSummary(realAgentIdForMessages, activeProjectId);
       
       console.log('[Frontend] Summary generated successfully:', {
         fileId: file.id,
@@ -989,11 +1141,21 @@ export default function App() {
       setAgents(mappedAgents);
       setProjectTypeAgents(mappedProjectTypeAgents);
       
-      // Приоритет обычным агентам проекта
-      const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
-      setActiveAgentId(mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null);
+      // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
+      const newMapping: Record<string, string> = {};
+      mappedProjectTypeAgents.forEach((template) => {
+        const realAgent = mappedAgents.find((agent) => agent.name === template.name);
+        if (realAgent) {
+          newMapping[template.id] = realAgent.id;
+        }
+      });
+      setTemplateToRealAgentMap(newMapping);
+      
+      // Выбираем первого агента из шаблонов (приоритет шаблонам)
+      setActiveAgentId(mappedProjectTypeAgents[0]?.id ?? null);
       
       // Обновляем список отслеживаемых агентов
+      const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
       trackedAgentsRef.current = new Set(allAgents.map(agent => agent.id));
       
       loadedAgentsRef.current.clear();
@@ -1024,12 +1186,22 @@ export default function App() {
         setAgents(mappedAgents);
         setProjectTypeAgents(mappedProjectTypeAgents);
         
-        // Приоритет обычным агентам проекта, но также проверяем агентов типа проекта
-        const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
-        const selectedAgentId = mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null;
+        // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
+        const newMapping: Record<string, string> = {};
+        mappedProjectTypeAgents.forEach((template) => {
+          const realAgent = mappedAgents.find((agent) => agent.name === template.name);
+          if (realAgent) {
+            newMapping[template.id] = realAgent.id;
+          }
+        });
+        setTemplateToRealAgentMap(newMapping);
+        
+        // Выбираем первого агента из шаблонов (приоритет шаблонам)
+        const selectedAgentId = mappedProjectTypeAgents[0]?.id ?? null;
         setActiveAgentId(selectedAgentId);
         
         // Обновляем список отслеживаемых агентов
+        const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
         trackedAgentsRef.current = new Set(allAgents.map(agent => agent.id));
       } catch (error) {
         // Если агентов нет - это нормально, просто оставляем пустой список

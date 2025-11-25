@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   DndContext,
   closestCorners,
@@ -103,6 +103,16 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
     onReorderAgents(newOrder);
   };
 
+  // Сортируем агентов по полю order для правильного отображения
+  const sortedProjectTypeAgents = useMemo(() => {
+    return [...projectTypeAgents].sort((a, b) => {
+      if (a.order === b.order) {
+        return a.name.localeCompare(b.name);
+      }
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+  }, [projectTypeAgents]);
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -131,37 +141,45 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
         </div>
 
         {/* Agent List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
-          {/* Агенты (теперь только projectTypeAgents) */}
-          {projectTypeAgents.map((agent, index) => (
-            <div
-              key={agent.id}
-              onClick={() => {
-                onSelectAgent(agent.id);
-                onCloseMobile();
-              }}
-              className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
-                agent.id === activeAgentId
-                  ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
-                  : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
-              }`}
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
+            <SortableContext 
+              items={sortedProjectTypeAgents.map(agent => agent.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className={`p-1.5 rounded-lg ${
-                agent.id === activeAgentId
-                  ? 'bg-indigo-500/30'
-                  : 'bg-white/5 group-hover:bg-indigo-500/20'
-              } transition-colors relative`}>
-                {getIcon(agent.name)}
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6),0_2px_4px_rgba(0,0,0,0.3)] border border-white/20 group-hover:shadow-[0_0_12px_rgba(99,102,241,0.8),0_2px_6px_rgba(0,0,0,0.4)] transition-all duration-300">
-                  {index + 1}
-                </span>
+              <div className="space-y-1.5 sm:space-y-2 mt-2">
+                {sortedProjectTypeAgents.map((agent, index) => (
+                  <div
+                    key={agent.id}
+                    onClick={() => {
+                      onSelectAgent(agent.id);
+                      onCloseMobile();
+                    }}
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
+                      agent.id === activeAgentId
+                        ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
+                        : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
+                    }`}
+                  >
+                    <div className={`p-1.5 rounded-lg ${
+                      agent.id === activeAgentId
+                        ? 'bg-indigo-500/30'
+                        : 'bg-white/5 group-hover:bg-indigo-500/20'
+                    } transition-colors relative`}>
+                      {getIcon(agent.name)}
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
+                        {index + 1}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-xs truncate">{agent.name}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-xs truncate">{agent.name}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+            </SortableContext>
+          </div>
+        </DndContext>
 
         {/* Project Space & User Section */}
         <div className="flex-shrink-0 flex flex-col gap-1 p-2 border-t border-white/5">
@@ -309,7 +327,7 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
 
         <div className={`p-1.5 rounded-lg transition-colors relative ${isActive ? 'bg-white/10 text-white shadow-inner' : 'bg-transparent'}`}>
           {getIcon(agent.name)}
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6),0_2px_4px_rgba(0,0,0,0.3)] border border-white/20 group-hover:shadow-[0_0_12px_rgba(99,102,241,0.8),0_2px_6px_rgba(0,0,0,0.4)] transition-all duration-300">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
             {agentNumber}
           </span>
         </div>

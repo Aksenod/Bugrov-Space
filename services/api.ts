@@ -407,8 +407,9 @@ export const api = {
     return request<void>(`/admin/agents/${agentId}/files/${fileId}`, { method: 'DELETE' });
   },
 
-  async generateSummary(agentId: string) {
-    return request<{ file: ApiFile }>(`/agents/${agentId}/summary`, { method: 'POST' });
+  async generateSummary(agentId: string, projectId?: string) {
+    const query = projectId ? `?projectId=${projectId}` : '';
+    return request<{ file: ApiFile }>(`/agents/${agentId}/summary${query}`, { method: 'POST' });
   },
 
   async getSummaryFiles(agentId: string, projectId?: string) {
