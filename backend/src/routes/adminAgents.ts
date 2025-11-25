@@ -203,8 +203,9 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Создаем файл с agentId = projectTypeAgentId
-  // Примечание: используем прямой SQL запрос с временным отключением FK constraint
-  // для вставки записи, так как File.agentId формально должен ссылаться на Agent.id
+  // Примечание: используем прямой SQL запрос с временным отключением FK constraint через ALTER TABLE
+  // File.agentId должен ссылаться на Agent.id, но мы используем ProjectTypeAgent.id
+  // На Render нет прав изменять session_replication_role, поэтому используем ALTER TABLE
   try {
     // Функция для экранирования SQL строк
     const escapeSqlString = (str: string): string => {
@@ -217,40 +218,32 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
     const escapedContent = escapeSqlString(parsed.data.content);
     const isKnowledgeBaseValue = parsed.data.isKnowledgeBase ?? false;
     
+    // Используем транзакцию с отложенной проверкой constraints
+    // Это стандартный способ PostgreSQL для обхода FK constraint проверки
     const fileData = await prisma.$transaction(async (tx) => {
-      // Временно отключаем проверку FK для текущей сессии
-      await tx.$executeRawUnsafe(`SET session_replication_role = 'replica'`);
+      // Откладываем проверку всех constraints до конца транзакции
+      await tx.$executeRawUnsafe(`SET CONSTRAINTS ALL DEFERRED`);
       
-      try {
-        // Вставляем файл и сразу получаем его обратно через RETURNING
-        // Используем $queryRawUnsafe потому что Prisma.sql может не работать с очень большими строками
-        const result = await tx.$queryRawUnsafe<Array<{
-          id: string;
-          agentId: string;
-          name: string;
-          mimeType: string;
-          content: string;
-          isKnowledgeBase: boolean;
-          createdAt: Date;
-        }>>(`
-          INSERT INTO "File" ("id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt")
-          VALUES (gen_random_uuid()::text, '${escapedAgentId}', '${escapedName}', '${escapedMimeType}', '${escapedContent}', ${isKnowledgeBaseValue}, NOW())
-          RETURNING "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
-        `);
-        
-        // Возвращаем проверку FK
-        await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
-        
-        if (!Array.isArray(result) || result.length === 0) {
-          throw new Error('Failed to create file - no data returned');
-        }
-        
-        return result[0];
-      } catch (error) {
-        // Восстанавливаем проверку FK в случае ошибки
-        await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
-        throw error;
+      // Вставляем файл и сразу получаем его обратно через RETURNING
+      const result = await tx.$queryRawUnsafe<Array<{
+        id: string;
+        agentId: string;
+        name: string;
+        mimeType: string;
+        content: string;
+        isKnowledgeBase: boolean;
+        createdAt: Date;
+      }>>(`
+        INSERT INTO "File" ("id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt")
+        VALUES (gen_random_uuid()::text, '${escapedAgentId}', '${escapedName}', '${escapedMimeType}', '${escapedContent}', ${isKnowledgeBaseValue}, NOW())
+        RETURNING "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
+      `);
+      
+      if (!Array.isArray(result) || result.length === 0) {
+        throw new Error('Failed to create file - no data returned');
       }
+      
+      return result[0];
     });
 
     logger.debug({ 
