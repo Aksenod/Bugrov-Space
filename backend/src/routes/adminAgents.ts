@@ -235,6 +235,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 
     let agent: any;
     try {
+      // ProjectTypeAgent не требует projectType при создании - связь устанавливается через промежуточную таблицу
       agent = await withRetry(
         () => (prisma as any).projectTypeAgent.create({
           data: {
@@ -244,6 +245,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
             summaryInstruction: summaryInstruction || '',
             model: model || 'gpt-5.1',
             role: role || '',
+            // НЕ передаем projectType - это many-to-many связь через ProjectTypeAgentProjectType
           },
         }),
         3,
