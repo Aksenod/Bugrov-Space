@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -157,6 +158,223 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       });
     }
     
+    throw error;
+  }
+}));
+
+const fileSchema = z.object({
+  name: z.string().min(1),
+  mimeType: z.string().min(1),
+  content: z.string().min(1),
+  isKnowledgeBase: z.boolean().optional().default(false),
+});
+
+// POST /:id/files - загрузить файл для агента-шаблона (должен быть ПЕРЕД /:id)
+router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const parsed = fileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const errorMessages = parsed.error.issues.map((err) => {
+      if (err.path.length > 0) {
+        return `${err.path.join('.')}: ${err.message}`;
+      }
+      return err.message;
+    }).join(', ');
+    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+  }
+
+  // Проверяем, что агент-шаблон существует
+  const agent = await withRetry(
+    () => (prisma as any).projectTypeAgent.findUnique({
+      where: { id },
+    }),
+    3,
+    `POST /admin/agents/${id}/files - find agent`
+  );
+
+  if (!agent) {
+    return res.status(404).json({ error: 'Агент не найден' });
+  }
+
+  // Проверяем, что пользователь является администратором
+  const userId = (req as any).userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Создаем файл с agentId = projectTypeAgentId
+  // Примечание: используем прямой SQL запрос с временным отключением FK constraint
+  // для вставки записи, так как File.agentId формально должен ссылаться на Agent.id
+  try {
+    // Используем Prisma.sql для безопасной параметризации запросов
+    const fileData = await prisma.$transaction(async (tx) => {
+      // Временно отключаем проверку FK для текущей сессии
+      await tx.$executeRawUnsafe(`SET session_replication_role = 'replica'`);
+      
+      try {
+        // Вставляем файл используя Prisma.sql для безопасной параметризации
+        const insertQuery = Prisma.sql`
+          INSERT INTO "File" ("id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt")
+          VALUES (gen_random_uuid()::text, ${id}::text, ${parsed.data.name}, ${parsed.data.mimeType}, ${parsed.data.content}, ${parsed.data.isKnowledgeBase ?? false}, NOW())
+        `;
+        await tx.$executeRaw(insertQuery);
+        
+        // Возвращаем проверку FK
+        await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
+        
+        // Получаем созданный файл используя Prisma.sql
+        const selectQuery = Prisma.sql`
+          SELECT "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
+          FROM "File"
+          WHERE "agentId" = ${id}::text AND "name" = ${parsed.data.name}
+          ORDER BY "createdAt" DESC
+          LIMIT 1
+        `;
+        const createdFile = await tx.$queryRaw<Array<{
+          id: string;
+          agentId: string;
+          name: string;
+          mimeType: string;
+          content: string;
+          isKnowledgeBase: boolean;
+          createdAt: Date;
+        }>>(selectQuery);
+        
+        return Array.isArray(createdFile) && createdFile.length > 0 ? createdFile[0] : null;
+      } catch (error) {
+        // Восстанавливаем проверку FK в случае ошибки
+        await tx.$executeRawUnsafe(`SET session_replication_role = 'origin'`);
+        throw error;
+      }
+    });
+
+    if (!fileData) {
+      return res.status(500).json({ error: 'Не удалось создать файл' });
+    }
+
+    logger.debug({ 
+      fileId: fileData.id, 
+      fileName: fileData.name, 
+      agentId: fileData.agentId, 
+      isKnowledgeBase: fileData.isKnowledgeBase 
+    }, 'File created for ProjectTypeAgent');
+
+    res.status(201).json({ 
+      file: {
+        id: fileData.id,
+        agentId: fileData.agentId,
+        name: fileData.name,
+        mimeType: fileData.mimeType,
+        content: fileData.content,
+        isKnowledgeBase: fileData.isKnowledgeBase,
+        createdAt: fileData.createdAt,
+      }
+    });
+  } catch (error: any) {
+    logger.error({ agentId: id, error: error.message, stack: error.stack }, 'POST /admin/agents/:id/files error');
+    throw error;
+  }
+}));
+
+// GET /:id/files - получить файлы агента-шаблона (должен быть ПЕРЕД /:id)
+router.get('/:id/files', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Проверяем, что агент-шаблон существует
+  const agent = await withRetry(
+    () => (prisma as any).projectTypeAgent.findUnique({
+      where: { id },
+    }),
+    3,
+    `GET /admin/agents/${id}/files - find agent`
+  );
+
+  if (!agent) {
+    return res.status(404).json({ error: 'Агент не найден' });
+  }
+
+  // Проверяем, что пользователь является администратором
+  const userId = (req as any).userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Загружаем файлы через безопасный параметризованный SQL запрос
+  try {
+    const files = await prisma.$queryRaw<Array<{
+      id: string;
+      agentId: string;
+      name: string;
+      mimeType: string;
+      content: string;
+      isKnowledgeBase: boolean;
+      createdAt: Date;
+    }>>(Prisma.sql`
+      SELECT "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
+      FROM "File"
+      WHERE "agentId" = ${id}::text 
+        AND "isKnowledgeBase" = true
+        AND "name" NOT LIKE 'Summary%'
+      ORDER BY "createdAt" DESC
+    `);
+
+    logger.debug({ agentId: id, filesCount: Array.isArray(files) ? files.length : 0 }, 'Files fetched for ProjectTypeAgent');
+
+    res.json({ 
+      files: Array.isArray(files) ? files.map((file: any) => ({
+        id: file.id,
+        agentId: file.agentId,
+        name: file.name,
+        mimeType: file.mimeType,
+        content: file.content,
+        isKnowledgeBase: file.isKnowledgeBase,
+        createdAt: file.createdAt,
+      })) : []
+    });
+  } catch (error: any) {
+    logger.error({ agentId: id, error: error.message, stack: error.stack }, 'GET /admin/agents/:id/files error');
+    throw error;
+  }
+}));
+
+// DELETE /:id/files/:fileId - удалить файл агента-шаблона (должен быть ПЕРЕД /:id)
+router.delete('/:id/files/:fileId', asyncHandler(async (req: Request, res: Response) => {
+  const { id, fileId } = req.params;
+
+  // Проверяем, что агент-шаблон существует
+  const agent = await withRetry(
+    () => (prisma as any).projectTypeAgent.findUnique({
+      where: { id },
+    }),
+    3,
+    `DELETE /admin/agents/${id}/files/${fileId} - find agent`
+  );
+
+  if (!agent) {
+    return res.status(404).json({ error: 'Агент не найден' });
+  }
+
+  // Проверяем, что пользователь является администратором
+  const userId = (req as any).userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Удаляем файл через безопасный параметризованный SQL запрос
+  try {
+    const result = await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM "File"
+      WHERE "id" = ${fileId}::text AND "agentId" = ${id}::text
+    `);
+
+    if (result === 0) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+
+    logger.info({ agentId: id, fileId }, 'File deleted for ProjectTypeAgent');
+    res.status(204).send();
+  } catch (error: any) {
+    logger.error({ agentId: id, fileId, error: error.message, stack: error.stack }, 'DELETE /admin/agents/:id/files/:fileId error');
     throw error;
   }
 }));

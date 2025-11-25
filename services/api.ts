@@ -359,8 +359,9 @@ export const api = {
     return request<void>(`/agents/${agentId}`, { method: 'DELETE' });
   },
 
-  async getMessages(agentId: string) {
-    return request<{ messages: ApiMessage[] }>(`/agents/${agentId}/messages`);
+  async getMessages(agentId: string, projectId?: string) {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return request<{ messages: ApiMessage[] }>(`/agents/${agentId}/messages${query}`);
   },
 
   async clearMessages(agentId: string) {
@@ -388,6 +389,22 @@ export const api = {
 
   async deleteFile(agentId: string, fileId: string) {
     return request<void>(`/agents/${agentId}/files/${fileId}`, { method: 'DELETE' });
+  },
+
+  // Admin agent files API (для агентов-шаблонов)
+  async uploadAdminAgentFile(agentId: string, payload: { name: string; mimeType: string; content: string; isKnowledgeBase?: boolean }) {
+    return request<{ file: ApiFile }>(`/admin/agents/${agentId}/files`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getAdminAgentFiles(agentId: string) {
+    return request<{ files: ApiFile[] }>(`/admin/agents/${agentId}/files`);
+  },
+
+  async deleteAdminAgentFile(agentId: string, fileId: string) {
+    return request<void>(`/admin/agents/${agentId}/files/${fileId}`, { method: 'DELETE' });
   },
 
   async generateSummary(agentId: string) {

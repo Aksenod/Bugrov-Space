@@ -160,10 +160,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           // Проверяем, что компонент все еще смонтирован
           if (!isMounted) return;
           
-          // Загружаем файлы агента
+          // Загружаем файлы агента-шаблона
           let agentFilesData: UploadedFile[] = [];
           try {
-            const { files } = await api.getAgentFiles(initialAgentId);
+            const { files } = await api.getAdminAgentFiles(initialAgentId);
             agentFilesData = files.map(file => ({
               id: file.id,
               name: file.name,
@@ -312,9 +312,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       setAgentModel(resolveModel(agent.model));
       setAgentRole(agent.role || '');
       setSelectedProjectTypeIds(agent.projectTypes?.map(pt => pt.id) || []);
-      // Загружаем файлы агента
+      // Загружаем файлы агента-шаблона
       try {
-        const { files } = await api.getAgentFiles(agent.id);
+        const { files } = await api.getAdminAgentFiles(agent.id);
         setAgentFiles(files.map(file => ({
           id: file.id,
           name: file.name,
@@ -527,7 +527,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       
       try {
         const base64 = await readFileToBase64(file);
-        const { file: uploaded } = await api.uploadFile(editingAgent.id, {
+        const { file: uploaded } = await api.uploadAdminAgentFile(editingAgent.id, {
           name: file.name,
           mimeType: file.type || 'text/plain',
           content: base64,
@@ -567,7 +567,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       'Файл будет удален из базы знаний.\n\nЭто действие нельзя отменить.',
       async () => {
         try {
-          await api.deleteFile(editingAgent.id, fileId);
+          await api.deleteAdminAgentFile(editingAgent.id, fileId);
           setAgentFiles(prev => prev.filter(file => file.id !== fileId));
           showAlert('Файл успешно удален', undefined, 'success', 3000);
         } catch (error: any) {
