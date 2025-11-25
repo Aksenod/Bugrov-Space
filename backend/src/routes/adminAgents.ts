@@ -18,51 +18,56 @@ const agentTemplateSchema = z.object({
 
 // GET / - получить все агенты-шаблоны
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
-  const agents = await withRetry(
-    () => (prisma as any).projectTypeAgent.findMany({
-      include: {
-        projectTypes: {
-          include: {
-            projectType: {
-              select: {
-                id: true,
-                name: true,
+  try {
+    const agents = await withRetry(
+      () => (prisma as any).projectTypeAgent.findMany({
+        include: {
+          projectTypes: {
+            include: {
+              projectType: {
+                select: {
+                  id: true,
+                  name: true,
+                },
               },
             },
-          },
-          orderBy: {
-            order: 'asc',
+            orderBy: {
+              order: 'asc',
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    }),
-    3,
-    'GET /admin/agents'
-  ) as any[];
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      3,
+      'GET /admin/agents'
+    ) as any[];
 
-  // Преобразуем данные для удобства фронтенда
-  const agentsWithProjectTypes = agents.map((agent: any) => ({
-    id: agent.id,
-    name: agent.name,
-    description: agent.description,
-    systemInstruction: agent.systemInstruction,
-    summaryInstruction: agent.summaryInstruction,
-    model: agent.model,
-    role: agent.role,
-    createdAt: agent.createdAt,
-    updatedAt: agent.updatedAt,
-    projectTypes: agent.projectTypes.map((pt: any) => ({
-      id: pt.projectType.id,
-      name: pt.projectType.name,
-      order: pt.order,
-    })),
-  }));
+    // Преобразуем данные для удобства фронтенда
+    const agentsWithProjectTypes = agents.map((agent: any) => ({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description || '',
+      systemInstruction: agent.systemInstruction || '',
+      summaryInstruction: agent.summaryInstruction || '',
+      model: agent.model || 'gpt-5.1',
+      role: agent.role || '',
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      projectTypes: (agent.projectTypes || []).map((pt: any) => ({
+        id: pt?.projectType?.id || pt?.projectTypeId,
+        name: pt?.projectType?.name || '',
+        order: pt?.order || 0,
+      })),
+    }));
 
-  logger.debug({ agentsCount: agentsWithProjectTypes.length }, 'Admin agents fetched');
-  res.json({ agents: agentsWithProjectTypes });
+    logger.debug({ agentsCount: agentsWithProjectTypes.length }, 'Admin agents fetched');
+    res.json({ agents: agentsWithProjectTypes });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack, code: error.code }, 'GET /admin/agents error');
+    throw error;
+  }
 }));
 
 // GET /:id - получить конкретный агент-шаблон
@@ -99,17 +104,17 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const agentWithProjectTypes = {
     id: agent.id,
     name: agent.name,
-    description: agent.description,
-    systemInstruction: agent.systemInstruction,
-    summaryInstruction: agent.summaryInstruction,
-    model: agent.model,
-    role: agent.role,
+    description: agent.description || '',
+    systemInstruction: agent.systemInstruction || '',
+    summaryInstruction: agent.summaryInstruction || '',
+    model: agent.model || 'gpt-5.1',
+    role: agent.role || '',
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
-    projectTypes: agent.projectTypes.map((pt: any) => ({
-      id: pt.projectType.id,
-      name: pt.projectType.name,
-      order: pt.order,
+    projectTypes: (agent.projectTypes || []).map((pt: any) => ({
+      id: pt?.projectType?.id || pt?.projectTypeId,
+      name: pt?.projectType?.name || '',
+      order: pt?.order || 0,
     })),
   };
 
@@ -118,36 +123,41 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 // POST / - создать новый агент-шаблон
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const parsed = agentTemplateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map((err) => {
-      if (err.path.length > 0) {
-        return `${err.path.join('.')}: ${err.message}`;
-      }
-      return err.message;
-    }).join(', ');
-    return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+  try {
+    const parsed = agentTemplateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMessages = parsed.error.issues.map((err) => {
+        if (err.path.length > 0) {
+          return `${err.path.join('.')}: ${err.message}`;
+        }
+        return err.message;
+      }).join(', ');
+      return res.status(400).json({ error: `Validation error: ${errorMessages}` });
+    }
+
+    const { name, description, systemInstruction, summaryInstruction, model, role } = parsed.data;
+
+    const agent = await withRetry(
+      () => (prisma as any).projectTypeAgent.create({
+        data: {
+          name,
+          description: description || '',
+          systemInstruction: systemInstruction || '',
+          summaryInstruction: summaryInstruction || '',
+          model: model || 'gpt-5.1',
+          role: role || '',
+        },
+      }),
+      3,
+      'POST /admin/agents - create'
+    );
+
+    logger.info({ agentId: (agent as any).id, name }, 'Admin agent created');
+    res.status(201).json({ agent });
+  } catch (error: any) {
+    logger.error({ error: error.message, stack: error.stack, code: error.code, meta: error.meta }, 'POST /admin/agents error');
+    throw error;
   }
-
-  const { name, description, systemInstruction, summaryInstruction, model, role } = parsed.data;
-
-  const agent = await withRetry(
-    () => (prisma as any).projectTypeAgent.create({
-      data: {
-        name,
-        description: description || '',
-        systemInstruction: systemInstruction || '',
-        summaryInstruction: summaryInstruction || '',
-        model: model || 'gpt-5.1',
-        role: role || '',
-      },
-    }),
-    3,
-    'POST /admin/agents - create'
-  );
-
-  logger.info({ agentId: (agent as any).id, name }, 'Admin agent created');
-  res.status(201).json({ agent });
 }));
 
 // PUT /:id - обновить агент-шаблон
@@ -251,10 +261,10 @@ router.get('/:id/project-types', asyncHandler(async (req: Request, res: Response
     return res.status(404).json({ error: 'Агент не найден' });
   }
 
-  const projectTypes = agent.projectTypes.map((pt: any) => ({
-    id: pt.projectType.id,
-    name: pt.projectType.name,
-    order: pt.order,
+  const projectTypes = (agent.projectTypes || []).map((pt: any) => ({
+    id: pt?.projectType?.id || pt?.projectTypeId,
+    name: pt?.projectType?.name || '',
+    order: pt?.order || 0,
   }));
 
   res.json({ projectTypes });
