@@ -18,7 +18,7 @@ async function resolveMigration(migrationName) {
       UPDATE "_prisma_migrations" 
       SET finished_at = NOW(), 
           logs = 'Manually resolved via script'
-      WHERE migration_name = $1 
+      WHERE migration_name = $1::text
       AND finished_at IS NULL
     `, migrationName);
     
