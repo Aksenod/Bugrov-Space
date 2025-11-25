@@ -371,32 +371,60 @@ router.get('/:id/files', asyncHandler(async (req: Request, res: Response) => {
 
   // Загружаем файлы через Prisma, фильтруя по projectTypeAgentId
   try {
-    const files = await withRetry(
-      () => prisma.file.findMany({
-        where: {
-          projectTypeAgentId: id,
-          isKnowledgeBase: true,
-          name: {
-            not: {
-              startsWith: 'Summary'
+    // Проверяем, что поле projectTypeAgentId доступно в схеме БД
+    let fieldExists = true;
+    try {
+      const testQuery = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'File' 
+        AND column_name = 'projectTypeAgentId'
+        LIMIT 1
+      `;
+      if (!testQuery || (Array.isArray(testQuery) && testQuery.length === 0)) {
+        fieldExists = false;
+        logger.warn({ agentId: id }, 'Column projectTypeAgentId does not exist in File table - migration not applied');
+      }
+    } catch (schemaCheckError: any) {
+      logger.warn({ agentId: id, error: schemaCheckError.message }, 'Could not verify column existence');
+      // Продолжаем попытку загрузки файлов
+    }
+
+    let files: any[] = [];
+    
+    if (fieldExists) {
+      // Поле существует, используем обычный запрос
+      files = await withRetry(
+        () => prisma.file.findMany({
+          where: {
+            projectTypeAgentId: id,
+            isKnowledgeBase: true,
+            name: {
+              not: {
+                startsWith: 'Summary'
+              }
             }
-          }
-        },
-        select: {
-          id: true,
-          agentId: true,
-          projectTypeAgentId: true,
-          name: true,
-          mimeType: true,
-          content: true,
-          isKnowledgeBase: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      3,
-      `GET /admin/agents/${id}/files - find files`
-    );
+          },
+          select: {
+            id: true,
+            agentId: true,
+            projectTypeAgentId: true,
+            name: true,
+            mimeType: true,
+            content: true,
+            isKnowledgeBase: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        3,
+        `GET /admin/agents/${id}/files - find files`
+      );
+    } else {
+      // Поле не существует, возвращаем пустой список
+      logger.info({ agentId: id }, 'Returning empty files list because projectTypeAgentId column does not exist');
+      files = [];
+    }
 
     logger.debug({ agentId: id, filesCount: Array.isArray(files) ? files.length : 0 }, 'Files fetched for ProjectTypeAgent');
 
@@ -412,7 +440,24 @@ router.get('/:id/files', asyncHandler(async (req: Request, res: Response) => {
       }))
     });
   } catch (error: any) {
-    logger.error({ agentId: id, error: error.message, stack: error.stack }, 'GET /admin/agents/:id/files error');
+    // Детальное логирование ошибки
+    const errorDetails: any = {
+      agentId: id,
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
+      errorMeta: error.meta,
+      stack: error.stack,
+    };
+
+    // Проверяем, является ли это ошибкой Prisma о несуществующем поле
+    if (error.message?.includes('Unknown field') || error.message?.includes('projectTypeAgentId') || error.code === 'P2021') {
+      logger.error(errorDetails, 'GET /admin/agents/:id/files error - field projectTypeAgentId does not exist in database schema');
+      // Возвращаем пустой список файлов, если поле не существует
+      return res.json({ files: [] });
+    }
+
+    logger.error(errorDetails, 'GET /admin/agents/:id/files error');
     throw error;
   }
 }));
