@@ -69,6 +69,17 @@ const sortAgents = (agentList: Agent[]) =>
     return orderA - orderB;
 });
 
+// Объединяем обычных агентов с агентами типа проекта и сортируем
+const mergeAgentsWithProjectTypeAgents = (
+  agents: Agent[],
+  projectTypeAgents: Agent[] = []
+): Agent[] => {
+  // Объединяем массивы
+  const allAgents = [...agents, ...projectTypeAgents];
+  // Сортируем по order
+  return sortAgents(allAgents);
+};
+
 const mapMessage = (message: ApiMessage): Message => ({
   id: message.id,
   role: message.role === 'USER' ? Role.USER : Role.MODEL,
@@ -286,15 +297,17 @@ export default function App() {
       if (projectToSelect && projectToSelect.trim() !== '') {
         localStorage.setItem('lastUsedProjectId', projectToSelect);
         try {
-          const { agents: apiAgents } = await api.getAgents(projectToSelect);
-          const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-          setAgents(mappedAgents);
+          const { agents: apiAgents, projectTypeAgents } = await api.getAgents(projectToSelect);
+          const mappedAgents = apiAgents.map(mapAgent);
+          const mappedProjectTypeAgents = (projectTypeAgents ?? []).map(mapProjectTypeAgent);
+          const allAgents = mergeAgentsWithProjectTypeAgents(mappedAgents, mappedProjectTypeAgents);
+          setAgents(allAgents);
           
           setActiveAgentId((prev) => {
-            if (prev && mappedAgents.some((agent) => agent.id === prev)) {
+            if (prev && allAgents.some((agent) => agent.id === prev)) {
               return prev;
             }
-            const fallbackId = mappedAgents[0]?.id ?? null;
+            const fallbackId = allAgents[0]?.id ?? null;
             console.log(`[Bootstrap] Selecting agent as activeAgentId: ${fallbackId}`);
             return fallbackId;
           });
@@ -387,18 +400,20 @@ export default function App() {
   // Функция для перезагрузки агентов текущего проекта
   const reloadAgents = useCallback(async () => {
     if (!activeProjectId) return;
-    
+
     try {
-      const { agents: apiAgents } = await api.getAgents(activeProjectId);
-      const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-      setAgents(mappedAgents);
-      
+      const { agents: apiAgents, projectTypeAgents } = await api.getAgents(activeProjectId);
+      const mappedAgents = apiAgents.map(mapAgent);
+      const mappedProjectTypeAgents = (projectTypeAgents ?? []).map(mapProjectTypeAgent);
+      const allAgents = mergeAgentsWithProjectTypeAgents(mappedAgents, mappedProjectTypeAgents);
+      setAgents(allAgents);
+
       // Обновляем активного агента, если он все еще существует
       setActiveAgentId((prev) => {
-        if (prev && mappedAgents.some((agent) => agent.id === prev)) {
+        if (prev && allAgents.some((agent) => agent.id === prev)) {
           return prev;
         }
-        return mappedAgents[0]?.id ?? null;
+        return allAgents[0]?.id ?? null;
       });
     } catch (error) {
       console.error('Failed to reload agents', error);
@@ -928,11 +943,13 @@ export default function App() {
     setActiveProjectId(projectId);
     localStorage.setItem('lastUsedProjectId', projectId);
     try {
-      const { agents: apiAgents } = await api.getAgents(projectId);
-      const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-      setAgents(mappedAgents);
-      setActiveAgentId(mappedAgents[0]?.id ?? null);
-      
+      const { agents: apiAgents, projectTypeAgents } = await api.getAgents(projectId);
+      const mappedAgents = apiAgents.map(mapAgent);
+      const mappedProjectTypeAgents = (projectTypeAgents ?? []).map(mapProjectTypeAgent);
+      const allAgents = mergeAgentsWithProjectTypeAgents(mappedAgents, mappedProjectTypeAgents);
+      setAgents(allAgents);
+      setActiveAgentId(allAgents[0]?.id ?? null);
+
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
       setChatHistories({});
@@ -953,10 +970,12 @@ export default function App() {
       
       // Загружаем агентов проекта
       try {
-        const { agents: apiAgents } = await api.getAgents(mappedProject.id);
-        const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-        setAgents(mappedAgents);
-        setActiveAgentId(mappedAgents[0]?.id ?? null);
+        const { agents: apiAgents, projectTypeAgents } = await api.getAgents(mappedProject.id);
+        const mappedAgents = apiAgents.map(mapAgent);
+        const mappedProjectTypeAgents = (projectTypeAgents ?? []).map(mapProjectTypeAgent);
+        const allAgents = mergeAgentsWithProjectTypeAgents(mappedAgents, mappedProjectTypeAgents);
+        setAgents(allAgents);
+        setActiveAgentId(allAgents[0]?.id ?? null);
       } catch (error) {
         console.log('No agents in new project, this is expected');
         setAgents([]);
@@ -1016,10 +1035,12 @@ export default function App() {
                 localStorage.setItem('lastUsedProjectId', nextProject.id);
                 // Загружаем агентов выбранного проекта
                 api.getAgents(nextProject.id)
-                  .then(({ agents: apiAgents }) => {
-                    const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-                    setAgents(mappedAgents);
-                    setActiveAgentId(mappedAgents[0]?.id ?? null);
+                  .then(({ agents: apiAgents, projectTypeAgents }) => {
+                    const mappedAgents = apiAgents.map(mapAgent);
+                    const mappedProjectTypeAgents = (projectTypeAgents ?? []).map(mapProjectTypeAgent);
+                    const allAgents = mergeAgentsWithProjectTypeAgents(mappedAgents, mappedProjectTypeAgents);
+                    setAgents(allAgents);
+                    setActiveAgentId(allAgents[0]?.id ?? null);
                   })
                   .catch(() => {
                     setAgents([]);
