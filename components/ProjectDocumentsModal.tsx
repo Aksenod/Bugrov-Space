@@ -74,7 +74,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       if (file) {
         const allAgents = agents;
         const creatorAgent = file.agentId ? allAgents.find(agent => agent.id === file.agentId) : null;
-        const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "verstka");
+        const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "layout");
         
         if (hasVerstkaRole) {
           setActiveTab('preview');
@@ -221,7 +221,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const showDSLButtons = documentCreatorAgent && hasRole(documentCreatorAgent.role, "copywriter");
   
   // Показывать подтабы только если документ создан агентом-верстальщиком
-  const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "verstka");
+  const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "layout");
   
   // Находим агентов DSL и Верстка по ролям (могут быть отдельными агентами или частью копирайтера)
   const dslAgent = allAgents.find(agent => {
@@ -230,7 +230,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   });
   const verstkaAgent = allAgents.find(agent => {
     const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
-    return roles.includes('verstka');
+    return roles.includes('layout');
   });
 
   const decodeContent = (base64: string) => {
@@ -272,7 +272,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     // Ищем агента с нужной ролью (может быть отдельным агентом или частью копирайтера)
     const allAgents = agents;
     const targetAgent = allAgents.find(agent => {
-      return hasRole(agent.role, role === 'dsl' ? 'dsl' : 'verstka');
+      return hasRole(agent.role, role === 'dsl' ? 'dsl' : 'layout');
     });
 
     if (!targetAgent) {
