@@ -230,6 +230,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     documentCreatorAgent: documentCreatorAgent?.name,
     agentRole: documentCreatorAgent?.role,
     showVerstkaSubTabs,
+    allAgentsCount: allAgents.length,
+    allAgentsIds: allAgents.map(a => ({ id: a.id, name: a.name, role: a.role })),
   });
   
   // Находим агентов DSL и Верстка по ролям (могут быть отдельными агентами или частью копирайтера)
