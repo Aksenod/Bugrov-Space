@@ -38,16 +38,14 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     isMountedRef.current = true;
     
     if (isOpen) {
-      // Если типы проектов уже переданы из родителя - используем их, иначе загружаем
+      // Сначала показываем то, что пришло сверху, чтобы не было пустого состояния
       if (initialProjectTypes.length > 0) {
         setProjectTypes(initialProjectTypes);
         setIsLoadingTypes(false);
-        // Загружаем агентов для всех типов проектов
         loadAgentsForProjectTypes(initialProjectTypes);
-      } else {
-        // Загружаем типы проектов только если они не переданы
-        loadProjectTypes();
       }
+      // Всегда запрашиваем свежие типы проектов, чтобы увидеть новые значения без перезагрузки
+      loadProjectTypes();
     } else {
       // Сброс формы при закрытии
       setName('');
