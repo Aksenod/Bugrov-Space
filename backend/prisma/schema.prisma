@@ -133,6 +133,8 @@ model File {
   mimeType           String
   content            String // Base64 or text content
   isKnowledgeBase    Boolean  @default(false) // true = база знаний агента, false = документ проекта
+  dslContent         String? // DSL content generated from original content
+  verstkaContent     String? // HTML layout content generated from DSL or original content
   createdAt          DateTime @default(now())
 
   agent Agent? @relation(fields: [agentId], references: [id], onDelete: Cascade)
