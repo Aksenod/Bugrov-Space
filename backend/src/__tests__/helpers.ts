@@ -2,11 +2,13 @@ import { hashPassword } from '../utils/password';
 import { signToken } from '../utils/token';
 import { prisma } from './setup';
 
-export async function createTestUser(username: string = 'testuser', password: string = 'testpass123') {
+export async function createTestUser(username?: string, password: string = 'testpass123') {
+  const uniqueUsername =
+    username ?? `testuser_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const passwordHash = await hashPassword(password);
   const user = await prisma.user.create({
     data: {
-      username,
+      username: uniqueUsername,
       passwordHash,
     },
   });
@@ -59,5 +61,28 @@ export async function createTestAgent(userId: string, projectId: string, name: s
       order: 0,
     },
   });
+}
+
+export async function createTestProjectTypeAgent(projectTypeId: string, name: string = 'Template Agent', order: number = 0) {
+  const template = await prisma.projectTypeAgent.create({
+    data: {
+      name,
+      description: '',
+      systemInstruction: '',
+      summaryInstruction: '',
+      model: 'gpt-5.1',
+      role: '',
+    },
+  });
+
+  await (prisma as any).projectTypeAgentProjectType.create({
+    data: {
+      projectTypeAgentId: template.id,
+      projectTypeId,
+      order,
+    },
+  });
+
+  return template;
 }
 

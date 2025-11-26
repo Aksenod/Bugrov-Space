@@ -79,7 +79,9 @@ const parseError = async (response: Response) => {
 };
 
 // Таймаут для всех запросов (10 секунд)
+// Для запросов к OpenAI (POST /agents/:agentId/messages) используется увеличенный timeout
 const REQUEST_TIMEOUT = 10000;
+const OPENAI_REQUEST_TIMEOUT = 60000; // 60 секунд для запросов к OpenAI
 
 // Глобальная блокировка запросов после получения 429
 let rateLimitBlockedUntil: number | null = null;
@@ -100,9 +102,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw error;
   }
 
+  // Определяем timeout в зависимости от типа запроса
+  // POST запросы к /agents/:agentId/messages и /agents/:agentId/summary требуют больше времени (OpenAI API)
+  const isOpenAiRequest = path.includes('/agents/') && 
+    (path.includes('/messages') || path.includes('/summary')) && 
+    init.method === 'POST';
+  const timeout = isOpenAiRequest ? OPENAI_REQUEST_TIMEOUT : REQUEST_TIMEOUT;
+  
   // Создаем AbortController для таймаута
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   const url = `${API_BASE_URL}${path}`;
   const startTime = Date.now();
@@ -173,7 +182,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // Если запрос был отменен из-за таймаута
     if (error.name === 'AbortError' || controller.signal.aborted) {
       console.error(`[API] Request timeout: ${url}`);
-      const timeoutError = new Error('Request timeout: запрос превысил время ожидания (10 секунд). Сервер может быть перегружен или недоступен.') as Error & { status?: number; isTimeout?: boolean };
+      const timeoutSeconds = isOpenAiRequest ? 60 : 10;
+      const timeoutError = new Error(`Request timeout: запрос превысил время ожидания (${timeoutSeconds} секунд). Сервер может быть перегружен или недоступен.`) as Error & { status?: number; isTimeout?: boolean };
       timeoutError.status = 408;
       timeoutError.isTimeout = true;
       throw timeoutError;
@@ -221,6 +231,7 @@ export interface ApiAgent {
   order?: number;
   isTemplate?: boolean;
   projectTypeId?: string;
+  projectTypeAgentId?: string;
   files: ApiFile[];
 }
 
@@ -326,46 +337,14 @@ export const api = {
     return request<{ agents: ApiAgent[]; projectTypeAgents?: ApiProjectTypeAgent[] }>(`/agents?projectId=${encodeURIComponent(projectId)}`);
   },
 
-  async createAgent(payload: {
-    name: string;
-    description?: string;
-    systemInstruction?: string;
-    summaryInstruction?: string;
-    model?: string;
-    role?: string;
-    projectId: string;
-  }) {
-    return request<{ agent: ApiAgent }>('/agents', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  async updateAgent(agentId: string, payload: Partial<Omit<ApiAgent, 'id' | 'files'>>) {
-    return request<{ agent: ApiAgent }>(`/agents/${agentId}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  async reorderAgents(orders: { id: string; order: number }[]) {
-    return request<{ success: boolean }>(`/agents/reorder`, {
-      method: 'POST',
-      body: JSON.stringify({ orders }),
-    });
-  },
-
-  async deleteAgent(agentId: string) {
-    return request<void>(`/agents/${agentId}`, { method: 'DELETE' });
-  },
-
   async getMessages(agentId: string, projectId?: string) {
     const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
     return request<{ messages: ApiMessage[] }>(`/agents/${agentId}/messages${query}`);
   },
 
-  async clearMessages(agentId: string) {
-    return request<void>(`/agents/${agentId}/messages`, { method: 'DELETE' });
+  async clearMessages(agentId: string, projectId?: string) {
+    const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return request<void>(`/agents/${agentId}/messages${query}`, { method: 'DELETE' });
   },
 
   async sendMessage(agentId: string, text: string, projectId?: string) {
@@ -375,20 +354,8 @@ export const api = {
     });
   },
 
-  async uploadFile(agentId: string, payload: { name: string; mimeType: string; content: string; isKnowledgeBase?: boolean }) {
-    return request<{ file: ApiFile }>(`/agents/${agentId}/files`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-
-
   async getAgentFiles(agentId: string) {
     return request<{ files: ApiFile[] }>(`/agents/${agentId}/files`);
-  },
-
-  async deleteFile(agentId: string, fileId: string) {
-    return request<void>(`/agents/${agentId}/files/${fileId}`, { method: 'DELETE' });
   },
 
   // Admin agent files API (для агентов-шаблонов)
@@ -462,6 +429,10 @@ export const api = {
 
   async deleteProjectFile(projectId: string, fileId: string) {
     return request<void>(`/projects/${projectId}/files/${fileId}`, { method: 'DELETE' });
+  },
+
+  async deleteFileById(fileId: string) {
+    return request<void>(`/agents/files/${fileId}`, { method: 'DELETE' });
   },
 
   // Project Types API

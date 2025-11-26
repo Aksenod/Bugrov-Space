@@ -133,14 +133,114 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Тип проекта не найден' });
   }
 
-  const project = await withRetry(
-    () => prisma.project.create({
-      data: {
-        name,
-        description: description || null,
-        userId,
-        projectTypeId,
+  // Загружаем агентов типа проекта и их порядок
+  const templateConnections = await withRetry(
+    () => (prisma as any).projectTypeAgentProjectType.findMany({
+      where: { projectTypeId },
+      include: {
+        projectTypeAgent: true,
       },
+      orderBy: [
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    }),
+    3,
+    'POST /projects - load project type agents'
+  ) as any[];
+
+  const templateAgentIds = templateConnections
+    .map((connection) => connection?.projectTypeAgent?.id)
+    .filter((id: string | undefined): id is string => Boolean(id));
+
+  // Подготовим базы знаний шаблонов для копирования
+  let templateKnowledgeBaseMap = new Map<string, any[]>();
+  if (templateAgentIds.length > 0) {
+    const templateFiles = await withRetry(
+      () => prisma.file.findMany({
+        where: {
+          projectTypeAgentId: { in: templateAgentIds },
+          isKnowledgeBase: true,
+          name: {
+            not: {
+              startsWith: 'Summary',
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      3,
+      'POST /projects - load template knowledge base'
+    );
+
+    templateKnowledgeBaseMap = templateFiles.reduce((map, file) => {
+      if (!file.projectTypeAgentId) {
+        return map;
+      }
+      if (!map.has(file.projectTypeAgentId)) {
+        map.set(file.projectTypeAgentId, []);
+      }
+      map.get(file.projectTypeAgentId)!.push(file);
+      return map;
+    }, new Map<string, any[]>());
+  }
+
+  const createdProject = await withRetry(
+    () => prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: {
+          name,
+          description: description || null,
+          userId,
+          projectTypeId,
+        },
+      });
+
+      // Создаем агентов проекта на основе шаблонов администратора
+      for (const [index, connection] of templateConnections.entries()) {
+        const template = connection?.projectTypeAgent;
+        if (!template) {
+          continue;
+        }
+
+        const agent = await tx.agent.create({
+          data: {
+            userId,
+            projectId: project.id,
+            projectTypeAgentId: template.id,
+            name: template.name,
+            description: template.description ?? '',
+            systemInstruction: template.systemInstruction ?? '',
+            summaryInstruction: template.summaryInstruction ?? '',
+            model: template.model ?? 'gpt-5.1',
+            role: template.role ?? '',
+            order: typeof connection.order === 'number' ? connection.order : index,
+          },
+        });
+
+        const knowledgeBaseFiles = templateKnowledgeBaseMap.get(template.id) ?? [];
+        if (knowledgeBaseFiles.length > 0) {
+          await tx.file.createMany({
+            data: knowledgeBaseFiles.map((file) => ({
+              agentId: agent.id,
+              name: file.name,
+              mimeType: file.mimeType,
+              content: file.content,
+              isKnowledgeBase: true,
+            })),
+          });
+        }
+      }
+
+      return project;
+    }),
+    3,
+    'POST /projects - create project with agents'
+  );
+
+  const project = await withRetry(
+    () => prisma.project.findUnique({
+      where: { id: createdProject.id },
       include: {
         _count: {
           select: { agents: true },
@@ -154,8 +254,13 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       },
     }),
     3,
-    'POST /projects - create project'
+    'POST /projects - load created project'
   );
+
+  if (!project) {
+    logger.error({ createdProjectId: createdProject.id }, 'Failed to load project after creation');
+    return res.status(500).json({ error: 'Не удалось создать проект' });
+  }
 
   logger.info({ userId, projectId: project.id, name, projectTypeId }, 'Project created');
   res.status(201).json({
@@ -295,6 +400,115 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
     // Пробрасываем другие ошибки для обработки в errorHandler
     throw error;
   }
+}));
+
+// DELETE /:projectId/files/:fileId - удалить файл проекта
+router.delete('/:projectId/files/:fileId', asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
+  const { projectId, fileId } = req.params;
+
+  // Проверяем, что проект принадлежит пользователю
+  const project = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id: projectId, userId },
+      select: {
+        id: true,
+        projectTypeId: true,
+      },
+    }),
+    3,
+    `DELETE /projects/${projectId}/files/${fileId} - find project`
+  );
+
+  if (!project) {
+    return res.status(404).json({ error: 'Проект не найден' });
+  }
+
+  // Находим файл с информацией о его агенте/шаблоне
+  const file = await withRetry(
+    () => prisma.file.findFirst({
+      where: { id: fileId },
+      select: {
+        id: true,
+        name: true,
+        projectTypeAgentId: true,
+        agent: {
+          select: {
+            id: true,
+            projectId: true,
+            userId: true,
+          },
+        },
+      },
+    }),
+    3,
+    `DELETE /projects/${projectId}/files/${fileId} - find file`
+  );
+
+  if (!file) {
+    return res.status(404).json({ error: 'Файл не найден' });
+  }
+
+  let belongsToProject = false;
+
+  if (file.agent) {
+    if (file.agent.projectId !== projectId) {
+      logger.warn({ fileId, fileProjectId: file.agent.projectId, currentProjectId: projectId }, 'File belongs to different project');
+      return res.status(403).json({ error: 'Доступ запрещен. Файл не принадлежит этому проекту.' });
+    }
+
+    if (file.agent.userId !== userId) {
+      logger.warn({ fileId, fileUserId: file.agent.userId, currentUserId: userId }, 'Attempt to delete file belonging to different user');
+      return res.status(403).json({ error: 'Доступ запрещен. Файл принадлежит другому пользователю.' });
+    }
+
+    belongsToProject = true;
+  } else if (file.projectTypeAgentId) {
+    if (!project.projectTypeId) {
+      logger.warn({ fileId, projectId, userId }, 'Project has no projectTypeId while deleting template-based file');
+      return res.status(403).json({ error: 'Доступ запрещен. Файл не принадлежит этому проекту.' });
+    }
+    const templateAgentId = file.projectTypeAgentId;
+
+    const templateConnection = await withRetry(
+      () => prisma.projectTypeAgentProjectType.findFirst({
+        where: {
+          projectTypeAgentId: templateAgentId,
+          projectTypeId: project.projectTypeId,
+        },
+        select: { id: true },
+      }),
+      3,
+      `DELETE /projects/${projectId}/files/${fileId} - validate template file access`
+    );
+
+    if (!templateConnection) {
+      logger.warn({
+        fileId,
+        projectId,
+        projectTypeId: project.projectTypeId,
+        projectTypeAgentId: templateAgentId,
+      }, 'Template file does not belong to project type');
+      return res.status(403).json({ error: 'Доступ запрещен. Файл не принадлежит этому проекту.' });
+    }
+
+    belongsToProject = true;
+  }
+
+  if (!belongsToProject) {
+    logger.warn({ fileId, projectId, userId }, 'File has no agent or template reference, cannot delete');
+    return res.status(403).json({ error: 'Доступ запрещен. Файл не принадлежит этому проекту.' });
+  }
+
+  await withRetry(
+    () => prisma.file.delete({ where: { id: fileId } }),
+    3,
+    `DELETE /projects/${projectId}/files/${fileId} - delete file`
+  );
+
+  logger.info({ userId, projectId, fileId, fileName: file.name }, 'Project file deleted');
+  res.status(204).send();
 }));
 
 export default router;

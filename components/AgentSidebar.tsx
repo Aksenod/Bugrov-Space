@@ -1,36 +1,19 @@
 import React, { useMemo } from 'react';
-import {
-  DndContext,
-  closestCorners,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  arrayMove,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { Agent, User, Project } from '../types';
-import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Trash2, Settings } from 'lucide-react';
+import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Settings, Brain, Cpu, Zap, Rocket, Sparkles, CircuitBoard, Wand2 } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
+
+const ADMIN_USERNAMES = new Set(['admin', 'aksenod']);
 
 interface AgentSidebarProps {
   projects: Project[];
   activeProject: Project | null;
   agents: Agent[];
-  projectTypeAgents: Agent[];
   activeAgentId: string;
   onSelectAgent: (id: string) => void;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
   onEditProject: (project: Project) => void;
-  onDeleteAgent: (id: string) => void;
-  onReorderAgents: (agentIds: string[]) => void;
   isOpen: boolean;
   onCloseMobile: () => void;
   onOpenDocs: () => void;
@@ -47,14 +30,11 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   projects,
   activeProject,
   agents,
-  projectTypeAgents,
   activeAgentId,
   onSelectAgent,
   onSelectProject,
   onCreateProject,
   onEditProject,
-  onDeleteAgent,
-  onReorderAgents,
   isOpen,
   onCloseMobile,
   onOpenDocs,
@@ -68,50 +48,49 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 }) => {
   
   // Проверка, является ли пользователь администратором
-  const isAdmin = currentUser && (currentUser.username === 'admin' || currentUser.role === 'admin');
+  const isAdmin =
+    !!currentUser &&
+    (currentUser.role === 'admin' || (currentUser?.username && ADMIN_USERNAMES.has(currentUser.username)));
   
-  const getIcon = (name: string) => {
+  const getIcon = (name: string, agentId?: string) => {
     const lower = name.toLowerCase();
     if (lower.includes('резюм') || lower.includes('sum')) return <CheckCircle size={16} />;
     if (lower.includes('документ') || lower.includes('document')) return <FileText size={16} />;
     if (lower.includes('творч') || lower.includes('writer') || lower.includes('копирайтер')) return <PenTool size={16} />;
-    if (lower.includes('assist') || lower.includes('помощник')) return <Bot size={16} />;
-    // Хештег только для "бери"
     if (lower.includes('бери')) return <Hash size={16} />;
-    // Для остальных - иконка по умолчанию (Bot)
+    
+    // Для остальных - разнообразные иконки роботов на основе ID
+    if (agentId) {
+      const hash = Array.from(agentId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const iconIndex = hash % 8;
+      const icons = [
+        <Bot key="bot" size={16} />,
+        <Brain key="brain" size={16} />,
+        <Cpu key="cpu" size={16} />,
+        <Zap key="zap" size={16} />,
+        <Rocket key="rocket" size={16} />,
+        <Sparkles key="sparkles" size={16} />,
+        <CircuitBoard key="circuit" size={16} />,
+        <Wand2 key="wand" size={16} />,
+      ];
+      return icons[iconIndex];
+    }
+    
+    // Fallback для случаев без ID
     return <Bot size={16} />;
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    // Обычные пользователи не могут перемещать агентов
-    if (!isAdmin) return;
-    
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    // Перемещение только для обычных агентов проекта (не для агентов типа проекта)
-    const oldIndex = agents.findIndex((agent) => agent.id === active.id);
-    const newIndex = agents.findIndex((agent) => agent.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newOrder = arrayMove(agents, oldIndex, newIndex).map((agent) => agent.id);
-    onReorderAgents(newOrder);
-  };
-
   // Сортируем агентов по полю order для правильного отображения
-  const sortedProjectTypeAgents = useMemo(() => {
-    return [...projectTypeAgents].sort((a, b) => {
-      if (a.order === b.order) {
-        return a.name.localeCompare(b.name);
+  const sortedAgents = useMemo(() => {
+    return [...agents].sort((a, b) => {
+      const orderA = a.order ?? 0;
+      const orderB = b.order ?? 0;
+      if (orderA === orderB) {
+        return a.id.localeCompare(b.id);
       }
-      return (a.order ?? 0) - (b.order ?? 0);
+      return orderA - orderB;
     });
-  }, [projectTypeAgents]);
+  }, [agents]);
 
   return (
     <>
@@ -141,45 +120,38 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
         </div>
 
         {/* Agent List */}
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
-            <SortableContext 
-              items={sortedProjectTypeAgents.map(agent => agent.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-1.5 sm:space-y-2 mt-2">
-                {sortedProjectTypeAgents.map((agent, index) => (
-                  <div
-                    key={agent.id}
-                    onClick={() => {
-                      onSelectAgent(agent.id);
-                      onCloseMobile();
-                    }}
-                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
-                      agent.id === activeAgentId
-                        ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
-                        : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-lg ${
-                      agent.id === activeAgentId
-                        ? 'bg-indigo-500/30'
-                        : 'bg-white/5 group-hover:bg-indigo-500/20'
-                    } transition-colors relative`}>
-                      {getIcon(agent.name)}
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
-                        {index + 1}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-xs truncate">{agent.name}</div>
-                    </div>
-                  </div>
-                ))}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
+          <div className="space-y-1.5 sm:space-y-2 mt-2">
+            {sortedAgents.map((agent, index) => (
+              <div
+                key={agent.id}
+                onClick={() => {
+                  onSelectAgent(agent.id);
+                  onCloseMobile();
+                }}
+                className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
+                  agent.id === activeAgentId
+                    ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
+                    : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg ${
+                  agent.id === activeAgentId
+                    ? 'bg-indigo-500/30'
+                    : 'bg-white/5 group-hover:bg-indigo-500/20'
+                } transition-colors relative`}>
+                  {getIcon(agent.name, agent.id)}
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
+                    {(agent.order ?? index) + 1}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-xs truncate">{agent.name}</div>
+                </div>
               </div>
-            </SortableContext>
+            ))}
           </div>
-        </DndContext>
+        </div>
 
         {/* Project Space & User Section */}
         <div className="flex-shrink-0 flex flex-col gap-1 p-2 border-t border-white/5">
@@ -276,87 +248,5 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
       </aside>
     </>
-  );
-};
-
-interface SortableAgentItemProps {
-  agent: Agent;
-  isActive: boolean;
-  canDelete: boolean;
-  onSelectAgent: () => void;
-  onDeleteAgent: () => void;
-  getIcon: (name: string) => React.ReactNode;
-  agentNumber: number;
-}
-
-const SortableAgentItem: React.FC<SortableAgentItemProps> = ({
-  agent,
-  isActive,
-  canDelete,
-  onSelectAgent,
-  onDeleteAgent,
-  getIcon,
-  agentNumber,
-}) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    cursor: 'grab',
-  } as React.CSSProperties;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`relative group/item ${isDragging ? 'z-20' : ''}`}
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        onClick={onSelectAgent}
-        className={`w-full flex items-center gap-3 p-2.5 pr-10 rounded-xl transition-all duration-300 group relative overflow-hidden ${
-          isActive
-            ? 'bg-white/10 text-white shadow-[0_4px_15px_rgba(0,0,0,0.2)] border border-white/10'
-            : 'hover:bg-white/5 text-white/50 hover:text-white border border-transparent'
-        } ${isDragging ? 'opacity-80' : ''}`}
-      >
-        {isActive && (
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-50" />
-        )}
-
-        <div className={`p-1.5 rounded-lg transition-colors relative ${isActive ? 'bg-white/10 text-white shadow-inner' : 'bg-transparent'}`}>
-          {getIcon(agent.name)}
-          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
-            {agentNumber}
-          </span>
-        </div>
-
-        <div className="flex-1 min-w-0 relative z-10 text-left">
-          <h3 className="font-medium text-xs truncate">
-            {agent.name}
-          </h3>
-        </div>
-
-        {isActive && <div className="w-1 h-1 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,1)] mr-1"></div>}
-      </button>
-
-      {canDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDeleteAgent();
-          }}
-          className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all z-20 ${
-            isActive
-              ? 'text-white/30 hover:text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100'
-              : 'text-white/20 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100'
-          }`}
-          title="Delete Agent"
-        >
-          <Trash2 size={14} />
-        </button>
-      )}
-    </div>
   );
 };

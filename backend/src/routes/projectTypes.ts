@@ -4,6 +4,9 @@ import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { withRetry } from '../utils/prismaRetry';
+import { syncProjectTypeAgents } from '../services/projectTypeSync';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { adminMiddleware } from '../middleware/adminMiddleware';
 
 const router = Router();
 
@@ -52,7 +55,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST / - создать новый тип проекта (только для админов, но пока без проверки)
-router.post('/', asyncHandler(async (req: Request, res: Response) => {
+router.post('/', authMiddleware, adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const parsed = projectTypeSchema.safeParse(req.body);
   if (!parsed.success) {
     const errorMessages = parsed.error.issues.map((err) => {
@@ -92,7 +95,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // PUT /:id - обновить тип проекта
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const parsed = projectTypeSchema.safeParse(req.body);
@@ -150,7 +153,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // DELETE /:id - удалить тип проекта
-router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Проверяем, что тип проекта существует
@@ -242,7 +245,7 @@ router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /:id/agents/reorder - изменить порядок агентов типа проекта
-router.post('/:id/agents/reorder', asyncHandler(async (req: Request, res: Response) => {
+router.post('/:id/agents/reorder', authMiddleware, adminMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Проверяем, что тип проекта существует
@@ -310,6 +313,7 @@ router.post('/:id/agents/reorder', asyncHandler(async (req: Request, res: Respon
   );
 
   logger.info({ projectTypeId: id, ordersCount: orders.length }, 'Project type agents reordered');
+  await syncProjectTypeAgents(id);
   res.json({ success: true });
 }));
 

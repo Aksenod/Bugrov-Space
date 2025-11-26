@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, Calendar, Eye, Trash2, Loader2 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { UploadedFile, Agent } from '../types';
+import { UploadedFile, Agent, Project } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
 
@@ -25,6 +25,7 @@ interface ProjectDocumentsModalProps {
   documents: UploadedFile[];
   onRemoveFile?: (fileId: string) => void;
   agents?: Agent[];
+  project?: Project | null;
   onAgentClick?: (agentId: string) => void;
   onOpenAgentSettings?: (agentId: string) => void;
   onDocumentUpdate?: (file: UploadedFile) => void;
@@ -42,6 +43,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   documents,
   onRemoveFile,
   agents = [],
+  project,
   onAgentClick,
   onOpenAgentSettings,
   onDocumentUpdate,
@@ -70,7 +72,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (selectedFileId) {
       const file = documents.find(doc => doc.id === selectedFileId);
       if (file) {
-        const creatorAgent = file.agentId ? agents.find(agent => agent.id === file.agentId) : null;
+        const allAgents = agents;
+        const creatorAgent = file.agentId ? allAgents.find(agent => agent.id === file.agentId) : null;
         const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "verstka");
         
         if (hasVerstkaRole) {
@@ -105,6 +108,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           }
           return fileFromProps;
         });
+      } else {
+        // Если выбранный файл не найден в списке документов (был удален), сбрасываем выбор
+        setSelectedFileId(null);
+        setLocalSelectedFile(null);
       }
     } else {
       setLocalSelectedFile(null);
@@ -112,8 +119,40 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   }, [documents, selectedFileId]);
 
   const getAgentName = (doc: UploadedFile) => {
-    if (!doc.agentId) return 'Документ';
-    return agents.find(agent => agent.id === doc.agentId)?.name ?? 'Документ';
+    // Ищем агента в обоих массивах: реальные агенты проекта и шаблоны агентов
+    const allAgents = agents;
+    
+    // Сначала пытаемся найти по agentId
+    if (doc.agentId) {
+      const agent = allAgents.find(agent => agent.id === doc.agentId);
+      if (agent) {
+        return agent.name;
+      }
+    }
+    
+    // Если агент не найден по ID, пытаемся извлечь название из имени файла
+    // Формат имени: "Summary - {AgentName} - {Date}" или "Summary – {AgentName} – {Date}"
+    // Поддерживаем разные типы тире: дефис (-), длинное тире (–), среднее тире (—)
+    const nameMatch = doc.name.match(/^Summary\s*[-–—]\s*(.+?)\s*[-–—]\s*\d/);
+    if (nameMatch && nameMatch[1]) {
+      const agentNameFromFile = nameMatch[1].trim();
+      // Проверяем, есть ли агент с таким именем (на случай если ID не совпадает, но имя есть)
+      const agentByName = allAgents.find(agent => agent.name === agentNameFromFile);
+      if (agentByName) {
+        return agentByName.name;
+      }
+      // Если агента с таким именем нет в списке, всё равно возвращаем имя из файла
+      return agentNameFromFile;
+    }
+    
+    // Альтернативный формат: "Документ - {AgentName} - {Date}"
+    const altNameMatch = doc.name.match(/^Документ\s*[-–—]\s*(.+?)\s*[-–—]\s*\d/);
+    if (altNameMatch && altNameMatch[1]) {
+      return altNameMatch[1].trim();
+    }
+    
+    // Если ничего не найдено, возвращаем "Документ"
+    return 'Документ';
   };
 
   const extractTimestamp = (doc: UploadedFile) => {
@@ -140,17 +179,42 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
+  const formatDateTime = (doc: UploadedFile) => {
+    const timestamp = extractTimestamp(doc);
+    try {
+      // Парсим дату в формате "11/22/2025, 6:53:14 PM"
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        // Если не удалось распарсить, возвращаем исходную строку
+        return timestamp;
+      }
+      // Форматируем дату в формате DD.MM.YYYY
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      // Форматируем время в 24-часовом формате
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+    } catch (e) {
+      return timestamp;
+    }
+  };
+
   const getDocumentDisplayName = (doc: UploadedFile) => {
     return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
   };
+
 
   if (!isOpen) return null;
 
   const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
   
   // Находим агента-создателя документа
+  const allAgents = agents;
   const documentCreatorAgent = selectedFile?.agentId 
-    ? agents.find(agent => agent.id === selectedFile.agentId)
+    ? allAgents.find(agent => agent.id === selectedFile.agentId)
     : null;
   
   // Показывать кнопки только если документ создан агентом-копирайтером
@@ -160,11 +224,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "verstka");
   
   // Находим агентов DSL и Верстка по ролям (могут быть отдельными агентами или частью копирайтера)
-  const dslAgent = agents.find(agent => {
+  const dslAgent = allAgents.find(agent => {
     const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
     return roles.includes('dsl');
   });
-  const verstkaAgent = agents.find(agent => {
+  const verstkaAgent = allAgents.find(agent => {
     const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
     return roles.includes('verstka');
   });
@@ -191,30 +255,23 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     e.stopPropagation();
     if (!onRemoveFile) return;
     
-    if (onShowConfirm) {
-      onShowConfirm(
-        'Удалить документ?',
-        'Этот документ будет удален.\n\nЭто действие нельзя отменить.',
-        () => {
-          onRemoveFile(fileId);
-          // Если удаляемый файл был выбран, сбросить выбор
-          if (selectedFileId === fileId) {
-            setSelectedFileId(null);
-          }
-        },
-        'danger'
-      );
-    } else {
-      // Если onShowConfirm не передан, используем alert как fallback (но это не должно происходить)
-      console.warn('onShowConfirm not provided, cannot show confirmation dialog');
+    // onRemoveFile в App.tsx уже показывает подтверждение, поэтому просто вызываем его
+    // Но сначала сбрасываем выбор, если удаляемый файл был выбран
+    if (selectedFileId === fileId) {
+      setSelectedFileId(null);
+      setLocalSelectedFile(null);
     }
+    
+    // Вызываем onRemoveFile, который покажет подтверждение и выполнит удаление
+    onRemoveFile(fileId);
   };
 
   const handleGenerateResult = async (role: 'dsl' | 'verstka') => {
     if (!selectedFile || !documentCreatorAgent) return;
 
     // Ищем агента с нужной ролью (может быть отдельным агентом или частью копирайтера)
-    const targetAgent = agents.find(agent => {
+    const allAgents = agents;
+    const targetAgent = allAgents.find(agent => {
       return hasRole(agent.role, role === 'dsl' ? 'dsl' : 'verstka');
     });
 
@@ -342,22 +399,30 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         
         {/* Sidebar List */}
         <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-amber-500/20 rounded-xl text-amber-400">
-                <FileText size={18} className="sm:w-5 sm:h-5" />
+          <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-amber-500/20 rounded-xl text-amber-400 flex-shrink-0">
+                    <FileText size={18} className="sm:w-5 sm:h-5" />
+                  </div>
+                  <span className="truncate">{project?.name || 'Документы'}</span>
+                </h2>
+                {project?.projectType && (
+                  <p className="text-xs sm:text-sm text-white/50 mt-1 ml-11 sm:ml-12 truncate">
+                    {project.projectType.name}
+                  </p>
+                )}
               </div>
-              <span className="hidden sm:inline">Documents</span>
-              <span className="sm:hidden">Документы</span>
-            </h2>
-            {/* Mobile Close Button */}
-            <button 
-              onClick={onClose} 
-              className="md:hidden p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              aria-label="Закрыть"
-            >
-              <X size={20} />
-            </button>
+              {/* Mobile Close Button */}
+              <button 
+                onClick={onClose} 
+                className="md:hidden p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
@@ -430,15 +495,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
                             {selectedFile ? getAgentName(selectedFile) : 'Документ'}
                         </div>
-                        {selectedFile && (
-                            <span className="text-sm text-white/60">
-                                {formatTime24h(selectedFile)}
-                            </span>
-                        )}
                     </div>
                     <div className="flex items-center justify-between gap-6 text-sm text-white/40">
                         <div className="flex items-center gap-6">
-                            <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date().toLocaleDateString()}</span>
+                            <span className="flex items-center gap-1.5"><Calendar size={14} /> {selectedFile ? formatDateTime(selectedFile) : new Date().toLocaleString()}</span>
                             
                             {/* Tabs for Verstka documents */}
                             {showVerstkaSubTabs && (
@@ -559,7 +619,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                    </div>
                  )}
                  
-                 <div className={`bg-white/5 rounded-[2rem] border border-white/5 min-h-[50vh] shadow-inner overflow-x-auto ${activeTab === 'preview' ? 'p-0' : 'p-8'}`}>
+                 <div className={`bg-black/50 backdrop-blur-sm rounded-[2rem] border border-white/10 min-h-[50vh] shadow-inner overflow-x-auto ${activeTab === 'preview' ? 'p-0' : 'p-8'}`}>
                     {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                     ) : (

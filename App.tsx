@@ -17,6 +17,7 @@ import { api, ApiAgent, ApiFile, ApiMessage, ApiUser, ApiProject, ApiProjectType
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
 const COLOR_PRESETS = ['indigo', 'emerald', 'amber', 'purple', 'rose', 'cyan', 'blue'];
+const ADMIN_USERNAMES = new Set(['admin', 'aksenod']);
 
 const readFileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -35,6 +36,7 @@ const mapFile = (file: ApiFile): UploadedFile => ({
   type: file.mimeType,
   data: file.content,
   agentId: file.agentId,
+  isKnowledgeBase: file.isKnowledgeBase,
 });
 
 const pickColor = (id: string) => {
@@ -53,14 +55,18 @@ const mapAgent = (agent: ApiAgent): Agent => ({
   model: (agent.model as LLMModel) || LLMModel.GPT51,
   role: agent.role,
   order: agent.order ?? 0,
+  projectTypeAgentId: agent.projectTypeAgentId,
 });
 
 const sortAgents = (agentList: Agent[]) =>
   [...agentList].sort((a, b) => {
-    if (a.order === b.order) {
-      return a.name.localeCompare(b.name);
+    const orderA = a.order ?? 0;
+    const orderB = b.order ?? 0;
+    if (orderA === orderB) {
+      // Используем id для стабильной сортировки при одинаковом order
+      return a.id.localeCompare(b.id);
     }
-    return a.order - b.order;
+    return orderA - orderB;
 });
 
 const mapMessage = (message: ApiMessage): Message => ({
@@ -86,7 +92,7 @@ const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => ({
   avatarColor: pickColor(agent.id),
   model: (agent.model as LLMModel) || LLMModel.GPT51,
   role: agent.role,
-  order: agent.order,
+  order: agent.order ?? 0, // Убеждаемся, что order всегда число
 });
 
 const mapProject = (project: ApiProject): Project => ({
@@ -110,11 +116,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [projectTypeAgents, setProjectTypeAgents] = useState<Agent[]>([]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [chatHistories, setChatHistories] = useState<Record<string, Message[]>>({});
-  // Маппинг между ID шаблона и ID реального агента проекта
-  const [templateToRealAgentMap, setTemplateToRealAgentMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summarySuccess, setSummarySuccess] = useState(false);
@@ -155,74 +158,24 @@ export default function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
   const loadedSummaryRef = useRef(new Set<string>());
-  const previousAgentsRef = useRef<Agent[] | null>(null);
-  const trackedAgentsRef = useRef<Set<string>>(new Set());
   const bootstrapInProgressRef = useRef(false);
   const lastBootstrapTokenRef = useRef<string | null>(null);
+  const hasBootstrappedRef = useRef(false);
 
   const activeAgent = useMemo(() => {
+    if (!agents.length) {
+      return undefined;
+    }
     if (!activeAgentId) {
-      return projectTypeAgents[0];
+      return agents[0];
     }
-    
-    // Сначала проверяем, является ли activeAgentId ID шаблона
-    const templateAgent = projectTypeAgents.find((agent) => agent.id === activeAgentId);
-    if (templateAgent) {
-      return templateAgent;
-    }
-    
-    // Если это не шаблон, проверяем, есть ли реальный агент с таким ID
-    const realAgent = agents.find((agent) => agent.id === activeAgentId);
-    if (realAgent) {
-      return realAgent;
-    }
-    
-    // Если не нашли, возможно это реальный агент, который еще не загружен
-    // Проверяем маппинг: возможно activeAgentId - это реальный агент, нужно найти соответствующий шаблон
-    const templateId = Object.keys(templateToRealAgentMap).find(
-      (templateId) => templateToRealAgentMap[templateId] === activeAgentId
-    );
-    if (templateId) {
-      const mappedTemplate = projectTypeAgents.find((agent) => agent.id === templateId);
-      if (mappedTemplate) {
-        return mappedTemplate;
-      }
-    }
-    
-    // Если ничего не найдено, возвращаем первый шаблон
-    return projectTypeAgents[0];
-  }, [activeAgentId, projectTypeAgents, agents, templateToRealAgentMap]);
+    return agents.find((agent) => agent.id === activeAgentId) ?? agents[0];
+  }, [activeAgentId, agents]);
 
   // Получаем реальный ID агента для загрузки сообщений
   const realAgentIdForMessages = useMemo(() => {
-    if (!activeAgentId) return null;
-    
-    // Если activeAgentId - это ID шаблона, проверяем маппинг
-    if (templateToRealAgentMap[activeAgentId]) {
-      const realId = templateToRealAgentMap[activeAgentId];
-      console.log(`[realAgentIdForMessages] Template ${activeAgentId} mapped to real agent ${realId}`);
-      return realId;
-    }
-    
-    // Если activeAgentId - это уже ID реального агента, проверяем обратный маппинг
-    const templateId = Object.keys(templateToRealAgentMap).find(
-      (templateId) => templateToRealAgentMap[templateId] === activeAgentId
-    );
-    if (templateId) {
-      console.log(`[realAgentIdForMessages] ActiveAgentId ${activeAgentId} is already a real agent`);
-      return activeAgentId; // Это уже реальный ID
-    }
-    
-    // Проверяем, есть ли реальный агент с таким ID
-    if (agents.find((agent) => agent.id === activeAgentId)) {
-      console.log(`[realAgentIdForMessages] ActiveAgentId ${activeAgentId} found in agents list`);
-      return activeAgentId;
-    }
-    
-    // Иначе используем сам activeAgentId (возможно, это шаблон, сообщений еще нет)
-    console.log(`[realAgentIdForMessages] Using activeAgentId as-is (template, no messages yet): ${activeAgentId}`);
-    return activeAgentId;
-  }, [activeAgentId, templateToRealAgentMap, agents]);
+    return activeAgent?.id ?? null;
+  }, [activeAgent?.id]);
 
   const messages = realAgentIdForMessages ? chatHistories[realAgentIdForMessages] ?? [] : [];
   // Документы проекта общие для всех агентов - всегда используем ключ 'all'
@@ -234,10 +187,9 @@ export default function App() {
       console.log(`[Frontend] Active agent changed: ${activeAgent.name} (${activeAgent.id})`);
       console.log(`[Frontend] activeAgentId: ${activeAgentId}`);
       console.log(`[Frontend] realAgentIdForMessages: ${realAgentIdForMessages}`);
-      console.log(`[Frontend] templateToRealAgentMap:`, templateToRealAgentMap);
       console.log(`[Frontend] Project documents count: ${projectDocuments.length}`);
     }
-  }, [activeAgent?.id, activeAgentId, realAgentIdForMessages, templateToRealAgentMap, projectDocuments.length]);
+  }, [activeAgent?.id, activeAgentId, realAgentIdForMessages, projectDocuments.length]);
   const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT51;
   const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
@@ -263,27 +215,26 @@ export default function App() {
     setAuthToken(null);
     setCurrentUser(null);
     setAgents([]);
-    setProjectTypeAgents([]);
     setActiveAgentId(null);
     setChatHistories({});
-    setTemplateToRealAgentMap({});
     loadedAgentsRef.current.clear();
     loadedSummaryRef.current.clear();
     setSummaryDocuments({});
     lastBootstrapTokenRef.current = null;
     bootstrapInProgressRef.current = false;
+    hasBootstrappedRef.current = false;
   }, []);
 
   const bootstrap = useCallback(async () => {
-      const token = api.getToken();
-      if (!token) {
+    const token = api.getToken();
+    if (!token) {
       setCurrentUser(null);
       setProjects([]);
       setActiveProjectId(null);
       setAgents([]);
-      setProjectTypeAgents([]);
       setActiveAgentId(null);
       lastBootstrapTokenRef.current = null;
+      hasBootstrappedRef.current = false;
       return;
     }
 
@@ -294,7 +245,7 @@ export default function App() {
     }
 
     // Если bootstrap уже был выполнен с тем же токеном, пропускаем
-    if (lastBootstrapTokenRef.current === token && currentUser && projects.length > 0) {
+    if (lastBootstrapTokenRef.current === token && hasBootstrappedRef.current) {
       console.log('[Bootstrap] Already bootstrapped with this token, skipping...');
       return;
     }
@@ -335,64 +286,33 @@ export default function App() {
       if (projectToSelect && projectToSelect.trim() !== '') {
         localStorage.setItem('lastUsedProjectId', projectToSelect);
         try {
-          const { agents: apiAgents, projectTypeAgents: apiProjectTypeAgents } = await api.getAgents(projectToSelect);
+          const { agents: apiAgents } = await api.getAgents(projectToSelect);
           const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-          const mappedProjectTypeAgents = apiProjectTypeAgents 
-            ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
-            : [];
           setAgents(mappedAgents);
-          setProjectTypeAgents(mappedProjectTypeAgents);
           
-          // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
-          const newMapping: Record<string, string> = {};
-          mappedProjectTypeAgents.forEach((template) => {
-            const realAgent = mappedAgents.find((agent) => agent.name === template.name);
-            if (realAgent) {
-              newMapping[template.id] = realAgent.id;
-            }
-          });
-          setTemplateToRealAgentMap(newMapping);
-          
-          // Выбираем активного агента из projectTypeAgents
-          // НЕ меняем activeAgentId, если он уже установлен и соответствует шаблону
           setActiveAgentId((prev) => {
-            // Если prev - это ID шаблона и он существует в списке, оставляем его
-            if (prev && mappedProjectTypeAgents.some((agent) => agent.id === prev)) {
-              console.log(`[Bootstrap] Keeping activeAgentId as template: ${prev}`);
+            if (prev && mappedAgents.some((agent) => agent.id === prev)) {
               return prev;
             }
-            // Проверяем, может быть prev - это ID реального агента
-            const realAgent = mappedAgents.find((agent) => agent.id === prev);
-            if (realAgent) {
-              // Находим соответствующий шаблон
-              const template = mappedProjectTypeAgents.find((t) => t.name === realAgent.name);
-              if (template) {
-                console.log(`[Bootstrap] Mapping real agent ${prev} to template ${template.id}`);
-                return template.id; // Возвращаем ID шаблона, чтобы отображался правильный агент
-              }
-            }
-            // Если ничего не найдено, выбираем первый шаблон
-            const firstTemplateId = mappedProjectTypeAgents[0]?.id ?? null;
-            console.log(`[Bootstrap] Selecting first template as activeAgentId: ${firstTemplateId}`);
-            return firstTemplateId;
+            const fallbackId = mappedAgents[0]?.id ?? null;
+            console.log(`[Bootstrap] Selecting agent as activeAgentId: ${fallbackId}`);
+            return fallbackId;
           });
         } catch (error) {
           console.error('Failed to load agents in bootstrap', error);
           setAgents([]);
-          setProjectTypeAgents([]);
           setActiveAgentId(null);
         }
       } else {
         setAgents([]);
-        setProjectTypeAgents([]);
         setActiveAgentId(null);
       }
       
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
       setChatHistories({});
-      setTemplateToRealAgentMap({});
       setSummaryDocuments({});
+      hasBootstrappedRef.current = true;
     } catch (error: any) {
       console.error('Bootstrap failed', error);
       
@@ -411,14 +331,13 @@ export default function App() {
         setProjects([]);
         setActiveProjectId(null);
         setAgents([]);
-        setProjectTypeAgents([]);
         setActiveAgentId(null);
         setChatHistories({});
-        setTemplateToRealAgentMap({});
         loadedAgentsRef.current.clear();
         loadedSummaryRef.current.clear();
         setSummaryDocuments({});
         lastBootstrapTokenRef.current = null;
+        hasBootstrappedRef.current = false;
       } else if (isDbError || isRateLimitError) {
         // Если ошибка базы данных или rate limit - оставляем пользователя залогиненным, но с пустыми данными
         // Пользователь может попробовать обновить страницу позже
@@ -434,10 +353,8 @@ export default function App() {
           setProjects([]);
           setActiveProjectId(null);
           setAgents([]);
-          setProjectTypeAgents([]);
           setActiveAgentId(null);
           setChatHistories({});
-          setTemplateToRealAgentMap({});
           loadedAgentsRef.current.clear();
           loadedSummaryRef.current.clear();
           setSummaryDocuments({});
@@ -449,10 +366,8 @@ export default function App() {
           setProjects([]);
           setActiveProjectId(null);
           setAgents([]);
-          setProjectTypeAgents([]);
           setActiveAgentId(null);
           setChatHistories({});
-          setTemplateToRealAgentMap({});
           loadedAgentsRef.current.clear();
           loadedSummaryRef.current.clear();
           setSummaryDocuments({});
@@ -465,28 +380,25 @@ export default function App() {
   }, [currentUser, projects.length]);
 
   // Проверка, является ли пользователь администратором
-  const isAdmin = currentUser && (currentUser.username === 'admin' || currentUser.role === 'admin');
+  const isAdmin =
+    !!currentUser &&
+    (currentUser.role === 'admin' || (currentUser.username && ADMIN_USERNAMES.has(currentUser.username)));
 
   // Функция для перезагрузки агентов текущего проекта
   const reloadAgents = useCallback(async () => {
     if (!activeProjectId) return;
     
     try {
-      const { agents: apiAgents, projectTypeAgents: apiProjectTypeAgents } = await api.getAgents(activeProjectId);
+      const { agents: apiAgents } = await api.getAgents(activeProjectId);
       const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-      const mappedProjectTypeAgents = apiProjectTypeAgents 
-        ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
-        : [];
       setAgents(mappedAgents);
-      setProjectTypeAgents(mappedProjectTypeAgents);
       
       // Обновляем активного агента, если он все еще существует
-      const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
       setActiveAgentId((prev) => {
-        if (prev && allAgents.some((agent) => agent.id === prev)) {
+        if (prev && mappedAgents.some((agent) => agent.id === prev)) {
           return prev;
         }
-        return mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null;
+        return mappedAgents[0]?.id ?? null;
       });
     } catch (error) {
       console.error('Failed to reload agents', error);
@@ -809,12 +721,10 @@ export default function App() {
       setProjects([]);
       setActiveProjectId(null);
       setAgents([]);
-      setProjectTypeAgents([]);
       setActiveAgentId(null);
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
       setChatHistories({});
-      setTemplateToRealAgentMap({});
       setSummaryDocuments({});
       
       // Пытаемся загрузить данные (но не критично, если не получится)
@@ -848,41 +758,9 @@ export default function App() {
     }
   };
 
-  const handleReorderAgents = useCallback(async (newOrderIds: string[]) => {
-    setAgents((prev) => {
-      if (prev.length !== newOrderIds.length) {
-        return prev;
-      }
-      previousAgentsRef.current = prev;
-      const map = new Map(prev.map((agent) => [agent.id, agent]));
-      const reordered: Agent[] = [];
-      for (const id of newOrderIds) {
-        const agent = map.get(id);
-        if (!agent) {
-          return prev;
-        }
-        reordered.push(agent);
-      }
-      return reordered.map((agent, index) => ({
-        ...agent,
-        order: index,
-      }));
-    });
-
-    try {
-      await api.reorderAgents(newOrderIds.map((id, index) => ({ id, order: index })));
-    } catch (error) {
-      console.error('Не удалось сохранить порядок агентов', error);
-      if (previousAgentsRef.current) {
-        setAgents(previousAgentsRef.current);
-      }
-    }
-  }, []);
-
   const handleSendMessage = async (text: string) => {
     if (!activeAgent || !text.trim() || isLoading) return;
 
-    // Проверяем наличие активного проекта
     if (!activeProjectId) {
       showAlert('Ошибка: не выбран активный проект', undefined, 'error', 3000);
       return;
@@ -891,16 +769,17 @@ export default function App() {
     setIsLoading(true);
     setSummarySuccess(false);
 
-    // Создаем временное сообщение пользователя (показываем сразу)
+    const agentId = activeAgent.id;
+    const trimmedText = text.trim();
+
     const tempUserMessageId = `temp-user-${Date.now()}`;
     const tempUserMessage: Message = {
       id: tempUserMessageId,
       role: Role.USER,
-      text: text.trim(),
+      text: trimmedText,
       timestamp: new Date(),
     };
 
-    // Создаем временное сообщение агента с индикатором загрузки
     const loadingMessageId = `loading-${Date.now()}`;
     const loadingMessage: Message = {
       id: loadingMessageId,
@@ -910,141 +789,54 @@ export default function App() {
       isStreaming: true,
     };
 
-    // Добавляем оба временных сообщения сразу после отправки
-    // Используем realAgentIdForMessages, если он есть (для отображения в правильном чате)
-    // Иначе используем ID шаблона
-    const displayAgentId = realAgentIdForMessages || activeAgent.id;
-    console.log(`[handleSendMessage] Adding temp messages under agentId: ${displayAgentId} (template: ${activeAgent.id}, real: ${realAgentIdForMessages})`);
     setChatHistories((prev) => ({
       ...prev,
-      [displayAgentId]: [
-        ...(prev[displayAgentId] ?? []),
+      [agentId]: [
+        ...(prev[agentId] ?? []),
         tempUserMessage,
         loadingMessage,
       ],
     }));
 
-    // Прокручиваем к индикатору загрузки
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
 
     try {
-      const response = await api.sendMessage(activeAgent.id, text.trim(), activeProjectId);
+      const response = await api.sendMessage(agentId, trimmedText, activeProjectId);
       const newMessages = response.messages.map(mapMessage);
-      
-      // Если агент был создан из шаблона, получаем новый agentId
-      const actualAgentId = response.agentId || activeAgent.id;
-      const templateId = activeAgent.id;
-      
-      console.log(`[handleSendMessage] Template ID: ${templateId}, Actual Agent ID: ${actualAgentId}, Current activeAgentId: ${activeAgentId}`);
-      
-      // Если агент был создан из шаблона, сохраняем маппинг
-      // ВАЖНО: НЕ меняем activeAgentId - оставляем ID шаблона, маппинг используется для получения реального ID
-      if (response.agentId && response.agentId !== activeAgent.id) {
-        console.log(`[handleSendMessage] Creating mapping: ${templateId} -> ${response.agentId}`);
-        
-        // Сохраняем маппинг между ID шаблона и ID реального агента
-        setTemplateToRealAgentMap((prev) => {
-          const updated = {
-            ...prev,
-            [templateId]: response.agentId!,
-          };
-          console.log(`[handleSendMessage] Updated mapping:`, updated);
-          return updated;
-        });
-        
-        // Перезагружаем агентов, чтобы новый агент появился в списке
-        if (activeProjectId) {
-          api.getAgents(activeProjectId).then(({ agents: apiAgents, projectTypeAgents: apiProjectTypeAgents }) => {
-            const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-            const mappedProjectTypeAgents = apiProjectTypeAgents 
-              ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
-              : [];
-            setAgents(mappedAgents);
-            setProjectTypeAgents(mappedProjectTypeAgents);
-            
-            // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
-            // Объединяем с существующим маппингом, чтобы не потерять только что добавленный
-            setTemplateToRealAgentMap((prev) => {
-              const newMapping: Record<string, string> = { ...prev };
-              mappedProjectTypeAgents.forEach((template) => {
-                const realAgent = mappedAgents.find((agent) => agent.name === template.name);
-                if (realAgent) {
-                  newMapping[template.id] = realAgent.id;
-                }
-              });
-              console.log(`[handleSendMessage] Restored mapping after reload:`, newMapping);
-              return newMapping;
-            });
-            
-            // Убеждаемся, что activeAgentId остается ID шаблона (не меняем его)
-            // Если активный агент был шаблоном, он должен остаться шаблоном
-            console.log(`[handleSendMessage] ActiveAgentId should remain: ${templateId}`);
-          }).catch(console.error);
-        }
-      }
-      
-      // Заменяем временные сообщения на реальные сообщения из API
-      // Используем actualAgentId, так как сообщения привязаны к созданному агенту
-      setChatHistories((prev) => {
-        // Удаляем временные сообщения из истории шаблона, если они там есть
-        const templateMessages = prev[templateId] ?? [];
-        const templateMessagesWithoutTemp = templateMessages.filter(
-          (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
-        );
-        
-        // Удаляем временные сообщения из истории реального агента, если они там есть
-        const realAgentMessages = prev[actualAgentId] ?? [];
-        const realAgentMessagesWithoutTemp = realAgentMessages.filter(
-          (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
-        );
-        
-        // Объединяем сообщения, убирая дубликаты
-        const existingMessages = [...templateMessagesWithoutTemp, ...realAgentMessagesWithoutTemp];
-        const existingMessageIds = new Set(existingMessages.map((m) => m.id));
-        const newMessagesToAdd = newMessages.filter((m) => !existingMessageIds.has(m.id));
-        
-        // Добавляем реальные сообщения из API под правильным agentId
-        return {
-          ...prev,
-          [templateId]: templateMessagesWithoutTemp, // Очищаем историю шаблона от временных сообщений
-          [actualAgentId]: [...existingMessages, ...newMessagesToAdd],
-        };
-      });
-      
-      // Помечаем, что сообщения для этого агента загружены
-      if (actualAgentId) {
-        loadedAgentsRef.current.add(actualAgentId);
-      }
+
+      setChatHistories((prev) => ({
+        ...prev,
+        [agentId]: [
+          ...(prev[agentId] ?? []).filter(
+            (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
+          ),
+          ...newMessages,
+        ],
+      }));
+
+      loadedAgentsRef.current.add(agentId);
     } catch (error: any) {
       console.error('Chat error', error);
-      
-      // Удаляем временное сообщение загрузки и добавляем сообщение об ошибке
-      // Сообщение пользователя оставляем как есть
-      // Используем тот же displayAgentId, под которым были добавлены временные сообщения
-      const errorDisplayAgentId = realAgentIdForMessages || activeAgent.id;
-      console.log(`[handleSendMessage error] Adding error message under agentId: ${errorDisplayAgentId}`);
+
+      const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
+
       setChatHistories((prev) => {
-        // Удаляем временные сообщения из обоих мест (шаблон и реальный агент)
-        const templateMessages = prev[activeAgent.id] ?? [];
-        const realAgentMessages = prev[errorDisplayAgentId] ?? [];
-        const allMessages = [...templateMessages, ...realAgentMessages];
-        const messagesWithoutLoading = allMessages.filter(
-          (msg) => msg.id !== loadingMessageId && msg.id !== tempUserMessageId
+        const currentMessages = (prev[agentId] ?? []).filter(
+          (msg) => msg.id !== loadingMessageId
         );
-        
-        // Добавляем сообщение пользователя и ошибку
-        const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
-        
+        const hasUserMessage = currentMessages.some(
+          (msg) => msg.role === Role.USER && msg.text === tempUserMessage.text
+        );
+
         return {
           ...prev,
-          [activeAgent.id]: [], // Очищаем шаблон
-          [errorDisplayAgentId]: [
-            ...messagesWithoutLoading,
-            tempUserMessage, // Добавляем сообщение пользователя
+          [agentId]: [
+            ...currentMessages,
+            ...(hasUserMessage ? [] : [tempUserMessage]),
             {
-              id: `error-${Date.now()}`,
+              id: `error-${Date.now()}-${Math.random()}`,
               role: Role.MODEL,
               text: errorMessage,
               timestamp: new Date(),
@@ -1065,7 +857,7 @@ export default function App() {
       'Все сообщения в этом чате будут удалены.\nЭто действие нельзя отменить.',
       async () => {
         try {
-          await api.clearMessages(realAgentIdForMessages);
+          await api.clearMessages(realAgentIdForMessages, activeProjectId || undefined);
           setChatHistories((prev) => ({ ...prev, [realAgentIdForMessages]: [] }));
           loadedAgentsRef.current.delete(realAgentIdForMessages);
           setSummarySuccess(false);
@@ -1080,17 +872,20 @@ export default function App() {
   };
 
   const handleGenerateSummary = async () => {
-    if (!activeAgent || !realAgentIdForMessages || messages.length < 1 || !activeProjectId) return;
+    if (!activeAgent || !activeAgentId || !realAgentIdForMessages || messages.length < 1 || !activeProjectId) return;
     setIsGeneratingSummary(true);
     try {
       console.log('[Frontend] handleGenerateSummary called:', {
-        agentId: realAgentIdForMessages,
+        agentId: activeAgentId, // Используем ID шаблона для генерации
+        realAgentId: realAgentIdForMessages,
         agentName: activeAgent.name,
         messagesCount: messages.length,
         projectId: activeProjectId,
       });
       
-      const { file } = await api.generateSummary(realAgentIdForMessages, activeProjectId);
+      // Используем activeAgentId (ID шаблона), так как бэкенд ожидает ID шаблона
+      // и сам создаст/найдет реальный агент через getOrCreateAgentFromTemplate
+      const { file } = await api.generateSummary(activeAgentId, activeProjectId);
       
       console.log('[Frontend] Summary generated successfully:', {
         fileId: file.id,
@@ -1111,8 +906,8 @@ export default function App() {
         });
         return updated;
       });
-      // Очищаем кеш загрузки для этого агента, чтобы при следующем переключении файлы перезагрузились
-      // Но не очищаем сейчас, так как мы уже добавили файл вручную
+      // Очищаем кеш загрузки, чтобы при следующем переключении файлы перезагрузились
+      loadedSummaryRef.current.delete('all');
       setSummarySuccess(true);
       setTimeout(() => setSummarySuccess(false), 3000);
     } catch (error: any) {
@@ -1133,30 +928,10 @@ export default function App() {
     setActiveProjectId(projectId);
     localStorage.setItem('lastUsedProjectId', projectId);
     try {
-      const { agents: apiAgents, projectTypeAgents: apiProjectTypeAgents } = await api.getAgents(projectId);
+      const { agents: apiAgents } = await api.getAgents(projectId);
       const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-      const mappedProjectTypeAgents = apiProjectTypeAgents 
-        ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
-        : [];
       setAgents(mappedAgents);
-      setProjectTypeAgents(mappedProjectTypeAgents);
-      
-      // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
-      const newMapping: Record<string, string> = {};
-      mappedProjectTypeAgents.forEach((template) => {
-        const realAgent = mappedAgents.find((agent) => agent.name === template.name);
-        if (realAgent) {
-          newMapping[template.id] = realAgent.id;
-        }
-      });
-      setTemplateToRealAgentMap(newMapping);
-      
-      // Выбираем первого агента из шаблонов (приоритет шаблонам)
-      setActiveAgentId(mappedProjectTypeAgents[0]?.id ?? null);
-      
-      // Обновляем список отслеживаемых агентов
-      const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
-      trackedAgentsRef.current = new Set(allAgents.map(agent => agent.id));
+      setActiveAgentId(mappedAgents[0]?.id ?? null);
       
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
@@ -1176,35 +951,13 @@ export default function App() {
       setActiveProjectId(mappedProject.id);
       localStorage.setItem('lastUsedProjectId', mappedProject.id);
       
-      // Загружаем агентов проекта (их может не быть, но это нормально)
+      // Загружаем агентов проекта
       try {
-        const { agents: apiAgents, projectTypeAgents: apiProjectTypeAgents } = await api.getAgents(mappedProject.id);
+        const { agents: apiAgents } = await api.getAgents(mappedProject.id);
         const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-        const mappedProjectTypeAgents = apiProjectTypeAgents 
-          ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
-          : [];
         setAgents(mappedAgents);
-        setProjectTypeAgents(mappedProjectTypeAgents);
-        
-        // Восстанавливаем маппинг между шаблонами и реальными агентами по имени
-        const newMapping: Record<string, string> = {};
-        mappedProjectTypeAgents.forEach((template) => {
-          const realAgent = mappedAgents.find((agent) => agent.name === template.name);
-          if (realAgent) {
-            newMapping[template.id] = realAgent.id;
-          }
-        });
-        setTemplateToRealAgentMap(newMapping);
-        
-        // Выбираем первого агента из шаблонов (приоритет шаблонам)
-        const selectedAgentId = mappedProjectTypeAgents[0]?.id ?? null;
-        setActiveAgentId(selectedAgentId);
-        
-        // Обновляем список отслеживаемых агентов
-        const allAgents = [...mappedProjectTypeAgents, ...mappedAgents];
-        trackedAgentsRef.current = new Set(allAgents.map(agent => agent.id));
+        setActiveAgentId(mappedAgents[0]?.id ?? null);
       } catch (error) {
-        // Если агентов нет - это нормально, просто оставляем пустой список
         console.log('No agents in new project, this is expected');
         setAgents([]);
         setActiveAgentId(null);
@@ -1263,18 +1016,13 @@ export default function App() {
                 localStorage.setItem('lastUsedProjectId', nextProject.id);
                 // Загружаем агентов выбранного проекта
                 api.getAgents(nextProject.id)
-                  .then(({ agents: apiAgents, projectTypeAgents: apiProjectTypeAgents }) => {
+                  .then(({ agents: apiAgents }) => {
                     const mappedAgents = sortAgents(apiAgents.map(mapAgent));
-                    const mappedProjectTypeAgents = apiProjectTypeAgents 
-                      ? sortAgents(apiProjectTypeAgents.map(mapProjectTypeAgent))
-                      : [];
                     setAgents(mappedAgents);
-                    setProjectTypeAgents(mappedProjectTypeAgents);
-                    setActiveAgentId(mappedAgents[0]?.id ?? mappedProjectTypeAgents[0]?.id ?? null);
+                    setActiveAgentId(mappedAgents[0]?.id ?? null);
                   })
                   .catch(() => {
                     setAgents([]);
-                    setProjectTypeAgents([]);
                     setActiveAgentId(null);
                   });
               } else {
@@ -1282,7 +1030,6 @@ export default function App() {
                 setActiveProjectId(null);
                 localStorage.removeItem('lastUsedProjectId');
                 setAgents([]);
-                setProjectTypeAgents([]);
                 setActiveAgentId(null);
               }
             }
@@ -1302,209 +1049,88 @@ export default function App() {
     );
   }, [editingProject, activeProjectId]);
 
-  const handleUpdateAgent = async (agent: Agent) => {
-    try {
-      const response = await api.updateAgent(agent.id, {
-        name: agent.name,
-        description: agent.description,
-        systemInstruction: agent.systemInstruction,
-        summaryInstruction: agent.summaryInstruction,
-        model: agent.model,
-        role: agent.role,
-      });
-      const mapped = mapAgent(response.agent);
-      
-      // Обновляем в списке агентов проекта
-      setAgents((prev) => {
-        const found = prev.find((a) => a.id === mapped.id);
-        if (found) {
-          return sortAgents(prev.map((item) => (item.id === mapped.id ? mapped : item)));
-        }
-        return prev;
-      });
-      
-      // Обновляем в списке агентов типа проекта, если это агент типа проекта
-      setProjectTypeAgents((prev) => {
-        const found = prev.find((a) => a.id === mapped.id);
-        if (found) {
-          return sortAgents(prev.map((item) => (item.id === mapped.id ? mapped : item)));
-        }
-        return prev;
-      });
-      
-      // Если это активный агент, обновляем его
-      if (activeAgentId === mapped.id) {
-        setActiveAgentId(mapped.id); // Это триггернет обновление через useMemo
-      }
-    } catch (error) {
-      console.error('Failed to update agent', error);
-      throw error;
-    }
-  };
-
-  const handleDeleteAgent = async (agentId: string) => {
-    const agent = agents.find((a) => a.id === agentId);
-    // Запрещаем удаление агентов с ролью
-    if (agent && agent.role && agent.role.trim() !== '') {
-      showAlert('Нельзя удалить агента с назначенной ролью.', 'Ошибка', 'error', 5000);
-      return;
-    }
-    if (agents.length <= 1) {
-      showAlert('Нельзя удалить последнего агента.', 'Ошибка', 'error', 5000);
-      return;
-    }
-    showConfirm(
-      'Удалить агента?',
-      `Агент "${agent?.name || 'Без имени'}" и вся его история будут удалены.\n\nЭто действие нельзя отменить.`,
-      async () => {
-        try {
-          await api.deleteAgent(agentId);
-          setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
-          setChatHistories((prev) => {
-            const next = { ...prev };
-            delete next[agentId];
-            return next;
-          });
-          if (activeAgentId === agentId) {
-            const remaining = agents.filter((agent) => agent.id !== agentId);
-            setActiveAgentId(remaining[0]?.id ?? null);
-          }
-          showAlert('Агент успешно удален', undefined, 'success', 3000);
-        } catch (error: any) {
-          console.error('Failed to delete agent', error);
-          showAlert(error?.message || 'Не удалось удалить агента.', 'Ошибка', 'error', 5000);
-        }
-      },
-      'danger'
-    );
-  };
-
-  const handleFileUpload = async (fileList: FileList) => {
-    if (!activeAgent || !fileList.length) return;
-    const uploads: UploadedFile[] = [];
-    const errors: string[] = [];
-
-    // Разрешенные расширения файлов
-    const allowedExtensions = ['.txt', '.md'];
-    const allowedMimeTypes = ['text/plain', 'text/markdown'];
-
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      
-      // Проверка типа файла
-      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-      const isValidExtension = allowedExtensions.includes(fileExtension);
-      const isValidMimeType = !file.type || allowedMimeTypes.includes(file.type);
-      
-      if (!isValidExtension && !isValidMimeType) {
-        errors.push(`Файл ${file.name} не поддерживается. Разрешены только .txt и .md файлы.`);
-        continue;
-      }
-      
-      if (file.size > FILE_SIZE_LIMIT) {
-        errors.push(`Файл ${file.name} слишком большой (>2MB)`);
-        continue;
-      }
-      
-      try {
-        const base64 = await readFileToBase64(file);
-        // Файлы помечаются как база знаний агента
-        const { file: uploaded } = await api.uploadFile(activeAgent.id, {
-          name: file.name,
-          mimeType: file.type || 'text/plain',
-          content: base64,
-          isKnowledgeBase: true,  // Помечаем как базу знаний
-        });
-        uploads.push(mapFile(uploaded));
-      } catch (error: any) {
-        console.error('File upload failed', error);
-        errors.push(`Не удалось загрузить ${file.name}: ${error?.message || 'Неизвестная ошибка'}`);
-      }
-    }
-
-    if (errors.length > 0) {
-      showAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error', 5000);
-    }
-
-    if (uploads.length > 0) {
-      setAgents((prev) =>
-        prev.map((agent) =>
-          agent.id === activeAgent.id ? { ...agent, files: [...uploads, ...agent.files] } : agent,
-        ),
-      );
-      // НЕ добавляем в summaryDocuments - это база знаний агента, не документ проекта
-      showAlert(`Успешно загружено файлов в базу знаний: ${uploads.length}`, undefined, 'success', 3000);
-    } else if (errors.length === 0) {
-      showAlert('Не удалось загрузить файлы', 'Ошибка', 'error', 5000);
-    }
-  };
+  // Пользователь не может изменять агентов, поэтому функции обновления/удаления/загрузки базы знаний удалены
 
   const handleRemoveFile = async (fileId: string) => {
-    if (!activeAgent) return;
-    
-    // Находим файл для отображения имени в подтверждении
-    // Проверяем во всех возможных местах, где может быть файл
-    const fileToRemove = 
-      activeAgent.files.find(f => f.id === fileId) || 
-      (summaryDocuments['all'] ?? []).find(f => f.id === fileId);
-    
-    console.log('[Frontend] handleRemoveFile called:', { fileId, activeAgentId: activeAgent.id, fileToRemove });
+    const projectFiles = summaryDocuments['all'] ?? [];
+    const fileToRemove = projectFiles.find(doc => doc.id === fileId);
     
     if (!fileToRemove) {
-      console.error('[Frontend] File not found in state:', { fileId, activeAgentId: activeAgent.id });
+      console.error('[Frontend] File not found in summary documents:', { fileId });
+      return;
+    }
+
+    if (fileToRemove.isKnowledgeBase) {
+      showAlert('Управление базой знаний выполняет администратор.', 'Ошибка', 'error', 4000);
       return;
     }
     
-    // Показываем окно подтверждения
     showConfirm(
       'Удалить файл?',
       `Файл "${fileToRemove.name}" будет удален.\n\nЭто действие нельзя отменить.`,
       async () => {
-        // Используем agentId файла, если он есть, иначе используем activeAgent.id
-        const agentIdForDelete = fileToRemove.agentId || activeAgent.id;
-        
-        console.log('[Frontend] Calling api.deleteProjectFile:', { fileId, agentIdForDelete });
+        console.log('[Frontend] Calling api.deleteProjectFile:', { fileId });
         
         try {
-          if (!activeProjectId) {
-            throw new Error('Нет активного проекта');
-          }
-          await api.deleteProjectFile(activeProjectId, fileId);
-          console.log('[Frontend] File deleted successfully');
-          
-          // Удаляем из summaryDocuments (все документы проекта теперь общие)
-          setSummaryDocuments((prev) => {
-            const updated = { ...prev };
-            if (updated['all']) {
-              updated['all'] = updated['all'].filter((file) => file.id !== fileId);
-            }
-            return updated;
-          });
-          
-          // Удаляем из agent.files на фронтенде - из того агента, которому принадлежит файл
-          setAgents((prev) =>
-            prev.map((agent) => {
-              // Если у файла есть agentId, удаляем из соответствующего агента
-              // Иначе удаляем из всех агентов (на всякий случай)
-              if (fileToRemove.agentId) {
-                return agent.id === fileToRemove.agentId
-                  ? { ...agent, files: agent.files.filter((file) => file.id !== fileId) }
-                  : agent;
-              } else {
-                // Если agentId нет, удаляем из всех агентов (fallback)
-                return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
+          if (activeProjectId) {
+            try {
+              await api.deleteProjectFile(activeProjectId, fileId);
+            } catch (projectDeleteError: any) {
+              const shouldFallback = projectDeleteError?.status === 403 || projectDeleteError?.status === 404;
+              if (!shouldFallback) {
+                throw projectDeleteError;
               }
-            }),
-          );
+              console.warn('[Frontend] Project-scoped deletion failed, falling back to direct delete', {
+                fileId,
+                projectId: activeProjectId,
+                status: projectDeleteError?.status,
+                message: projectDeleteError?.message,
+              });
+              await api.deleteFileById(fileId);
+            }
+          } else {
+            await api.deleteFileById(fileId);
+          }
+          
+          if (realAgentIdForMessages && activeProjectId) {
+            loadedSummaryRef.current.delete('all');
+            try {
+              const { files } = await api.getSummaryFiles(realAgentIdForMessages, activeProjectId);
+              const mapped = files.map(mapFile);
+              setSummaryDocuments((prev) => ({
+                ...prev,
+                'all': mapped,
+              }));
+            } catch (reloadError: any) {
+              if (reloadError?.status === 404 || reloadError?.message?.includes('404') || reloadError?.message?.includes('Not Found')) {
+                setSummaryDocuments((prev) => ({
+                  ...prev,
+                  'all': [],
+                }));
+              } else {
+                console.error('[Frontend] Failed to reload documents after deletion:', reloadError);
+                setSummaryDocuments((prev) => {
+                  const updated = { ...prev };
+                  if (updated['all']) {
+                    updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+                  }
+                  return updated;
+                });
+              }
+            }
+          } else {
+            setSummaryDocuments((prev) => {
+              const updated = { ...prev };
+              if (updated['all']) {
+                updated['all'] = updated['all'].filter((file) => file.id !== fileId);
+              }
+              return updated;
+            });
+          }
+          
           showAlert('Файл успешно удален', undefined, 'success', 3000);
         } catch (error: any) {
           console.error('[Frontend] Failed to remove file:', error);
-          console.error('[Frontend] Error details:', { 
-            message: error?.message, 
-            status: error?.status,
-            agentId: agentIdForDelete,
-            fileId 
-          });
           showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
         }
       },
@@ -1540,11 +1166,18 @@ export default function App() {
       );
     }
 
-    // Если нет проектов, показываем приглашение создать проект
-    if (projects.length === 0 || !activeProjectId) {
+    // Если нет проектов, показываем приглашение создать проект (кроме админов)
+    if (!isAdmin && (projects.length === 0 || !activeProjectId)) {
       return (
         <>
-          <div className="flex items-center justify-center h-full bg-black text-white px-4">
+          <div className="relative flex items-center justify-center h-full bg-black text-white px-4">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="absolute top-4 right-4 px-4 py-2 rounded-full border border-white/20 text-sm font-semibold text-white/70 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-2 focus:ring-offset-black"
+            >
+              Выйти
+            </button>
             <div className="text-center space-y-6 max-w-md">
               <div className="relative">
                 <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
@@ -1593,6 +1226,8 @@ export default function App() {
         setAdminInitialAgentId(undefined);
         window.location.hash = '';
         window.history.replaceState(null, '', window.location.pathname);
+        // Перезагружаем агентов после закрытия AdminPage, чтобы обновить порядок
+        reloadAgents();
       }}
       initialAgentId={adminInitialAgentId}
       onAgentUpdated={reloadAgents}
@@ -1605,14 +1240,11 @@ export default function App() {
         projects={projects}
         activeProject={projects.find(p => p.id === activeProjectId) || null}
         agents={agents}
-        projectTypeAgents={projectTypeAgents}
         activeAgentId={activeAgent?.id ?? ''}
         onSelectAgent={setActiveAgentId}
         onSelectProject={handleSelectProject}
         onCreateProject={() => setIsCreateProjectOpen(true)}
         onEditProject={handleEditProject}
-        onDeleteAgent={handleDeleteAgent}
-        onReorderAgents={handleReorderAgents}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
         onOpenDocs={() => setIsDocsOpen(true)}
@@ -1710,11 +1342,21 @@ export default function App() {
                   </div>
                )}
                
-               {messages
-                 .filter((msg) => !(msg.isStreaming && msg.text.length === 0))
-                 .map((msg) => (
+               {(() => {
+                 // Убираем дубликаты по ID перед рендером
+                 const uniqueMessages = new Map<string, Message>();
+                 messages
+                   .filter((msg) => !(msg.isStreaming && msg.text.length === 0))
+                   .forEach((msg) => {
+                     // Если сообщение с таким ID уже есть, оставляем последнее (более свежее)
+                     if (!uniqueMessages.has(msg.id) || msg.timestamp > uniqueMessages.get(msg.id)!.timestamp) {
+                       uniqueMessages.set(msg.id, msg);
+                     }
+                   });
+                 return Array.from(uniqueMessages.values()).map((msg) => (
                    <MessageBubble key={msg.id} message={msg} />
-                 ))}
+                 ));
+               })()}
                {isLoading && messages.length > 0 && <MessageSkeleton />}
                <div ref={messagesEndRef} />
             </div>
@@ -1732,6 +1374,7 @@ export default function App() {
         documents={projectDocuments}
         onRemoveFile={handleRemoveFile}
         agents={agents}
+        project={projects.find(p => p.id === activeProjectId) || null}
         onAgentClick={(agentId) => {
           // Переключаемся на выбранного агента
           setActiveAgentId(agentId);
@@ -1753,51 +1396,6 @@ export default function App() {
               'all': updatedDocs,
             };
           });
-        }}
-        onUpdateAgent={handleUpdateAgent}
-        onFileUpload={handleFileUpload}
-        onAgentFilesUpdate={(agentId: string, files: UploadedFile[]) => {
-          // Обновляем файлы агента в списке
-          setAgents((prev) =>
-            prev.map((agent) =>
-              agent.id === agentId ? { ...agent, files } : agent
-            )
-          );
-        }}
-        onRemoveAgentFile={async (fileId: string) => {
-          // Для удаления файлов из базы знаний агента
-          const fileToRemove = agents
-            .flatMap(agent => agent.files)
-            .find(f => f.id === fileId);
-          
-          if (!fileToRemove) return;
-          
-          showConfirm(
-            'Удалить файл из базы знаний?',
-            `Файл "${fileToRemove.name}" будет удален из базы знаний.\n\nЭто действие нельзя отменить.`,
-            async () => {
-              try {
-                if (!activeProjectId) {
-                  throw new Error('Нет активного проекта');
-                }
-                await api.deleteProjectFile(activeProjectId, fileId);
-                // Обновляем агентов, удаляя файл из того агента, которому он принадлежит
-                setAgents((prev) =>
-                  prev.map((agent) => {
-                    if (fileToRemove.agentId && agent.id === fileToRemove.agentId) {
-                      return { ...agent, files: agent.files.filter((file) => file.id !== fileId) };
-                    }
-                    return agent;
-                  })
-                );
-                showAlert('Файл успешно удален из базы знаний', undefined, 'success', 3000);
-              } catch (error: any) {
-                console.error('Failed to remove agent file:', error);
-                showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
-              }
-            },
-            'danger'
-          );
         }}
         onShowConfirm={showConfirm}
         onShowAlert={showAlert}

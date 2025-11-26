@@ -2,7 +2,18 @@ import request from 'supertest';
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import app from '../../app';
 import { prisma } from '../../__tests__/setup';
-import { createTestUser, getAuthToken, createTestProject, createTestAgent } from '../../__tests__/helpers';
+import { createTestUser, getAuthToken, createTestProject, createTestAgent, createTestProjectTypeAgent } from '../../__tests__/helpers';
+
+const getDefaultProjectTypeId = async () => {
+  const existing = await prisma.projectType.findFirst();
+  if (existing) {
+    return existing.id;
+  }
+  const created = await prisma.projectType.create({
+    data: { name: 'По умолчанию' },
+  });
+  return created.id;
+};
 
 describe('Projects API', () => {
   let user1Id: string;
@@ -118,12 +129,14 @@ describe('Projects API', () => {
 
   describe('POST /api/projects', () => {
     it('should create project with valid data', async () => {
+      const projectTypeId = await getDefaultProjectTypeId();
       const response = await request(app)
         .post('/api/projects')
         .set('Authorization', `Bearer ${user1Token}`)
         .send({
           name: 'New Project',
           description: 'Project description',
+          projectTypeId,
         })
         .expect(201);
 
@@ -134,11 +147,13 @@ describe('Projects API', () => {
     });
 
     it('should create project without description', async () => {
+      const projectTypeId = await getDefaultProjectTypeId();
       const response = await request(app)
         .post('/api/projects')
         .set('Authorization', `Bearer ${user1Token}`)
         .send({
           name: 'Project Without Description',
+          projectTypeId,
         })
         .expect(201);
 
@@ -188,6 +203,54 @@ describe('Projects API', () => {
         .post('/api/projects')
         .send({ name: 'Test' })
         .expect(401);
+    });
+
+    it('should clone template agents and knowledge base for the selected project type', async () => {
+      const projectTypeId = await getDefaultProjectTypeId();
+      const templateA = await createTestProjectTypeAgent(projectTypeId, 'Template Agent A', 0);
+      const templateB = await createTestProjectTypeAgent(projectTypeId, 'Template Agent B', 1);
+
+      // Добавляем базу знаний к первому шаблону
+      await prisma.file.create({
+        data: {
+          projectTypeAgentId: templateA.id,
+          name: 'KB - Template Agent A',
+          mimeType: 'text/plain',
+          content: Buffer.from('Knowledge base content').toString('base64'),
+          isKnowledgeBase: true,
+        },
+      });
+
+      const response = await request(app)
+        .post('/api/projects')
+        .set('Authorization', `Bearer ${user1Token}`)
+        .send({
+          name: 'Project With Templates',
+          projectTypeId,
+        })
+        .expect(201);
+
+      const projectId = response.body.project.id;
+      expect(response.body.project.agentCount).toBe(2);
+
+      const clonedAgents = await prisma.agent.findMany({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+      });
+
+      expect(clonedAgents).toHaveLength(2);
+      expect(clonedAgents[0].name).toBe('Template Agent A');
+      expect(clonedAgents[0].projectTypeAgentId).toBe(templateA.id);
+      expect(clonedAgents[1].name).toBe('Template Agent B');
+      expect(clonedAgents[1].projectTypeAgentId).toBe(templateB.id);
+
+      const clonedKnowledgeBase = await prisma.file.findMany({
+        where: { agentId: clonedAgents[0].id, isKnowledgeBase: true },
+      });
+
+      expect(clonedKnowledgeBase).toHaveLength(1);
+      expect(clonedKnowledgeBase[0].name).toBe('KB - Template Agent A');
+      expect(clonedKnowledgeBase[0].projectTypeAgentId).toBeNull();
     });
   });
 
@@ -328,6 +391,230 @@ describe('Projects API', () => {
       await request(app)
         .delete(`/api/projects/${project.id}`)
         .expect(401);
+    });
+  });
+
+  describe('DELETE /api/projects/:projectId/files/:fileId', () => {
+    it('should delete project file that belongs to the requesting user', async () => {
+      const project = await createTestProject(user1Id, 'Docs Project');
+      const agent = await createTestAgent(user1Id, project.id, 'Docs Agent');
+      const file = await prisma.file.create({
+        data: {
+          agentId: agent.id,
+          name: 'Summary - agent - now',
+          mimeType: 'text/markdown',
+          content: Buffer.from('# Summary').toString('base64'),
+          isKnowledgeBase: false,
+        },
+      });
+
+      await request(app)
+        .delete(`/api/projects/${project.id}/files/${file.id}`)
+        .set('Authorization', `Bearer ${user1Token}`)
+        .expect(204);
+
+      const deletedFile = await prisma.file.findUnique({ where: { id: file.id } });
+      expect(deletedFile).toBeNull();
+    });
+
+    it('should not allow deleting files belonging to a different project', async () => {
+      const projectA = await createTestProject(user1Id, 'Project A');
+      const projectB = await createTestProject(user1Id, 'Project B');
+      const agent = await createTestAgent(user1Id, projectA.id, 'Docs Agent');
+      const file = await prisma.file.create({
+        data: {
+          agentId: agent.id,
+          name: 'Summary - agent - now',
+          mimeType: 'text/markdown',
+          content: Buffer.from('# Summary').toString('base64'),
+          isKnowledgeBase: false,
+        },
+      });
+
+      await request(app)
+        .delete(`/api/projects/${projectB.id}/files/${file.id}`)
+        .set('Authorization', `Bearer ${user1Token}`)
+        .expect(403);
+
+      const existingFile = await prisma.file.findUnique({ where: { id: file.id } });
+      expect(existingFile).not.toBeNull();
+    });
+
+    it('should delete template-based files linked to the project type', async () => {
+      const project = await createTestProject(user1Id, 'Template Docs');
+      const projectTypeId = project.projectTypeId;
+
+      const template = await prisma.projectTypeAgent.create({
+        data: {
+          name: 'Template Agent',
+          description: '',
+          systemInstruction: '',
+          summaryInstruction: '',
+          model: 'gpt-5.1',
+          role: '',
+        },
+      });
+
+      await prisma.projectTypeAgentProjectType.create({
+        data: {
+          projectTypeAgentId: template.id,
+          projectTypeId: projectTypeId,
+          order: 0,
+        },
+      });
+
+      const templateFile = await prisma.file.create({
+        data: {
+          projectTypeAgentId: template.id,
+          agentId: null,
+          name: 'Template Summary',
+          mimeType: 'text/markdown',
+          content: Buffer.from('# Template Summary').toString('base64'),
+          isKnowledgeBase: false,
+        },
+      });
+
+      await request(app)
+        .delete(`/api/projects/${project.id}/files/${templateFile.id}`)
+        .set('Authorization', `Bearer ${user1Token}`)
+        .expect(204);
+
+      const deletedFile = await prisma.file.findUnique({ where: { id: templateFile.id } });
+      expect(deletedFile).toBeNull();
+    });
+  });
+
+  describe('Admin agent synchronization', () => {
+    let adminToken: string;
+    let adminId: string;
+    let regularUserId: string;
+    let regularToken: string;
+    let projectTypeId: string;
+
+    beforeEach(async () => {
+      const adminUser = await createTestUser('admin-sync', 'pass123');
+      adminId = adminUser.id;
+      await prisma.user.update({
+        where: { id: adminId },
+        data: { role: 'admin' },
+      });
+      adminToken = getAuthToken(adminId);
+
+      const regularUser = await createTestUser('regular-user', 'pass123');
+      regularUserId = regularUser.id;
+      regularToken = getAuthToken(regularUserId);
+
+      const projectType = await prisma.projectType.create({
+        data: { name: `Type-${Date.now()}` },
+      });
+      projectTypeId = projectType.id;
+    });
+
+    it('should update project agents when admin updates template', async () => {
+      const templateResponse = await request(app)
+        .post('/api/admin/agents')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Sync Template',
+          description: 'Original description',
+          systemInstruction: 'Original system',
+          summaryInstruction: 'Original summary',
+          model: 'gpt-5.1',
+          role: '',
+        })
+        .expect(201);
+
+      const templateId = templateResponse.body.agent.id;
+
+      await request(app)
+        .post(`/api/admin/agents/${templateId}/project-types`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ projectTypeIds: [projectTypeId] })
+        .expect(200);
+
+      const projectResponse = await request(app)
+        .post('/api/projects')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({
+          name: 'Synced Project',
+          projectTypeId,
+        })
+        .expect(201);
+
+      const projectId = projectResponse.body.project.id;
+
+      await request(app)
+        .put(`/api/admin/agents/${templateId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Updated Template',
+          systemInstruction: 'Updated system instruction',
+        })
+        .expect(200);
+
+      const clonedAgents = await prisma.agent.findMany({
+        where: { projectId },
+      });
+
+      expect(clonedAgents).toHaveLength(1);
+      expect(clonedAgents[0].name).toBe('Updated Template');
+      expect(clonedAgents[0].systemInstruction).toBe('Updated system instruction');
+    });
+
+    it('should add new agents to existing projects when admin attaches template to project type', async () => {
+      const initialTemplate = await request(app)
+        .post('/api/admin/agents')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Initial Template',
+          model: 'gpt-5.1',
+        })
+        .expect(201);
+
+      const initialTemplateId = initialTemplate.body.agent.id;
+
+      await request(app)
+        .post(`/api/admin/agents/${initialTemplateId}/project-types`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ projectTypeIds: [projectTypeId] })
+        .expect(200);
+
+      const projectResponse = await request(app)
+        .post('/api/projects')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({
+          name: 'Project With Single Agent',
+          projectTypeId,
+        })
+        .expect(201);
+
+      const projectId = projectResponse.body.project.id;
+
+      const newTemplateResponse = await request(app)
+        .post('/api/admin/agents')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'New Template',
+          model: 'gpt-5.1',
+        })
+        .expect(201);
+
+      const newTemplateId = newTemplateResponse.body.agent.id;
+
+      await request(app)
+        .post(`/api/admin/agents/${newTemplateId}/project-types`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ projectTypeIds: [projectTypeId] })
+        .expect(200);
+
+      const clonedAgents = await prisma.agent.findMany({
+        where: { projectId },
+        orderBy: { name: 'asc' },
+      });
+
+      expect(clonedAgents).toHaveLength(2);
+      const agentNames = clonedAgents.map((agent) => agent.name).sort();
+      expect(agentNames).toEqual(['Initial Template', 'New Template']);
     });
   });
 });

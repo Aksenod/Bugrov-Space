@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { withRetry } from '../utils/prismaRetry';
 import { env } from '../env';
+import { syncProjectTypeAgents, syncProjectTypesForTemplate } from '../services/projectTypeSync';
 
 const router = Router();
 
@@ -289,6 +290,7 @@ router.post('/:id/files', asyncHandler(async (req: Request, res: Response) => {
       verified: true
     }, 'File created and verified for ProjectTypeAgent');
 
+    await syncProjectTypesForTemplate(id);
     res.status(201).json({ 
       file: {
         id: fileData.id,
@@ -513,6 +515,7 @@ router.delete('/:id/files/:fileId', asyncHandler(async (req: Request, res: Respo
     );
 
     logger.info({ agentId: id, fileId }, 'File deleted for ProjectTypeAgent');
+    await syncProjectTypesForTemplate(id);
     res.status(204).send();
   } catch (error: any) {
     logger.error({ agentId: id, fileId, error: error.message, stack: error.stack }, 'DELETE /admin/agents/:id/files/:fileId error');
@@ -702,6 +705,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   );
 
   logger.info({ agentId: id }, 'Admin agent updated');
+  await syncProjectTypesForTemplate(id);
   res.json({ agent: updated });
 }));
 
@@ -722,6 +726,23 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Агент не найден' });
   }
 
+  const projectTypeConnections = await withRetry(
+    () => (prisma as any).projectTypeAgentProjectType.findMany({
+      where: { projectTypeAgentId: id },
+      select: { projectTypeId: true },
+    }),
+    3,
+    `DELETE /admin/agents/${id} - load project types`
+  ) as Array<{ projectTypeId?: string }>;
+
+  const projectTypeIds = Array.from(
+    new Set(
+      projectTypeConnections
+        .map((connection) => connection.projectTypeId)
+        .filter((projectTypeId): projectTypeId is string => Boolean(projectTypeId))
+    )
+  );
+
   await withRetry(
     () => (prisma as any).projectTypeAgent.delete({
       where: { id },
@@ -731,6 +752,9 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   );
 
   logger.info({ agentId: id }, 'Admin agent deleted');
+  for (const projectTypeId of projectTypeIds) {
+    await syncProjectTypeAgents(projectTypeId);
+  }
   res.status(204).send();
 }));
 
@@ -853,6 +877,9 @@ router.post('/:id/project-types', asyncHandler(async (req: Request, res: Respons
   );
 
   logger.info({ agentId: id, projectTypeIds }, 'Agent attached to project types');
+  for (const projectTypeId of projectTypeIds) {
+    await syncProjectTypeAgents(projectTypeId);
+  }
   res.json({ success: true });
 }));
 
@@ -886,6 +913,7 @@ router.delete('/:id/project-types/:projectTypeId', asyncHandler(async (req: Requ
   );
 
   logger.info({ agentId: id, projectTypeId }, 'Agent detached from project type');
+  await syncProjectTypeAgents(projectTypeId);
   res.status(204).send();
 }));
 

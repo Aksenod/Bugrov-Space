@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical, ChevronDown, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical, ChevronDown, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Rocket, Sparkles, CircuitBoard, Wand2, Sparkle, Calendar } from 'lucide-react';
 import {
   DndContext,
   closestCorners,
@@ -32,6 +32,28 @@ interface SortableAgentItemProps {
   index: number;
 }
 
+// Функция для выбора разнообразной иконки робота на основе ID агента
+const getAgentIcon = (agentId: string, size: number = 16, className: string = '') => {
+  // Создаем хеш из ID для детерминированного выбора
+  const hash = Array.from(agentId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const iconIndex = hash % 8;
+  
+  const iconProps = { size, className: `text-indigo-400 shrink-0 ${className}` };
+  
+  const icons = [
+    <Bot key="bot" {...iconProps} />,
+    <Brain key="brain" {...iconProps} />,
+    <Cpu key="cpu" {...iconProps} />,
+    <Zap key="zap" {...iconProps} />,
+    <Rocket key="rocket" {...iconProps} />,
+    <Sparkles key="sparkles" {...iconProps} />,
+    <CircuitBoard key="circuit" {...iconProps} />,
+    <Wand2 key="wand" {...iconProps} />,
+  ];
+  
+  return icons[iconIndex];
+};
+
 const SortableAgentItem: React.FC<SortableAgentItemProps> = ({ agent, index }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.id });
   const style = {
@@ -55,9 +77,9 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({ agent, index }) =
         <GripVertical size={14} className="sm:w-4 sm:h-4" />
       </div>
       <span className="text-xs sm:text-sm text-white/50 font-medium w-6 sm:w-8 text-center">
-        {index + 1}
+        {(agent.order ?? 0) + 1}
       </span>
-      <Bot size={14} className="sm:w-4 sm:h-4 text-indigo-400 shrink-0" />
+      {getAgentIcon(agent.id, 14, 'sm:w-4 sm:h-4')}
       <div className="flex-1 min-w-0">
         <div className="text-xs sm:text-sm text-white font-medium truncate">
           {agent.name}
@@ -206,6 +228,57 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       loadAgents();
     }
   }, [activeTab]);
+
+  // Restore filters and sort from localStorage
+  useEffect(() => {
+    try {
+      const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (savedFilters) {
+        const filters = JSON.parse(savedFilters);
+        setSearchQuery(filters.searchQuery || '');
+        setSelectedProjectTypeFilters(filters.selectedProjectTypeFilters || []);
+        setSelectedRoleFilters(filters.selectedRoleFilters || []);
+        setSelectedModelFilters(filters.selectedModelFilters || []);
+        setIsFiltersOpen(filters.isFiltersOpen || false);
+      }
+      
+      const savedSort = localStorage.getItem(SORT_STORAGE_KEY);
+      if (savedSort) {
+        const sort = JSON.parse(savedSort);
+        setSortBy(sort.sortBy || 'name');
+        setSortOrder(sort.sortOrder || 'asc');
+      }
+    } catch (error) {
+      console.error('Failed to restore filters/sort from localStorage', error);
+    }
+  }, []);
+
+  // Save filters to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+        searchQuery,
+        selectedProjectTypeFilters,
+        selectedRoleFilters,
+        selectedModelFilters,
+        isFiltersOpen,
+      }));
+    } catch (error) {
+      console.error('Failed to save filters to localStorage', error);
+    }
+  }, [searchQuery, selectedProjectTypeFilters, selectedRoleFilters, selectedModelFilters, isFiltersOpen]);
+
+  // Save sort to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify({
+        sortBy,
+        sortOrder,
+      }));
+    } catch (error) {
+      console.error('Failed to save sort to localStorage', error);
+    }
+  }, [sortBy, sortOrder]);
 
   // Сбрасываем флаг при изменении initialAgentId и переключаемся на вкладку агентов
   useEffect(() => {
@@ -386,6 +459,56 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     } finally {
       setIsLoadingAgents(false);
     }
+  };
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      const options: Intl.DateTimeFormatOptions = {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      };
+      
+      if (diffDays === 0) {
+        return `Сегодня, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+      } else if (diffDays === 1) {
+        return `Вчера, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+      } else {
+        return date.toLocaleString('ru-RU', options);
+      }
+    } catch {
+      return '';
+    }
+  };
+
+  // Функция для выбора разнообразной иконки робота на основе ID агента
+  const getAgentIcon = (agentId: string, size: number = 16, className: string = '') => {
+    // Создаем хеш из ID для детерминированного выбора
+    const hash = Array.from(agentId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const iconIndex = hash % 8;
+    
+    const iconProps = { size, className: `text-indigo-400 shrink-0 ${className}` };
+    
+    const icons = [
+      <Bot key="bot" {...iconProps} />,
+      <Brain key="brain" {...iconProps} />,
+      <Cpu key="cpu" {...iconProps} />,
+      <Zap key="zap" {...iconProps} />,
+      <Rocket key="rocket" {...iconProps} />,
+      <Sparkles key="sparkles" {...iconProps} />,
+      <CircuitBoard key="circuit" {...iconProps} />,
+      <Wand2 key="wand" {...iconProps} />,
+    ];
+    
+    return icons[iconIndex];
   };
 
   const handleCreate = async () => {
@@ -877,12 +1000,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         order: index,
       }));
       await api.reorderProjectTypeAgents(projectTypeId, orders);
+      // Обновляем порядок для каждого агента в массиве
+      const updatedOrder = newOrder.map((agent, index) => ({
+        ...agent,
+        order: index,
+      }));
       // Обновляем локальное состояние
       setProjectTypeAgents(prev => {
         const newMap = new Map(prev);
-        newMap.set(projectTypeId, newOrder);
+        newMap.set(projectTypeId, updatedOrder);
         return newMap;
       });
+      // Вызываем callback для перезагрузки агентов в App.tsx
+      // Вызываем сразу, так как await уже дождался завершения сохранения в БД
+      if (onAgentUpdatedRef.current) {
+        onAgentUpdatedRef.current();
+      }
     } catch (error: any) {
       console.error('Failed to reorder agents', error);
       showAlert(error?.message || 'Не удалось изменить порядок агентов', 'Ошибка', 'error');
@@ -897,7 +1030,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const agents = projectTypeAgents.get(projectTypeId) || [];
+    const agentsRaw = projectTypeAgents.get(projectTypeId) || [];
+    // Сортируем агентов по полю order для правильного определения индексов
+    const agents = [...agentsRaw].sort((a, b) => {
+      if (a.order === b.order) {
+        return a.name.localeCompare(b.name);
+      }
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
     const oldIndex = agents.findIndex((agent) => agent.id === active.id);
     const newIndex = agents.findIndex((agent) => agent.id === over.id);
     
@@ -905,6 +1045,113 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
 
     const newOrder = arrayMove(agents, oldIndex, newIndex);
     handleReorderAgents(projectTypeId, newOrder);
+  };
+
+  // Filter and sort agents
+  const filteredAndSortedAgents = useMemo(() => {
+    let filtered = [...agents];
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(agent => 
+        agent.name.toLowerCase().includes(query) ||
+        (agent.description && agent.description.toLowerCase().includes(query))
+      );
+    }
+
+    // Filter by project types
+    if (selectedProjectTypeFilters.length > 0) {
+      filtered = filtered.filter(agent => {
+        const agentProjectTypeIds = agent.projectTypes?.map(pt => pt.id) || [];
+        return selectedProjectTypeFilters.some(filterId => 
+          agentProjectTypeIds.includes(filterId)
+        );
+      });
+    }
+
+    // Filter by roles
+    if (selectedRoleFilters.length > 0) {
+      filtered = filtered.filter(agent => {
+        if (selectedRoleFilters.includes('none') && !agent.role) return true;
+        return agent.role && selectedRoleFilters.includes(agent.role);
+      });
+    }
+
+    // Filter by models
+    if (selectedModelFilters.length > 0) {
+      filtered = filtered.filter(agent => 
+        selectedModelFilters.includes(agent.model)
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' });
+          break;
+        case 'createdAt':
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          comparison = dateA - dateB;
+          break;
+        case 'projectTypesCount':
+          const countA = a.projectTypes?.length || 0;
+          const countB = b.projectTypes?.length || 0;
+          comparison = countA - countB;
+          break;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [agents, searchQuery, selectedProjectTypeFilters, selectedRoleFilters, selectedModelFilters, sortBy, sortOrder]);
+
+  // Count active filters
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery.trim()) count++;
+    if (selectedProjectTypeFilters.length > 0) count++;
+    if (selectedRoleFilters.length > 0) count++;
+    if (selectedModelFilters.length > 0) count++;
+    return count;
+  }, [searchQuery, selectedProjectTypeFilters, selectedRoleFilters, selectedModelFilters]);
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedProjectTypeFilters([]);
+    setSelectedRoleFilters([]);
+    setSelectedModelFilters([]);
+  };
+
+  // Toggle filter values
+  const toggleProjectTypeFilter = (projectTypeId: string) => {
+    setSelectedProjectTypeFilters(prev => 
+      prev.includes(projectTypeId)
+        ? prev.filter(id => id !== projectTypeId)
+        : [...prev, projectTypeId]
+    );
+  };
+
+  const toggleRoleFilter = (role: string) => {
+    setSelectedRoleFilters(prev => 
+      prev.includes(role)
+        ? prev.filter(r => r !== role)
+        : [...prev, role]
+    );
+  };
+
+  const toggleModelFilter = (model: string) => {
+    setSelectedModelFilters(prev => 
+      prev.includes(model)
+        ? prev.filter(m => m !== model)
+        : [...prev, model]
+    );
   };
 
   const toggleCollapse = (typeId: string) => {
@@ -920,8 +1167,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-black to-indigo-950/20 overflow-x-hidden flex flex-col">
-      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-6 max-w-6xl w-full flex flex-col flex-1 min-h-0">
+    <div className="h-screen bg-gradient-to-br from-black via-black to-indigo-950/20 overflow-hidden flex flex-col">
+      <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-6 max-w-6xl w-full flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Header */}
         <div className="mb-4 sm:mb-6 shrink-0">
           <div className="flex justify-between items-center mb-3 sm:mb-4">
@@ -961,7 +1208,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           </div>
 
           {/* Content */}
-          <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
+          <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {activeTab === 'projectTypes' ? (
               <>
                 {/* Create Form */}
@@ -992,7 +1239,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                 ) : (
                   <div className="space-y-3 sm:space-y-4">
                     {projectTypes.map((type) => {
-                      const agents = projectTypeAgents.get(type.id) || [];
+                      const agentsRaw = projectTypeAgents.get(type.id) || [];
+                      // Сортируем агентов по полю order для правильного отображения
+                      const agents = [...agentsRaw].sort((a, b) => {
+                        if (a.order === b.order) {
+                          return a.name.localeCompare(b.name);
+                        }
+                        return (a.order ?? 0) - (b.order ?? 0);
+                      });
                       const isLoadingAgents = loadingAgentsForType.has(type.id);
                       
                       return (
@@ -1120,73 +1374,352 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
             ) : (
               <>
                 {/* Agents Tab */}
-                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2 sm:gap-2">
                   <h2 className="text-base sm:text-lg font-bold text-white">Агенты-шаблоны</h2>
-                  <button
-                    onClick={() => handleOpenAgentDialog()}
-                    className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1 sm:gap-2"
-                  >
-                    <Plus size={14} className="sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">Создать агента</span>
-                    <span className="sm:hidden">Создать</span>
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Compact Sort Controls */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] sm:text-xs text-white/60 font-medium">Сортировка:</span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {/* Name Sort */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => {
+                              setSortBy('name');
+                              setSortOrder('asc');
+                              setIsFiltersOpen(false);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${
+                              sortBy === 'name' && sortOrder === 'asc'
+                                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
+                                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                            }`}
+                            title="По имени A-Z"
+                          >
+                            <span className="hidden sm:inline">Имя</span>
+                            <span className="sm:hidden">И</span>
+                            <ArrowUp size={10} className="inline ml-0.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSortBy('name');
+                              setSortOrder('desc');
+                              setIsFiltersOpen(false);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${
+                              sortBy === 'name' && sortOrder === 'desc'
+                                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
+                                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                            }`}
+                            title="По имени Z-A"
+                          >
+                            <ArrowDown size={10} className="inline" />
+                          </button>
+                        </div>
+                        
+                        {/* Date Sort */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => {
+                              setSortBy('createdAt');
+                              setSortOrder('desc');
+                              setIsFiltersOpen(false);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${
+                              sortBy === 'createdAt' && sortOrder === 'desc'
+                                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
+                                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                            }`}
+                            title="Новые сначала"
+                          >
+                            <span className="hidden sm:inline">Дата</span>
+                            <span className="sm:hidden">Д</span>
+                            <ArrowDown size={10} className="inline ml-0.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSortBy('createdAt');
+                              setSortOrder('asc');
+                              setIsFiltersOpen(false);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${
+                              sortBy === 'createdAt' && sortOrder === 'asc'
+                                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
+                                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                            }`}
+                            title="Старые сначала"
+                          >
+                            <ArrowUp size={10} className="inline" />
+                          </button>
+                        </div>
+                        
+                        {/* Project Types Count Sort */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => {
+                              setSortBy('projectTypesCount');
+                              setSortOrder('desc');
+                              setIsFiltersOpen(false);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${
+                              sortBy === 'projectTypesCount' && sortOrder === 'desc'
+                                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
+                                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                            }`}
+                            title="Больше типов"
+                          >
+                            <span className="hidden sm:inline">Типы</span>
+                            <span className="sm:hidden">Т</span>
+                            <ArrowDown size={10} className="inline ml-0.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSortBy('projectTypesCount');
+                              setSortOrder('asc');
+                              setIsFiltersOpen(false);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${
+                              sortBy === 'projectTypesCount' && sortOrder === 'asc'
+                                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
+                                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                            }`}
+                            title="Меньше типов"
+                          >
+                            <ArrowUp size={10} className="inline" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleOpenAgentDialog()}
+                      className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1 sm:gap-2"
+                    >
+                      <Plus size={14} className="sm:w-4 sm:h-4" />
+                      <span className="hidden sm:inline">Создать агента</span>
+                      <span className="sm:hidden">Создать</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Filters Panel */}
+                <div className="mb-3 sm:mb-4">
+                  <button
+                    onClick={() => {
+                      setIsFiltersOpen(!isFiltersOpen);
+                      setIsSortDropdownOpen(false);
+                    }}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white transition-colors flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Filter size={16} className="sm:w-5 sm:h-5" />
+                      <span className="text-xs sm:text-sm font-medium">Фильтры</span>
+                      {activeFiltersCount > 0 && (
+                        <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] sm:text-xs rounded-full border border-indigo-500/30 font-semibold">
+                          {activeFiltersCount}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown 
+                      size={16} 
+                      className={`sm:w-5 sm:h-5 transition-transform duration-200 ${
+                        isFiltersOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  
+                  {/* Filters Content */}
+                  {isFiltersOpen && (
+                    <div className="mt-2 p-2.5 sm:p-3 bg-white/5 border border-white/10 rounded-lg space-y-3">
+                      {/* Search */}
+                      <div>
+                        <div className="relative">
+                          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Поиск по имени или описанию..."
+                            className="w-full pl-9 pr-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Project Types Filter */}
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
+                          Типы проектов
+                        </label>
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                          {projectTypes.length === 0 ? (
+                            <p className="text-[10px] text-white/40">Нет типов</p>
+                          ) : (
+                            projectTypes.map((type) => {
+                              const isSelected = selectedProjectTypeFilters.includes(type.id);
+                              return (
+                                <button
+                                  key={type.id}
+                                  onClick={() => toggleProjectTypeFilter(type.id)}
+                                  className={`px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                                    isSelected
+                                      ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                                      : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                                  }`}
+                                >
+                                  {type.name}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Roles Filter */}
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
+                          Роли
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { value: 'copywriter', label: 'Копирайтер' },
+                            { value: 'layout', label: 'Верстальщик' },
+                            { value: 'dsl', label: 'DSL' },
+                            { value: 'none', label: 'Без роли' },
+                          ].map((role) => {
+                            const isSelected = selectedRoleFilters.includes(role.value);
+                            return (
+                              <button
+                                key={role.value}
+                                onClick={() => toggleRoleFilter(role.value)}
+                                className={`px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                                  isSelected
+                                    ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                                    : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                                }`}
+                              >
+                                {role.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Models Filter */}
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
+                          Модели
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {MODELS.map((model) => {
+                            const isSelected = selectedModelFilters.includes(model.id);
+                            return (
+                              <button
+                                key={model.id}
+                                onClick={() => toggleModelFilter(model.id)}
+                                className={`px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                                  isSelected
+                                    ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
+                                    : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                                }`}
+                              >
+                                {model.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Reset Button */}
+                      {activeFiltersCount > 0 && (
+                        <button
+                          onClick={resetFilters}
+                          className="w-full px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] sm:text-xs text-white/80 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <X size={12} />
+                          Сбросить фильтры ({activeFiltersCount})
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Results Counter */}
+                {!isLoadingAgents && agents.length > 0 && (
+                  <div className="mb-2 text-xs sm:text-sm text-white/60">
+                    Показано {filteredAndSortedAgents.length} из {agents.length} агентов
+                  </div>
+                )}
 
                 {isLoadingAgents ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 size={24} className="animate-spin text-indigo-400" />
                   </div>
                 ) : (
-                  <div className="space-y-1.5 sm:space-y-2">
+                  <div className="space-y-2 sm:space-y-2">
                     {agents.length === 0 ? (
                       <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-white/60">
                         Нет агентов. Создайте первого агента.
                       </div>
+                    ) : filteredAndSortedAgents.length === 0 ? (
+                      <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-white/60">
+                        Нет агентов, соответствующих фильтрам.
+                      </div>
                     ) : (
-                      agents.map((agent) => (
+                      filteredAndSortedAgents.map((agent) => (
                         <div
                           key={agent.id}
                           onClick={() => handleOpenAgentDialog(agent)}
-                          className="p-2.5 sm:p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+                          className="group relative p-3 sm:p-3.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-indigo-500/10 transition-all duration-200 cursor-pointer"
                         >
-                          <div className="flex items-start justify-between gap-2 sm:gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-                                <Bot size={16} className="sm:w-[18px] sm:h-[18px] text-indigo-400 shrink-0" />
-                                <h3 className="text-sm sm:text-base text-white font-semibold truncate">{agent.name}</h3>
+                          {/* Верхний правый угол: дата и кнопка удаления */}
+                          <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
+                            {/* Дата создания */}
+                            {agent.createdAt && (
+                              <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-white/50">
+                                <Calendar size={9} className="text-white/30 shrink-0" />
+                                <span>{formatDate(agent.createdAt)}</span>
                               </div>
-                              {agent.description && (
-                                <p className="text-xs sm:text-sm text-white/60 mb-1.5 sm:mb-2 line-clamp-2">{agent.description}</p>
-                              )}
-                              {agent.projectTypes && agent.projectTypes.length > 0 && (
-                                <div className="flex flex-wrap gap-1 sm:gap-2 mt-1.5 sm:mt-2">
-                                  {agent.projectTypes.map((pt) => (
-                                    <span
-                                      key={pt.id}
-                                      className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-indigo-500/20 text-indigo-300 text-[10px] sm:text-xs rounded-full border border-indigo-500/30"
-                                    >
-                                      {pt.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                            )}
+                            {/* Кнопка удаления */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAgent(agent.id, agent.name);
+                              }}
+                              className="p-1 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                              title="Удалить"
+                            >
+                              <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="flex-1 min-w-0 pr-16">
+                            {/* Заголовок с иконкой */}
+                            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                              {getAgentIcon(agent.id, 14, 'sm:w-4 sm:h-4')}
+                              <h3 className="text-xs sm:text-sm text-white font-semibold truncate">{agent.name}</h3>
                             </div>
-                            <div className="flex items-center gap-1 sm:gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => handleOpenAgentDialog(agent)}
-                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
-                                title="Редактировать"
-                              >
-                                <Edit2 size={14} className="sm:w-4 sm:h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteAgent(agent.id, agent.name)}
-                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                title="Удалить"
-                              >
-                                <Trash2 size={14} className="sm:w-4 sm:h-4" />
-                              </button>
-                            </div>
+                            
+                            {/* Описание */}
+                            {agent.description && (
+                              <p className="text-[10px] sm:text-xs text-white/60 mb-2.5 line-clamp-2 leading-tight">
+                                {agent.description}
+                              </p>
+                            )}
+                            
+                            {/* Теги проектов */}
+                            {agent.projectTypes && agent.projectTypes.length > 0 && (
+                              <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                                {agent.projectTypes.map((pt) => (
+                                  <span
+                                    key={pt.id}
+                                    className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-[9px] sm:text-[10px] rounded-full border border-indigo-500/30 font-medium"
+                                  >
+                                    {pt.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
@@ -1416,7 +1949,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                     value={agentSummaryInstruction}
                     onChange={(e) => setAgentSummaryInstruction(e.target.value)}
                     className="w-full h-20 sm:h-24 bg-black/30 border border-white/10 rounded-lg p-2 sm:p-3 text-xs text-white/80 focus:ring-1 focus:ring-indigo-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all"
-                    placeholder="Сохраняй результаты в формате Markdown. Используй заголовки для структуры..."
+                    placeholder="Для копирайтера: 'Сохрани последнее сообщение БЕЗ ИЗМЕНЕНИЙ, точно как написано, с сохранением всей markdown разметки.' Для других: 'Сформируй резюме с markdown разметкой...'"
                     maxLength={2000}
                   />
                   <div className="flex justify-between items-center mt-1">

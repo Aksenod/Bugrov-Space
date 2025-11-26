@@ -1,28 +1,13 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
 import { generateAgentResponse, generateSummaryContent } from '../services/openaiService';
 import { withRetry } from '../utils/prismaRetry';
 import { logger } from '../utils/logger';
+import { syncProjectAgentsForProject } from '../services/projectTypeSync';
 
 const router = Router();
-
-const agentSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  systemInstruction: z.string().optional(),
-  summaryInstruction: z.string().optional(),
-  model: z.string().optional(),
-  role: z.string().optional(),
-  projectId: z.string().min(1),
-});
-
-const reorderSchema = z.object({
-  orders: z.array(z.object({
-    id: z.string().min(1),
-    order: z.number().int(),
-  })).min(1),
-});
 
 const getNextOrderValue = async (userId: string) => {
   const lastAgent = await withRetry(
@@ -35,6 +20,47 @@ const getNextOrderValue = async (userId: string) => {
     'getNextOrderValue'
   );
   return (lastAgent?.order ?? -1) + 1;
+};
+
+const cloneTemplateKnowledgeBase = async (templateId: string, agentId: string) => {
+  const files = await withRetry(
+    () => prisma.file.findMany({
+      where: {
+        projectTypeAgentId: templateId,
+        isKnowledgeBase: true,
+        name: {
+          not: {
+            startsWith: 'Summary',
+          },
+        },
+      } as Prisma.FileWhereInput & { projectTypeAgentId?: string | null },
+      orderBy: { createdAt: 'asc' },
+    }),
+    3,
+    `cloneTemplateKnowledgeBase - load files for ${templateId}`
+  );
+
+  if (files.length === 0) {
+    return;
+  }
+
+  await withRetry(
+    () => prisma.file.createMany({
+      data: files.map((file) => ({
+        agentId,
+        name: file.name,
+        mimeType: file.mimeType,
+        content: file.content,
+        isKnowledgeBase: true,
+      })),
+    }),
+    3,
+    `cloneTemplateKnowledgeBase - copy files for ${agentId}`
+  );
+};
+
+const forbidAgentMutation = (res: Response) => {
+  return res.status(403).json({ error: 'Управление агентами доступно только администратору' });
 };
 
 // Вспомогательная функция для получения или создания агента из шаблона ProjectTypeAgent
@@ -136,23 +162,27 @@ const getOrCreateAgentFromTemplate = async (
     // Создаем новый экземпляр агента проекта из шаблона
     const nextOrder = await getNextOrderValue(userId);
     
+    const agentData: Prisma.AgentUncheckedCreateInput & { projectTypeAgentId?: string | null } = {
+      userId,
+      projectId: projectId,
+      projectTypeAgentId: template.id,
+      name: template.name,
+      description: template.description ?? '',
+      systemInstruction: template.systemInstruction ?? '',
+      summaryInstruction: template.summaryInstruction ?? '',
+      model: template.model ?? 'gpt-5.1',
+      role: template.role ?? '',
+      order: nextOrder,
+    };
+
     agent = await withRetry(
       () => prisma.agent.create({
-        data: {
-          userId,
-          projectId: projectId,
-          name: template.name,
-          description: template.description ?? '',
-          systemInstruction: template.systemInstruction ?? '',
-          summaryInstruction: template.summaryInstruction ?? '',
-          model: template.model ?? 'gpt-5.1',
-          role: template.role ?? '',
-          order: nextOrder,
-        },
+        data: agentData,
       }),
       3,
       `getOrCreateAgentFromTemplate - create agent from template`
     );
+    await cloneTemplateKnowledgeBase(template.id, agent.id);
 
     logger.info({ 
       newAgentId: agent.id,
@@ -184,43 +214,43 @@ router.get('/', async (req, res, next) => {
     }
 
     const projectId = req.query.projectId as string | undefined;
-    
-    let whereClause: any = { userId };
-    
-    // Если указан projectId, фильтруем агентов по проекту
-    if (projectId) {
-      whereClause.projectId = projectId;
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId обязателен' });
     }
-    
-    // Оптимизация: загружаем агентов проекта и проект параллельно
-    // Это ускоряет загрузку рабочего пространства
-    const [agents, project] = await Promise.all([
-      // Оптимизация: НЕ загружаем файлы при загрузке списка агентов
-      // Файлы (база знаний) загружаются отдельно, когда нужно
-      withRetry(
-        () => prisma.agent.findMany({
-          where: whereClause,
-          // УБРАЛИ include: { files } - файлы не нужны при загрузке списка
-          orderBy: [
-            { order: 'asc' },
-            { createdAt: 'asc' },
-          ],
-        }),
-        3,
-        `GET /agents?projectId=${projectId || 'none'}`
-      ),
-      // Загружаем проект только если указан projectId
-      projectId
-        ? withRetry(
-            () => prisma.project.findUnique({
-              where: { id: projectId },
-              select: { projectTypeId: true },
-            }),
-            3,
-            `GET /agents - find project ${projectId}`
-          )
-        : Promise.resolve(null),
-    ]);
+
+    const project = await withRetry(
+      () => prisma.project.findUnique({
+        where: { id: projectId, userId },
+        select: { id: true, projectTypeId: true },
+      }),
+      3,
+      `GET /agents - find project ${projectId}`
+    );
+
+    if (!project) {
+      return res.status(404).json({ error: 'Проект не найден' });
+    }
+
+    try {
+      await syncProjectAgentsForProject(projectId);
+    } catch (syncError: any) {
+      logger.error(
+        { projectId, error: syncError?.message },
+        'Failed to sync project agents before GET /agents response'
+      );
+    }
+
+    const agents = await withRetry(
+      () => prisma.agent.findMany({
+        where: { userId, projectId },
+        orderBy: [
+          { order: 'asc' },
+          { createdAt: 'asc' },
+        ],
+      }),
+      3,
+      `GET /agents?projectId=${projectId}`
+    );
 
     // Загружаем агентов типа проекта, если проект найден
     // Используем связь many-to-many через ProjectTypeAgentProjectType
@@ -316,10 +346,9 @@ router.get('/', async (req, res, next) => {
 
     logger.debug({ userId, agentsCount: agents.length, projectTypeAgentsCount: projectTypeAgents.length }, 'Agents loaded');
 
-    // Теперь возвращаем только projectTypeAgents, обычные агенты не нужны
-    // (экземпляры агентов создаются автоматически из шаблонов при первом использовании)
+    // Возвращаем как шаблоны, так и реальные агенты пользователя
     res.json({ 
-      agents: [], // Обычные агенты больше не используются
+      agents: agentsWithEmptyFiles,
       projectTypeAgents: projectTypeAgents.length > 0 ? projectTypeAgents : undefined
     });
   } catch (error: any) {
@@ -328,191 +357,20 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/', async (req, res) => {
-  const userId = req.userId!;
-  const parsed = agentSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  const nextOrder = await getNextOrderValue(userId);
-
-  const agent = await withRetry(
-    () => prisma.agent.create({
-      data: {
-        userId,
-        projectId: parsed.data.projectId,
-        name: parsed.data.name,
-        description: parsed.data.description ?? '',
-        systemInstruction: parsed.data.systemInstruction ?? '',
-        summaryInstruction: parsed.data.summaryInstruction ?? '',
-        model: parsed.data.model ?? 'gpt-5.1',
-        role: parsed.data.role ?? '',
-        order: nextOrder,
-      },
-    }),
-    3,
-    'POST /agents - create agent'
-  );
-
-  res.status(201).json({ agent });
+router.post('/', async (_req, res) => {
+  return forbidAgentMutation(res);
 });
 
-router.post('/reorder', async (req, res) => {
-  const userId = req.userId!;
-  const parsed = reorderSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  const orders = parsed.data.orders;
-  const agentIds = orders.map((order) => order.id);
-
-  const ownedAgents = await withRetry(
-    () => prisma.agent.findMany({
-      where: {
-        userId,
-        id: { in: agentIds },
-      },
-      select: { id: true },
-    }),
-    3,
-    'POST /agents/reorder - find owned agents'
-  );
-
-  if (ownedAgents.length !== agentIds.length) {
-    return res.status(403).json({ error: 'One or more agents do not belong to the user' });
-  }
-
-  const updates = orders.map(({ id, order }) =>
-    prisma.agent.update({
-      where: { id },
-      data: { order },
-    })
-  );
-
-  await withRetry(
-    () => prisma.$transaction(updates),
-    3,
-    'POST /agents/reorder - transaction'
-  );
-
-  logger.debug({ userId, agentsCount: orders.length }, 'Agents reordered');
-  res.json({ success: true });
+router.post('/reorder', async (_req, res) => {
+  return forbidAgentMutation(res);
 });
 
-router.put('/:agentId', async (req, res) => {
-  const userId = req.userId!;
-  const { agentId } = req.params;
-
-  const parsed = agentSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    logger.warn({ agentId, userId, validationError: parsed.error.flatten() }, 'Agent update validation failed');
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  try {
-    const existing = await withRetry(
-      () => prisma.agent.findFirst({ where: { id: agentId, userId } }),
-      3,
-      `PUT /agents/${agentId} - find existing`
-    );
-    if (!existing) {
-      logger.warn({ agentId, userId }, 'Agent not found for update');
-      return res.status(404).json({ error: 'Agent not found' });
-    }
-
-    const updated = await withRetry(
-      () => prisma.agent.update({
-        where: { id: agentId },
-        data: parsed.data,
-      }),
-      3,
-      `PUT /agents/${agentId} - update`
-    );
-
-    logger.debug({ agentId, userId, updatedFields: Object.keys(parsed.data) }, 'Agent updated');
-
-    res.json({ agent: updated });
-  } catch (error) {
-    logger.error({ 
-      agentId, 
-      userId, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined 
-    }, 'Failed to update agent');
-    return res.status(500).json({ 
-      error: 'Failed to update agent',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
+router.put('/:agentId', async (_req, res) => {
+  return forbidAgentMutation(res);
 });
 
-router.delete('/:agentId', async (req, res) => {
-  const userId = req.userId!;
-  const { agentId } = req.params;
-
-  try {
-    // Проверяем, существует ли агент с таким ID у пользователя
-    const existing = await withRetry(
-      () => prisma.agent.findFirst({ 
-        where: { id: agentId, userId },
-      }),
-      3,
-      `DELETE /agents/${agentId} - find existing`
-    );
-
-    if (!existing) {
-      // Проверяем, может быть агент существует, но принадлежит другому пользователю
-      const agentExists = await withRetry(
-        () => prisma.agent.findFirst({ where: { id: agentId } }),
-        3,
-        `DELETE /agents/${agentId} - check if exists`
-      );
-      if (agentExists) {
-        logger.warn({ agentId, agentUserId: agentExists.userId, currentUserId: userId }, 'Attempt to delete agent belonging to different user');
-        return res.status(403).json({ error: 'Access denied. Agent belongs to different user.' });
-      }
-      return res.status(404).json({ error: 'Agent not found' });
-    }
-
-    // Запрещаем удаление агентов с ролью
-    if (existing.role && existing.role.trim() !== '') {
-      logger.warn({ agentId, role: existing.role }, 'Attempt to delete agent with role');
-      return res.status(400).json({ error: 'Cannot delete agent with assigned role' });
-    }
-
-    // Удаляем агента - каскадное удаление автоматически удалит связанные messages и files
-    // благодаря onDelete: Cascade в схеме Prisma и включенным foreign keys в SQLite
-    // Foreign keys включены при инициализации Prisma Client в db/prisma.ts
-    await withRetry(
-      () => prisma.agent.delete({ where: { id: agentId } }),
-      3,
-      `DELETE /agents/${agentId} - delete`
-    );
-    logger.debug({ agentId, userId, agentName: existing.name }, 'Agent deleted');
-    
-    res.status(204).send();
-  } catch (error) {
-    logger.error({ 
-      agentId, 
-      userId, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined 
-    }, 'Failed to delete agent');
-    
-    // Если это ошибка Prisma о внешних ключах, возвращаем понятное сообщение
-    if (error instanceof Error && error.message.includes('Foreign key constraint')) {
-      return res.status(500).json({ 
-        error: 'Failed to delete agent due to database constraints. Please try again.' 
-      });
-    }
-    
-    return res.status(500).json({ 
-      error: 'Failed to delete agent',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
+router.delete('/:agentId', async (_req, res) => {
+  return forbidAgentMutation(res);
 });
 
 router.get('/:agentId/messages', async (req, res) => {
@@ -571,7 +429,14 @@ router.get('/:agentId/messages', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  // Дополнительная проверка безопасности: убеждаемся, что агент принадлежит пользователю
+  if (agent.userId !== userId) {
+    logger.warn({ agentId: agent.id, agentUserId: agent.userId, currentUserId: userId }, 'Attempt to access messages of agent belonging to different user');
+    return res.status(403).json({ error: 'Access denied. Agent belongs to different user.' });
+  }
+
   // Загружаем сообщения для найденного или созданного агента
+  // Фильтруем строго по agentId - каждый агент видит только свои сообщения
   const messages = await withRetry(
     () => prisma.message.findMany({
       where: { agentId: agent.id },
@@ -628,13 +493,27 @@ router.post('/:agentId/messages', async (req, res) => {
     return res.status(404).json({ error: 'Agent not found' });
   }
 
+  // Проверяем, что проект принадлежит пользователю (дополнительная проверка безопасности)
+  const project = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id: parsed.data.projectId, userId },
+    }),
+    3,
+    `POST /agents/${agentId}/messages - verify project ${parsed.data.projectId}`
+  );
+
+  if (!project) {
+    logger.warn({ agentId, userId, projectId: parsed.data.projectId }, 'Project not found or does not belong to user');
+    return res.status(404).json({ error: 'Project not found' });
+  }
+
   // Загружаем агентов проекта и историю (теперь agent точно существует)
   // После создания нового агента нужно перезагрузить список projectAgents
   const projectId = parsed.data.projectId!;
   const [projectAgents, history] = await Promise.all([
     withRetry(
       () => prisma.agent.findMany({
-        where: { projectId: projectId },
+        where: { projectId: projectId, userId }, // Добавляем проверку userId для дополнительной безопасности
         select: { id: true },
       }),
       3,
@@ -653,11 +532,82 @@ router.post('/:agentId/messages', async (req, res) => {
 
   const agentIds = projectAgents.map(a => a.id);
 
-  // Загружаем файлы проекта
+  // Загружаем базу знаний агента (isKnowledgeBase: true)
+  const agentKnowledgeBase = await withRetry(
+    () => prisma.file.findMany({
+      where: {
+        agentId: agent.id,
+        isKnowledgeBase: true,  // Только база знаний
+        name: {
+          not: {
+            startsWith: 'Summary'
+          }
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        mimeType: true,
+        content: true,
+        agentId: true,
+        isKnowledgeBase: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    3,
+    `POST /agents/${agentId}/messages - find agent knowledge base`
+  );
+
+  // Если агент был создан из шаблона ProjectTypeAgent, загружаем базу знаний шаблона
+  let templateKnowledgeBase: any[] = [];
+  if (agent.id !== agentId) {
+    // Агент был создан из шаблона, загружаем базу знаний шаблона по projectTypeAgentId
+    try {
+      templateKnowledgeBase = await withRetry(
+        () => prisma.file.findMany({
+          where: {
+            projectTypeAgentId: agentId,
+            isKnowledgeBase: true,
+            name: {
+              not: {
+                startsWith: 'Summary'
+              }
+            }
+          },
+          select: {
+            id: true,
+            agentId: true,
+            projectTypeAgentId: true,
+            name: true,
+            mimeType: true,
+            content: true,
+            isKnowledgeBase: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        } as any),
+        3,
+        `POST /agents/${agentId}/messages - load template knowledge base`
+      );
+      
+      logger.debug({ 
+        templateId: agentId, 
+        templateKnowledgeBaseCount: templateKnowledgeBase.length 
+      }, 'Loaded template knowledge base');
+    } catch (error: any) {
+      logger.warn({ 
+        templateId: agentId, 
+        error: error.message 
+      }, 'Failed to load template knowledge base');
+    }
+  }
+
+  // Загружаем документы проекта (isKnowledgeBase: false)
   const allProjectFiles = await withRetry(
     () => prisma.file.findMany({
       where: {
-        isKnowledgeBase: false,  // Исключаем базу знаний
+        isKnowledgeBase: false,  // Только документы проекта
         agentId: { in: agentIds },  // Файлы агентов проекта
       },
       select: {
@@ -675,16 +625,26 @@ router.post('/:agentId/messages', async (req, res) => {
     `POST /agents/${agentId}/messages - find project files`
   );
 
+  // Объединяем все файлы: база знаний агента + база знаний шаблона + документы проекта
+  const allFiles = [
+    ...agentKnowledgeBase,
+    ...templateKnowledgeBase,
+    ...allProjectFiles,
+  ];
+
   logger.debug({ 
     agentId: agent.id, 
     agentName: agent.name,
-    projectFilesCount: allProjectFiles.length 
-  }, 'Processing message with project files');
+    agentKnowledgeBaseCount: agentKnowledgeBase.length,
+    templateKnowledgeBaseCount: templateKnowledgeBase.length,
+    projectFilesCount: allProjectFiles.length,
+    totalFilesCount: allFiles.length
+  }, 'Processing message with all files (knowledge base + project documents)');
 
-  // Создаем объект агента со всеми файлами проекта
+  // Создаем объект агента со всеми файлами: база знаний + документы проекта
   const agentWithAllFiles = {
     ...agent,
-    files: allProjectFiles,
+    files: allFiles,
   };
 
   const userMessage = await withRetry(
@@ -756,27 +716,68 @@ router.post('/:agentId/messages', async (req, res) => {
 router.delete('/:agentId/messages', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
+  const projectId = req.query.projectId as string | undefined;
 
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({
-      where: { id: agentId, userId },
-    }),
-    3,
-    `DELETE /agents/${agentId}/messages - find agent`
-  );
+  logger.info({ 
+    agentId, 
+    userId,
+    projectId,
+    hasProjectId: !!projectId 
+  }, 'DELETE /agents/:agentId/messages - request received');
+
+  // Используем функцию для получения или создания агента из шаблона
+  // Если projectId не указан, функция вернет null для ProjectTypeAgent
+  let agent = null;
+  
+  if (projectId) {
+    // Если projectId указан, пытаемся получить или создать агента из шаблона
+    agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
+  } else {
+    // Если projectId не указан, сначала пытаемся найти существующего агента
+    agent = await withRetry(
+      () => prisma.agent.findFirst({
+        where: { id: agentId, userId },
+      }),
+      3,
+      `DELETE /agents/${agentId}/messages - find agent`
+    );
+
+    // Если агент не найден, проверяем, является ли это ProjectTypeAgent
+    // В этом случае возвращаем успешный ответ (у шаблона нет сообщений для удаления)
+    if (!agent) {
+      try {
+        const projectTypeAgent = await withRetry(
+          () => (prisma as any).projectTypeAgent.findUnique({
+            where: { id: agentId },
+          }),
+          3,
+          `DELETE /agents/${agentId}/messages - check if ProjectTypeAgent`
+        );
+
+        if (projectTypeAgent) {
+          logger.debug({ agentId, userId }, 'ProjectTypeAgent template found, no messages to delete');
+          return res.status(204).send();
+        }
+      } catch (error: any) {
+        logger.error({ agentId, userId, error: error.message, code: error.code }, 'Error checking ProjectTypeAgent');
+      }
+    }
+  }
 
   if (!agent) {
+    logger.warn({ agentId, userId, projectId }, 'Agent not found and not a ProjectTypeAgent');
     return res.status(404).json({ error: 'Agent not found' });
   }
 
   await withRetry(
     () => prisma.message.deleteMany({
-      where: { agentId },
+      where: { agentId: agent.id },
     }),
     3,
     `DELETE /agents/${agentId}/messages - delete messages`
   );
 
+  logger.debug({ agentId: agent.id }, 'Messages deleted successfully');
   res.status(204).send();
 });
 
@@ -787,45 +788,8 @@ const fileSchema = z.object({
   isKnowledgeBase: z.boolean().optional().default(false),
 });
 
-router.post('/:agentId/files', async (req, res) => {
-  const userId = req.userId!;
-  const { agentId } = req.params;
-  const parsed = fileSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
-
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({ where: { id: agentId, userId } }),
-    3,
-    `POST /agents/${agentId}/files - find agent`
-  );
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
-
-  const file = await withRetry(
-    () => prisma.file.create({
-      data: {
-        agentId,
-        name: parsed.data.name,
-        mimeType: parsed.data.mimeType,
-        content: parsed.data.content,
-        isKnowledgeBase: parsed.data.isKnowledgeBase ?? false,
-      },
-    }),
-    3,
-    `POST /agents/${agentId}/files - create file`
-  );
-
-  logger.debug({ 
-    fileId: file.id, 
-    fileName: file.name, 
-    agentId: file.agentId, 
-    isKnowledgeBase: file.isKnowledgeBase 
-  }, 'File created');
-
-  res.status(201).json({ file });
+router.post('/:agentId/files', async (_req, res) => {
+  return forbidAgentMutation(res);
 });
 
 // GET /:agentId/files - получить файлы агента (база знаний)
@@ -859,31 +823,35 @@ router.get('/:agentId/files', async (req, res, next) => {
         );
 
         if (projectTypeAgent) {
-          // Для ProjectTypeAgent шаблонов файлы хранятся с agentId = projectTypeAgentId
-          // Используем прямой SQL запрос, так как File.agentId формально ссылается на Agent.id
-          // Экранируем agentId для безопасности (как в adminAgents.ts)
-          const escapedAgentId = agentId.replace(/'/g, "''");
-          const files = await (prisma as any).$queryRawUnsafe(`
-            SELECT "id", "agentId", "name", "mimeType", "content", "isKnowledgeBase", "createdAt"
-            FROM "File"
-            WHERE "agentId" = '${escapedAgentId}' 
-              AND "isKnowledgeBase" = true
-              AND "name" NOT LIKE 'Summary%'
-            ORDER BY "createdAt" DESC
-          `);
+          const files = await withRetry(
+            () => prisma.file.findMany({
+              where: {
+                projectTypeAgentId: agentId,
+                isKnowledgeBase: true,
+                name: {
+                  not: {
+                    startsWith: 'Summary'
+                  }
+                }
+              },
+              select: {
+                id: true,
+                agentId: true,
+                projectTypeAgentId: true,
+                name: true,
+                mimeType: true,
+                content: true,
+                isKnowledgeBase: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            } as any),
+            3,
+            `GET /agents/${agentId}/files - load template files`
+          );
 
-          logger.debug({ agentId, filesCount: Array.isArray(files) ? files.length : 0 }, 'Files fetched for ProjectTypeAgent template');
-          return res.json({ 
-            files: Array.isArray(files) ? files.map((file: any) => ({
-              id: file.id,
-              agentId: file.agentId,
-              name: file.name,
-              mimeType: file.mimeType,
-              content: file.content,
-              isKnowledgeBase: file.isKnowledgeBase,
-              createdAt: file.createdAt,
-            })) : []
-          });
+          logger.debug({ agentId, filesCount: files.length }, 'Files fetched for ProjectTypeAgent template');
+          return res.json({ files });
         }
       } catch (error: any) {
         logger.error({ agentId, userId, error: error.message, code: error.code }, 'Error checking ProjectTypeAgent for files');
@@ -952,6 +920,20 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
       });
     }
 
+    // Проверяем, что проект принадлежит пользователю
+    const project = await withRetry(
+      () => prisma.project.findFirst({
+        where: { id: projectId, userId },
+      }),
+      3,
+      `GET /agents/${agentId}/files/summary - verify project ${projectId}`
+    );
+
+    if (!project) {
+      logger.warn({ agentId, userId, projectId }, 'Project not found or does not belong to user');
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
     // Используем функцию для получения или создания агента из шаблона
     const agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
 
@@ -961,9 +943,10 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
     }
 
     // Получаем всех агентов проекта для загрузки их файлов
+    // Проект уже проверен на принадлежность пользователю, поэтому все агенты проекта принадлежат пользователю
     const projectAgents = await withRetry(
       () => prisma.agent.findMany({
-        where: { projectId: projectId },
+        where: { projectId: projectId, userId }, // Добавляем проверку userId для дополнительной безопасности
         select: { id: true },
       }),
       3,
@@ -1045,54 +1028,8 @@ router.delete('/files/:fileId', async (req, res) => {
   res.status(204).send();
 });
 
-router.delete('/:agentId/files/:fileId', async (req, res) => {
-  const userId = req.userId!;
-  const { agentId, fileId } = req.params;
-
-  // Проверяем, что агент существует и принадлежит пользователю (для валидации запроса)
-  const agent = await withRetry(
-    () => prisma.agent.findFirst({
-      where: { id: agentId, userId },
-    }),
-    3,
-    `DELETE /agents/${agentId}/files/${fileId} - find agent`
-  );
-
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
-
-  // Находим файл с информацией о его агенте
-  const file = await withRetry(
-    () => prisma.file.findFirst({
-      where: { id: fileId },
-      include: { agent: true },
-    }),
-    3,
-    `DELETE /agents/${agentId}/files/${fileId} - find file`
-  );
-
-  if (!file) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  // Проверяем, что файл принадлежит любому агенту этого пользователя
-  // Если userId агента файла совпадает с userId запрашивающего агента - можно удалять
-  if (!file.agent || file.agent.userId !== userId) {
-    if (!file.agent) {
-      logger.warn({ fileId, agentId, userId }, 'File does not belong to an agent (possibly ProjectTypeAgent file)');
-    }
-    return res.status(403).json({ error: 'Access denied. File belongs to different user.' });
-  }
-
-  // Удаляем файл - теперь все проверки пройдены
-  await withRetry(
-    () => prisma.file.delete({ where: { id: fileId } }),
-    3,
-    `DELETE /agents/${agentId}/files/${fileId} - delete file`
-  );
-  
-  res.status(204).send();
+router.delete('/:agentId/files/:fileId', async (_req, res) => {
+  return forbidAgentMutation(res);
 });
 
 router.post('/:agentId/summary', async (req, res) => {

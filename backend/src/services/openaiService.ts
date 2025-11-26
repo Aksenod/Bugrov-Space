@@ -108,7 +108,7 @@ function buildSystemPrompt(agent: AgentWithFiles) {
 
   const fileContext =
     processedFiles.length > 0
-      ? `Вот контекст из документов проекта:\n${processedFiles
+      ? `Вот контекст из базы знаний и документов проекта:\n${processedFiles
           .map(
             ({ file, content }) =>
               `---\nНазвание: ${file.name}\nТип: ${file.mimeType}\nСодержимое:\n${content}\n---`,
@@ -214,15 +214,28 @@ export async function generateSummaryContent(
   agent: Pick<AgentWithFiles, 'name' | 'summaryInstruction' | 'model'>,
   transcript: string,
 ): Promise<string> {
+  // Извлекаем последнее сообщение MODEL из транскрипта
+  const modelMessages = transcript.split('\n\n').filter(msg => msg.startsWith('MODEL:'));
+  const lastModelMessage = modelMessages.length > 0 
+    ? modelMessages[modelMessages.length - 1].replace(/^MODEL:\s*/, '')
+    : null;
+
   const instruction =
     agent.summaryInstruction?.trim().length
       ? agent.summaryInstruction
-      : 'Сформируй краткое содержательное резюме беседы, выдели ключевые решения и задачи.';
+      : 'Сформируй краткое содержательное резюме беседы, выдели ключевые решения и задачи. Используй markdown разметку для форматирования: заголовки (# ## ###), списки (- *), жирный текст (**текст**), курсив (*текст*).';
+
+  // Улучшенный системный промпт для сохранения исходной разметки
+  const systemPrompt = `Ты создаешь структурированные отчеты в формате Markdown для агента "${agent.name}". 
+
+ВАЖНО: Если в последнем сообщении агента уже есть markdown разметка (заголовки, списки, жирный текст, курсив и т.д.), сохрани её ТОЧНО как есть, без изменений. Не переформулируй текст, не меняй структуру, не добавляй и не удаляй элементы разметки. Просто используй исходный текст с сохранением всей форматирования.
+
+Если разметки нет или нужно создать резюме из всего диалога, используй markdown разметку для форматирования: заголовки (# ## ###), списки (- *), жирный текст (**текст**), курсив (*текст*), блоки кода (\`код\`).`;
 
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `Ты создаешь структурированные отчеты для агента "${agent.name}".`,
+      content: systemPrompt,
     },
     {
       role: 'user',

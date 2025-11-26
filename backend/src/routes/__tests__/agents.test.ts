@@ -2,7 +2,7 @@ import request from 'supertest';
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import app from '../../app';
 import { prisma } from '../../__tests__/setup';
-import { createTestUser, getAuthToken, createTestProject, createTestAgent } from '../../__tests__/helpers';
+import { createTestUser, getAuthToken, createTestProject, createTestAgent, createTestProjectTypeAgent } from '../../__tests__/helpers';
 
 describe('Agents API with Projects', () => {
   let user1Id: string;
@@ -95,85 +95,51 @@ describe('Agents API with Projects', () => {
         .get(`/api/agents?projectId=${project1Id}`)
         .expect(401);
     });
+
+    it('should synchronize missing project agents from templates before responding', async () => {
+      const project = await prisma.project.findUnique({
+        where: { id: project1Id },
+        select: { projectTypeId: true },
+      });
+
+      if (!project?.projectTypeId) {
+        throw new Error('Test project lacks projectTypeId');
+      }
+
+      await prisma.agent.deleteMany({ where: { projectId: project1Id } });
+      const template = await createTestProjectTypeAgent(project.projectTypeId, 'Template Sync Agent', 0);
+
+      const response = await request(app)
+        .get(`/api/agents?projectId=${project1Id}`)
+        .set('Authorization', `Bearer ${user1Token}`)
+        .expect(200);
+
+      expect(response.body.agents).toHaveLength(1);
+      expect(response.body.agents[0].name).toBe('Template Sync Agent');
+
+      const dbAgents = await prisma.agent.findMany({ where: { projectId: project1Id } });
+      expect(dbAgents).toHaveLength(1);
+      expect(dbAgents[0].projectTypeAgentId).toBe(template.id);
+    });
   });
 
   describe('POST /api/agents', () => {
-    it('should create agent with projectId', async () => {
+    it('should return 403 because agents are managed by administrator', async () => {
       const response = await request(app)
         .post('/api/agents')
         .set('Authorization', `Bearer ${user1Token}`)
         .send({
           name: 'New Agent',
-          description: 'Agent description',
-          systemInstruction: 'You are helpful',
-          summaryInstruction: 'Summarize',
-          model: 'gpt-5.1',
-          role: 'assistant',
           projectId: project1Id,
         })
-        .expect(201);
+        .expect(403);
 
-      expect(response.body.agent).toHaveProperty('id');
-      expect(response.body.agent.name).toBe('New Agent');
-      // projectId должен быть в ответе (если он включен в модель Prisma)
-    });
-
-    it('should return error when projectId is missing', async () => {
-      const response = await request(app)
-        .post('/api/agents')
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          name: 'New Agent',
-        })
-        .expect(400);
-
-      expect(response.body.error).toBeDefined();
-    });
-
-    it('should return 404 when project does not exist', async () => {
-      const response = await request(app)
-        .post('/api/agents')
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          name: 'New Agent',
-          projectId: 'nonexistent',
-        })
-        .expect(404);
-
-      expect(response.body.error).toBe('Проект не найден');
-    });
-
-    it('should return 404 when project belongs to other user', async () => {
-      const response = await request(app)
-        .post('/api/agents')
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          name: 'New Agent',
-          projectId: otherUserProjectId,
-        })
-        .expect(404);
-
-      expect(response.body.error).toBe('Проект не найден');
-    });
-
-    it('should assign correct order to new agent', async () => {
-      const agent1 = await createTestAgent(user1Id, project1Id, 'Agent 1');
-      
-      const response = await request(app)
-        .post('/api/agents')
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          name: 'Agent 2',
-          projectId: project1Id,
-        })
-        .expect(201);
-
-      expect(response.body.agent.order).toBe(agent1.order + 1);
+      expect(response.body.error).toBe('Управление агентами доступно только администратору');
     });
   });
 
   describe('PUT /api/agents/:agentId', () => {
-    it('should update agent without changing projectId', async () => {
+    it('should return 403 because agents are managed by administrator', async () => {
       const agent = await createTestAgent(user1Id, project1Id, 'Original Name');
 
       const response = await request(app)
@@ -182,54 +148,9 @@ describe('Agents API with Projects', () => {
         .send({
           name: 'Updated Name',
         })
-        .expect(200);
+        .expect(403);
 
-      expect(response.body.agent.name).toBe('Updated Name');
-    });
-
-    it('should allow moving agent to another project of same user', async () => {
-      const agent = await createTestAgent(user1Id, project1Id, 'Agent');
-
-      const response = await request(app)
-        .put(`/api/agents/${agent.id}`)
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          projectId: project2Id,
-        })
-        .expect(200);
-
-      // Проверяем, что агент был перемещен (если projectId возвращается в ответе)
-      // В реальном API projectId может не возвращаться, но агент должен быть обновлен в БД
-      const updatedAgent = await prisma.agent.findUnique({ where: { id: agent.id } });
-      expect(updatedAgent?.projectId).toBe(project2Id);
-    });
-
-    it('should return 404 when moving to non-existent project', async () => {
-      const agent = await createTestAgent(user1Id, project1Id, 'Agent');
-
-      const response = await request(app)
-        .put(`/api/agents/${agent.id}`)
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          projectId: 'nonexistent',
-        })
-        .expect(404);
-
-      expect(response.body.error).toBe('Проект не найден');
-    });
-
-    it('should return 404 when moving to other user project', async () => {
-      const agent = await createTestAgent(user1Id, project1Id, 'Agent');
-
-      const response = await request(app)
-        .put(`/api/agents/${agent.id}`)
-        .set('Authorization', `Bearer ${user1Token}`)
-        .send({
-          projectId: otherUserProjectId,
-        })
-        .expect(404);
-
-      expect(response.body.error).toBe('Проект не найден');
+      expect(response.body.error).toBe('Управление агентами доступно только администратору');
     });
   });
 });

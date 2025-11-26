@@ -24,6 +24,9 @@ beforeEach(async () => {
     await prisma.file.deleteMany();
     await prisma.agent.deleteMany();
     await prisma.project.deleteMany();
+    await (prisma as any).projectTypeAgentProjectType.deleteMany();
+    await (prisma as any).projectTypeAgent.deleteMany();
+    await prisma.projectType.deleteMany();
     await prisma.user.deleteMany();
   } catch (error) {
     // Игнорируем ошибки очистки (например, если таблицы не существуют)

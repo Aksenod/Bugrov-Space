@@ -30,6 +30,7 @@ export interface UploadedFile {
   type: string;
   data: string; // Base64 string
   agentId?: string;
+  isKnowledgeBase?: boolean;
 }
 
 export interface Agent {
@@ -43,6 +44,7 @@ export interface Agent {
   model: LLMModel | string;
   role?: string;
   order: number;
+  projectTypeAgentId?: string;
 }
 
 export interface User {
