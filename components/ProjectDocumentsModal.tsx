@@ -372,22 +372,26 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       return content;
     } else if (activeTab === 'code') {
       // Для таба "Код" показываем verstkaContent (сгенерированный HTML код верстки)
-      const codeContent = fileToUse.verstkaContent || null;
+      // Если документ создан агентом-верстальщиком напрямую, HTML находится в data
+      const codeContent = fileToUse.verstkaContent || (showVerstkaSubTabs ? fileToUse.data : null);
       console.log('[ProjectDocumentsModal] getDisplayContent Code:', {
         hasVerstkaContent: !!fileToUse.verstkaContent,
         codeContent: !!codeContent,
         verstkaContentLength: fileToUse.verstkaContent?.length || 0,
+        isVerstkaDocument: showVerstkaSubTabs,
       });
       return codeContent;
     } else if (activeTab === 'preview') {
       // Для таба "Превью" показываем verstkaContent (HTML код верстки)
-      const previewContent = fileToUse.verstkaContent || null;
+      // Если документ создан агентом-верстальщиком напрямую, HTML находится в data
+      const previewContent = fileToUse.verstkaContent || (showVerstkaSubTabs ? fileToUse.data : null);
       console.log('[ProjectDocumentsModal] getDisplayContent Preview:', {
         hasVerstkaContent: !!fileToUse.verstkaContent,
         previewContent: !!previewContent,
         verstkaContentLength: fileToUse.verstkaContent?.length || 0,
         fileId: fileToUse.id,
         isLocalSelected: !!localSelectedFile,
+        isVerstkaDocument: showVerstkaSubTabs,
       });
       return previewContent;
     }
