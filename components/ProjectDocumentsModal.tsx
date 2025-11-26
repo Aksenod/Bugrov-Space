@@ -634,6 +634,16 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                    </div>
                  )}
                  
+                 {/* DEBUG INFO */}
+                 {selectedFile && (
+                   <div className="mb-4 p-4 bg-red-900/50 border border-red-500/50 rounded-lg text-white text-xs">
+                     <div>Agent ID: {selectedFile.agentId || 'null'}</div>
+                     <div>Agent Name: {documentCreatorAgent?.name || 'not found'}</div>
+                     <div>Agent Role: {documentCreatorAgent?.role || 'null'}</div>
+                     <div>showVerstkaSubTabs: {String(showVerstkaSubTabs)}</div>
+                   </div>
+                 )}
+
                  <div className={`bg-black/50 backdrop-blur-sm rounded-[2rem] border border-white/10 min-h-[50vh] shadow-inner overflow-x-auto ${showVerstkaSubTabs ? 'p-0' : 'p-8'}`}>
                     {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
