@@ -33,7 +33,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           }
         `}
       >
-        {message.text.length > 0 && <MarkdownRenderer content={message.text} />}
+        {message.text.length > 0 && <MarkdownRenderer content={message.text} isCompact />}
 
         {/* Timestamp */}
         <div className={`text-[9px] mt-2 font-medium tracking-wide flex items-center gap-1 ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>

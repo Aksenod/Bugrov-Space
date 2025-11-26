@@ -63,11 +63,14 @@ const SyntaxHighlighterWrapper: React.FC<{ language: string; children: string; [
 
 interface MarkdownRendererProps {
   content: string;
+  isCompact?: boolean;
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isCompact = false }) => {
+  const lineHeightClass = isCompact ? 'leading-[1.2]' : 'leading-loose';
+
   return (
-    <div className="prose prose-invert prose-sm max-w-none break-words leading-relaxed">
+    <div className={`prose prose-invert prose-sm max-w-none break-words leading-relaxed ${isCompact ? 'leading-[1.2]' : ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -84,10 +87,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             );
           },
           ul({ children }) {
-            return <ul className="list-disc ml-5 my-3 space-y-2 text-white/90">{children}</ul>;
+            return <ul className={`list-disc ml-5 my-3 space-y-2 text-white/90 ${lineHeightClass}`}>{children}</ul>;
           },
           ol({ children }) {
-            return <ol className="list-decimal ml-5 my-3 space-y-2 text-white/90">{children}</ol>;
+            return <ol className={`list-decimal ml-5 my-3 space-y-2 text-white/90 ${lineHeightClass}`}>{children}</ol>;
           },
           a({ href, children }) {
             return (
@@ -97,7 +100,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
             );
           },
           p({ children }) {
-            return <p className="mb-3 last:mb-0 text-white/90 leading-loose">{children}</p>;
+            return <p className={`mb-3 last:mb-0 text-white/90 ${lineHeightClass}`}>{children}</p>;
           },
           h1({ children }) {
             return <h1 className="text-xl font-bold text-white mb-3 mt-4 first:mt-0">{children}</h1>;
