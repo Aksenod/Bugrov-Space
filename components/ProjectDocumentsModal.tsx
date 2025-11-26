@@ -222,6 +222,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   
   // Показывать подтабы только если документ создан агентом-верстальщиком
   const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "layout");
+
+  // Debug logging
+  console.log('[ProjectDocumentsModal] Document check:', {
+    selectedFileId: selectedFile?.id,
+    agentId: selectedFile?.agentId,
+    documentCreatorAgent: documentCreatorAgent?.name,
+    agentRole: documentCreatorAgent?.role,
+    showVerstkaSubTabs,
+  });
   
   // Находим агентов DSL и Верстка по ролям (могут быть отдельными агентами или частью копирайтера)
   const dslAgent = allAgents.find(agent => {
@@ -623,7 +632,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                    </div>
                  )}
                  
-                 <div className={`bg-black/50 backdrop-blur-sm rounded-[2rem] border border-white/10 min-h-[50vh] shadow-inner overflow-x-auto ${activeTab === 'preview' ? 'p-0' : 'p-8'}`}>
+                 <div className={`bg-black/50 backdrop-blur-sm rounded-[2rem] border border-white/10 min-h-[50vh] shadow-inner overflow-x-auto ${showVerstkaSubTabs ? 'p-0' : 'p-8'}`}>
                     {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                     ) : (
@@ -639,8 +648,27 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                              </div>
                            );
                          }
+
+                         // Если документ от агента Верстальщика - показываем HTML в iframe
+                         if (showVerstkaSubTabs) {
+                           const htmlContent = selectedFile.verstkaContent || selectedFile.data;
+                           if (htmlContent) {
+                             const decodedHtml = decodeContent(htmlContent);
+                             return (
+                               <div className="w-full h-[70vh] rounded-xl overflow-hidden border-0">
+                                 <iframe
+                                   srcDoc={decodedHtml}
+                                   className="w-full h-full border-0"
+                                   title="HTML Preview"
+                                   sandbox="allow-same-origin allow-scripts"
+                                 />
+                               </div>
+                             );
+                           }
+                         }
+
                          const content = getDisplayContent();
-                         
+
                          // Специальная обработка для табов верстальщика (Код и Превью)
                          if (activeTab === 'code' || activeTab === 'preview') {
                            const fileToUse = localSelectedFile || selectedFile;
