@@ -109,9 +109,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     init.method === 'POST';
   const timeout = isOpenAiRequest ? OPENAI_REQUEST_TIMEOUT : REQUEST_TIMEOUT;
   
-  // Создаем AbortController для таймаута
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  // Для запросов к агентам НЕ используем AbortController - позволяем запросу продолжаться
+  // даже если он превышает таймаут, так как сервер может все равно вернуть ответ
+  // Для обычных запросов используем таймаут с отменой
+  let controller: AbortController | null = null;
+  let timeoutId: NodeJS.Timeout | null = null;
+  
+  if (!isOpenAiRequest) {
+    // Для обычных запросов используем таймаут с отменой
+    controller = new AbortController();
+    timeoutId = setTimeout(() => controller!.abort(), timeout);
+  }
 
   const url = `${API_BASE_URL}${path}`;
   const startTime = Date.now();
@@ -120,14 +128,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     console.log(`[API] Request: ${init.method || 'GET'} ${url}`);
     const response = await fetch(url, {
       ...init,
-      signal: controller.signal,
+      ...(controller ? { signal: controller.signal } : {}),
       headers: getHeaders(init.headers as Record<string, string>),
     });
     
     const duration = Date.now() - startTime;
     console.log(`[API] Response: ${response.status} in ${duration}ms`);
 
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    
+    // Если запрос к агенту занял больше 60 секунд, логируем предупреждение, но не ошибку
+    if (isOpenAiRequest && duration > OPENAI_REQUEST_TIMEOUT) {
+      console.warn(`[API] Request to agent took ${duration}ms (exceeded ${OPENAI_REQUEST_TIMEOUT}ms timeout), but response received successfully`);
+    }
 
     // Если получили 429 - блокируем все запросы на некоторое время
     // НО не блокируем, если это auth роут - пользователь должен иметь возможность залогиниться
@@ -163,7 +178,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
     return (await response.json()) as T;
   } catch (error: any) {
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     const duration = Date.now() - startTime;
     
     // Если это 429 ошибка - устанавливаем блокировку (но не для auth роутов)
@@ -180,13 +197,23 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     console.error(`[API] Error after ${duration}ms:`, error.name, error.message);
     
     // Если запрос был отменен из-за таймаута
-    if (error.name === 'AbortError' || controller.signal.aborted) {
+    // Для запросов к агентам НЕ показываем ошибку таймаута, так как сервер может все равно вернуть ответ
+    // Для обычных запросов показываем ошибку таймаута как раньше
+    if ((error.name === 'AbortError' || (controller && controller.signal.aborted)) && !isOpenAiRequest) {
       console.error(`[API] Request timeout: ${url}`);
-      const timeoutSeconds = isOpenAiRequest ? 60 : 10;
+      const timeoutSeconds = 10;
       const timeoutError = new Error(`Request timeout: запрос превысил время ожидания (${timeoutSeconds} секунд). Сервер может быть перегружен или недоступен.`) as Error & { status?: number; isTimeout?: boolean };
       timeoutError.status = 408;
       timeoutError.isTimeout = true;
       throw timeoutError;
+    }
+    
+    // Для запросов к агентам, если произошла ошибка после таймаута, но это не AbortError,
+    // значит запрос все еще выполняется - не показываем ошибку таймаута
+    if (isOpenAiRequest && duration > OPENAI_REQUEST_TIMEOUT && error.name !== 'AbortError') {
+      // Запрос все еще выполняется, просто ждем дольше
+      console.warn(`[API] Agent request taking longer than expected (${duration}ms), but still waiting for response...`);
+      // Продолжаем ждать - не бросаем ошибку таймаута
     }
     
     // Обработка сетевых ошибок

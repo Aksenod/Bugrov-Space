@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2 } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project } from '../types';
@@ -55,7 +55,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onShowAlert
 }) => {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka' | 'code' | 'preview'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka'>('text');
+  const [showVerstkaCode, setShowVerstkaCode] = useState(false); // false = превью, true = код
   const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
   const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
@@ -67,9 +68,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     return roles.includes(roleName.toLowerCase());
   };
 
-  // Сбрасываем таб при смене документа
+  // Сбрасываем таб при смене документа или открытии модального окна
   useEffect(() => {
-    if (selectedFileId) {
+    if (isOpen && selectedFileId) {
       const file = documents.find(doc => doc.id === selectedFileId);
       if (file) {
         const allAgents = agents;
@@ -77,14 +78,20 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "verstka");
         
         if (hasVerstkaRole) {
-          setActiveTab('preview');
+          setActiveTab('verstka');
+          setShowVerstkaCode(false); // По умолчанию показываем превью
         } else {
           setActiveTab('text');
+          setShowVerstkaCode(false);
         }
       }
+    } else if (!isOpen) {
+      // Сбрасываем таб при закрытии модального окна
+      setActiveTab('text');
+      setShowVerstkaCode(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFileId]);
+  }, [selectedFileId, isOpen]);
 
   // Синхронизируем локальное состояние с documents prop при смене файла
   // Не перезаписываем если локальный файл уже имеет результаты генерации
@@ -241,6 +248,61 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
+  const enhanceHtmlContent = (html: string): string => {
+    // Стили для полного заполнения iframe без пустых пространств
+    const noSpacingStyles = `
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow: auto;
+        }
+        body {
+          display: block;
+        }
+      </style>
+    `;
+
+    // Проверяем, есть ли уже тег <style> или <head>
+    const hasStyleTag = html.includes('<style') || html.includes('<STYLE');
+    const hasHeadTag = html.includes('<head') || html.includes('<HEAD');
+
+    if (hasHeadTag) {
+      // Если есть head, добавляем стили в head
+      if (html.includes('</head>')) {
+        return html.replace('</head>', `${noSpacingStyles}</head>`);
+      } else if (html.includes('</HEAD>')) {
+        return html.replace('</HEAD>', `${noSpacingStyles}</HEAD>`);
+      } else {
+        // Если head открыт, но не закрыт, добавляем перед закрывающим тегом
+        return html.replace(/(<head[^>]*>)/i, `$1${noSpacingStyles}`);
+      }
+    } else if (html.includes('<html') || html.includes('<HTML')) {
+      // Если есть html, но нет head, создаем head
+      return html.replace(/(<html[^>]*>)/i, `$1<head>${noSpacingStyles}</head>`);
+    } else {
+      // Если это фрагмент HTML, оборачиваем в полную структуру
+      return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${noSpacingStyles}
+</head>
+<body>
+${html}
+</body>
+</html>`;
+    }
+  };
+
   const handleDownload = (file: UploadedFile, e: React.MouseEvent) => {
     e.stopPropagation();
     const link = document.createElement('a');
@@ -370,26 +432,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         isLocalSelected: localSelectedFile?.id === fileToUse.id,
       });
       return content;
-    } else if (activeTab === 'code') {
-      // Для таба "Код" показываем verstkaContent (сгенерированный HTML код верстки)
-      const codeContent = fileToUse.verstkaContent || null;
-      console.log('[ProjectDocumentsModal] getDisplayContent Code:', {
-        hasVerstkaContent: !!fileToUse.verstkaContent,
-        codeContent: !!codeContent,
-        verstkaContentLength: fileToUse.verstkaContent?.length || 0,
-      });
-      return codeContent;
-    } else if (activeTab === 'preview') {
-      // Для таба "Превью" показываем verstkaContent (HTML код верстки)
-      const previewContent = fileToUse.verstkaContent || null;
-      console.log('[ProjectDocumentsModal] getDisplayContent Preview:', {
-        hasVerstkaContent: !!fileToUse.verstkaContent,
-        previewContent: !!previewContent,
-        verstkaContentLength: fileToUse.verstkaContent?.length || 0,
-        fileId: fileToUse.id,
-        isLocalSelected: !!localSelectedFile,
-      });
-      return previewContent;
     }
     return null;
   };
@@ -469,8 +511,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           
           {/* Mobile Header for Preview */}
           <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-black/40 backdrop-blur-md">
-            <button onClick={() => setSelectedFileId(null)} className="text-white/60 hover:text-white">
-               ← Назад
+            <button onClick={() => setSelectedFileId(null)} className="p-2 text-white hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+              <ArrowLeft size={20} className="font-bold" />
             </button>
             <span className="font-medium truncate text-white">
               {selectedFile ? getDocumentDisplayName(selectedFile) : ''}
@@ -488,8 +530,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 scrollbar-thin">
-              <div className="max-w-6xl mx-auto w-full">
+            <div className={`flex-1 ${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'overflow-visible p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: 'auto', minHeight: '200vh', maxHeight: 'none' } : undefined}>
+              <div className={`${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'w-full h-full' : 'max-w-6xl mx-auto w-full'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: '200vh', minHeight: '200vh', maxHeight: 'none' } : undefined}>
+                 {!(activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode) && (
                  <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
@@ -500,30 +543,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         <div className="flex items-center gap-6">
                             <span className="flex items-center gap-1.5"><Calendar size={14} /> {selectedFile ? formatDateTime(selectedFile) : new Date().toLocaleString()}</span>
                             
-                            {/* Tabs for Verstka documents */}
+                            {/* Кнопка переключения для документов верстальщика */}
                             {showVerstkaSubTabs && (
-                              <div className="flex items-center gap-2 border-b border-white/10 -mb-[1px]">
-                                <button
-                                  onClick={() => setActiveTab('preview')}
-                                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                                    activeTab === 'preview'
-                                      ? 'text-cyan-400 border-cyan-400/40'
-                                      : 'text-white/50 border-transparent hover:text-white/70'
-                                  }`}
-                                >
-                                  Превью
-                                </button>
-                                <button
-                                  onClick={() => setActiveTab('code')}
-                                  className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                                    activeTab === 'code'
-                                      ? 'text-cyan-400 border-cyan-400/40'
-                                      : 'text-white/50 border-transparent hover:text-white/70'
-                                  }`}
-                                >
-                                  Код
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => setShowVerstkaCode(!showVerstkaCode)}
+                                className="px-4 py-2 text-sm font-medium transition-colors text-white/50 hover:text-white/70 border border-white/10 rounded-lg hover:bg-white/5"
+                              >
+                                {showVerstkaCode ? 'Показать превью' : 'Показать код'}
+                              </button>
                             )}
                             
                             {showDSLButtons && (
@@ -582,6 +609,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         </div>
                     </div>
                  </div>
+                 )}
 
                  {/* Tabs for copywriter documents */}
                  {showDSLButtons && (
@@ -619,7 +647,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                    </div>
                  )}
                  
-                 <div className={`bg-black/50 backdrop-blur-sm rounded-[2rem] border border-white/10 min-h-[50vh] shadow-inner overflow-x-auto ${activeTab === 'preview' ? 'p-0' : 'p-8'}`}>
+                 <div className={`bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner ${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'rounded-none overflow-visible' : 'rounded-[2rem] overflow-hidden'}`} style={{ 
+                   minHeight: activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? '200vh' : '60vh', 
+                   padding: 0, 
+                   margin: 0,
+                   height: activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? '200vh' : 'auto',
+                   maxHeight: activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'none' : undefined,
+                   display: 'block'
+                 }}>
                     {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                     ) : (
@@ -637,16 +672,23 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                          }
                          const content = getDisplayContent();
                          
-                         // Специальная обработка для табов верстальщика (Код и Превью)
-                         if (activeTab === 'code' || activeTab === 'preview') {
+                         // Специальная обработка для документов верстальщика
+                         console.log('[ProjectDocumentsModal] Render check:', { 
+                           activeTab, 
+                           showVerstkaSubTabs, 
+                           showVerstkaCode, 
+                           hasContent: !!content 
+                         });
+                         
+                         if (activeTab === 'verstka' && showVerstkaSubTabs) {
                            const fileToUse = localSelectedFile || selectedFile;
                            
-                           if (activeTab === 'code') {
-                             // Таб "Код" - показываем HTML с подсветкой синтаксиса
+                           if (showVerstkaCode) {
+                             // Показываем HTML код с подсветкой синтаксиса
                              if (content) {
                                const decodedHtml = decodeContent(content);
                                return (
-                                 <div className="overflow-auto max-h-[70vh]">
+                                 <div className="overflow-auto" style={{ height: '100%', minHeight: '60vh' }}>
                                    <SyntaxHighlighter
                                      style={vscDarkPlus}
                                      language="html"
@@ -662,7 +704,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                  </div>
                                );
                              } else {
-                               // Если verstkaContent нет, показываем сообщение
                                return (
                                  <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
                                    <p className="text-base font-medium mb-2">HTML код еще не сгенерирован</p>
@@ -672,23 +713,48 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                  </div>
                                );
                              }
-                           } else if (activeTab === 'preview') {
-                             // Таб "Превью" - показываем HTML в iframe
-                             // Используем content из getDisplayContent(), который уже проверил verstkaContent
+                           } else {
+                             // Показываем HTML превью в iframe
+                             console.log('[ProjectDocumentsModal] Inside iframe block, showVerstkaCode:', showVerstkaCode, 'content exists:', !!content);
                              if (content) {
                                const decodedHtml = decodeContent(content);
+                               const enhancedHtml = enhanceHtmlContent(decodedHtml);
+                               console.log('[ProjectDocumentsModal] Rendering iframe with height 200vh');
                                return (
-                                 <div className="w-full h-[70vh] rounded-xl overflow-hidden border-0">
+                                 <div 
+                                   className="w-full overflow-hidden border-0 p-0 m-0 relative" 
+                                   style={{ 
+                                     width: '100%', 
+                                     height: '200vh', 
+                                     minHeight: '200vh', 
+                                     maxHeight: 'none',
+                                     padding: 0, 
+                                     margin: 0,
+                                     boxSizing: 'border-box'
+                                   }}
+                                 >
                                    <iframe
-                                     srcDoc={decodedHtml}
-                                     className="w-full h-full border-0"
+                                     srcDoc={enhancedHtml}
+                                     className="absolute inset-0 w-full h-full border-0"
+                                     style={{ 
+                                       position: 'absolute',
+                                       top: 0,
+                                       left: 0,
+                                       right: 0,
+                                       bottom: 0,
+                                       width: '100%',
+                                       height: '100%',
+                                       border: 'none',
+                                       margin: 0,
+                                       padding: 0,
+                                       display: 'block'
+                                     }}
                                      title="HTML Preview"
                                      sandbox="allow-same-origin allow-scripts"
                                    />
                                  </div>
                                );
                              } else {
-                               // Если контента нет, показываем сообщение
                                return (
                                  <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
                                    <p className="text-base font-medium mb-2">HTML верстка еще не сгенерирована</p>
@@ -718,7 +784,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                          
                          // Обычный рендер для других табов
                          return (
-                           <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words">
+                           <div className="prose prose-invert prose-lg max-w-none overflow-x-auto overflow-y-auto break-words py-0 min-h-[60vh] [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0" style={{ paddingTop: 0, paddingBottom: 0, marginTop: 0, marginBottom: 0 }}>
                              <MarkdownRenderer content={decodeContent(content)} />
                            </div>
                          );

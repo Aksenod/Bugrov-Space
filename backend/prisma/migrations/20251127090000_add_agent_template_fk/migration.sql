@@ -9,3 +9,5 @@ ADD CONSTRAINT "Agent_projectTypeAgentId_fkey"
 FOREIGN KEY ("projectTypeAgentId") REFERENCES "ProjectTypeAgent"("id")
 ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+

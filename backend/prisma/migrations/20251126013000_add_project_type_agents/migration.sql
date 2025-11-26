@@ -17,3 +17,5 @@ CREATE TABLE "ProjectTypeAgent" (
 -- CreateIndex
 CREATE INDEX "ProjectTypeAgent_projectTypeId_idx" ON "ProjectTypeAgent"("projectTypeId");
 
+
+

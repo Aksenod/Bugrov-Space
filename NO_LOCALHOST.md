@@ -30,3 +30,5 @@ VITE_API_URL=https://bugrov-space.onrender.com/api
 Ранее бэкенд мог работать локально на `localhost:4000`, но это больше не поддерживается.
 Все запросы идут напрямую на Render.
 
+
+
