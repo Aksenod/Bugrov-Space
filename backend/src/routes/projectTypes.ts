@@ -228,7 +228,7 @@ router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
   ) as any[];
 
   // Преобразуем в формат, совместимый со старым API
-  const agents = agentConnections.map((connection: any) => ({
+  const agents = agentConnections.map((connection: any, index: number) => ({
     id: connection.projectTypeAgent.id,
     name: connection.projectTypeAgent.name,
     description: connection.projectTypeAgent.description,
@@ -236,7 +236,7 @@ router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
     summaryInstruction: connection.projectTypeAgent.summaryInstruction,
     model: connection.projectTypeAgent.model,
     role: connection.projectTypeAgent.role,
-    order: connection.order,
+    order: connection.order ?? index, // Используем index как fallback если order отсутствует
     createdAt: connection.projectTypeAgent.createdAt,
     updatedAt: connection.projectTypeAgent.updatedAt,
   }));

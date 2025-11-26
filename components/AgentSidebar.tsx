@@ -142,7 +142,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                 } transition-colors relative`}>
                   {getIcon(agent.name, agent.id)}
                   <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
-                    {(agent.order ?? index) + 1}
+                    {(agent.order ?? 0) + 1}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">

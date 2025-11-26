@@ -303,12 +303,12 @@ router.get('/', async (req, res, next) => {
             }
             return isValid;
           })
-          .map((conn: any) => ({
+          .map((conn: any, index: number) => ({
             ...conn.projectTypeAgent,
-            order: conn.order, // Используем order из связи
+            order: conn.order ?? index, // Используем order из связи, index как fallback
             projectTypes: [{
               projectType: conn.projectType,
-              order: conn.order,
+              order: conn.order ?? index,
             }],
           }));
         
