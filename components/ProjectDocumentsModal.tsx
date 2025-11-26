@@ -248,60 +248,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
-  const enhanceHtmlContent = (html: string): string => {
-    // Стили для полного заполнения iframe без пустых пространств
-    const noSpacingStyles = `
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        html, body {
-          width: 100%;
-          height: 100%;
-          margin: 0;
-          padding: 0;
-          overflow: auto;
-        }
-        body {
-          display: block;
-        }
-      </style>
-    `;
-
-    // Проверяем, есть ли уже тег <style> или <head>
-    const hasStyleTag = html.includes('<style') || html.includes('<STYLE');
-    const hasHeadTag = html.includes('<head') || html.includes('<HEAD');
-
-    if (hasHeadTag) {
-      // Если есть head, добавляем стили в head
-      if (html.includes('</head>')) {
-        return html.replace('</head>', `${noSpacingStyles}</head>`);
-      } else if (html.includes('</HEAD>')) {
-        return html.replace('</HEAD>', `${noSpacingStyles}</HEAD>`);
-      } else {
-        // Если head открыт, но не закрыт, добавляем перед закрывающим тегом
-        return html.replace(/(<head[^>]*>)/i, `$1${noSpacingStyles}`);
-      }
-    } else if (html.includes('<html') || html.includes('<HTML')) {
-      // Если есть html, но нет head, создаем head
-      return html.replace(/(<html[^>]*>)/i, `$1<head>${noSpacingStyles}</head>`);
-    } else {
-      // Если это фрагмент HTML, оборачиваем в полную структуру
-      return `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  ${noSpacingStyles}
-</head>
-<body>
-${html}
-</body>
-</html>`;
-    }
-  };
 
   const handleDownload = (file: UploadedFile, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -507,10 +453,10 @@ ${html}
         </div>
 
         {/* Preview Area */}
-        <div className={`flex-1 flex flex-col bg-black/30 relative ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
           
           {/* Mobile Header for Preview */}
-          <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-black/40 backdrop-blur-md">
+          <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-black/40 backdrop-blur-md flex-shrink-0">
             <button onClick={() => setSelectedFileId(null)} className="p-2 text-white hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
               <ArrowLeft size={20} className="font-bold" />
             </button>
@@ -530,7 +476,7 @@ ${html}
           </div>
 
           {selectedFile ? (
-            <div className={`flex-1 ${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'overflow-visible p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: 'auto', minHeight: '200vh', maxHeight: 'none' } : undefined}>
+            <div className={`flex-1 min-h-0 ${activeTab === 'verstka' && showVerstkaSubTabs ? 'overflow-visible p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: 'auto', minHeight: '200vh', maxHeight: 'none' } : undefined}>
               <div className={`${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'w-full h-full' : 'max-w-6xl mx-auto w-full'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: '200vh', minHeight: '200vh', maxHeight: 'none' } : undefined}>
                  {!(activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode) && (
                  <div className="mb-8 pb-6 border-b border-white/10">
@@ -687,22 +633,22 @@ ${html}
                              // Показываем HTML код с подсветкой синтаксиса
                              if (content) {
                                const decodedHtml = decodeContent(content);
-                               return (
-                                 <div className="overflow-auto" style={{ height: '100%', minHeight: '60vh' }}>
-                                   <SyntaxHighlighter
-                                     style={vscDarkPlus}
-                                     language="html"
-                                     PreTag="div"
-                                     customStyle={{
-                                       margin: 0,
-                                       borderRadius: '1rem',
-                                       padding: '1.5rem',
-                                     }}
-                                   >
-                                     {decodedHtml}
-                                   </SyntaxHighlighter>
-                                 </div>
-                               );
+                              return (
+                                <div className="overflow-x-auto">
+                                  <SyntaxHighlighter
+                                    style={vscDarkPlus}
+                                    language="html"
+                                    PreTag="div"
+                                    customStyle={{
+                                      margin: 0,
+                                      borderRadius: '1rem',
+                                      padding: 0,
+                                    }}
+                                  >
+                                    {decodedHtml}
+                                  </SyntaxHighlighter>
+                                </div>
+                              );
                              } else {
                                return (
                                  <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
@@ -714,46 +660,19 @@ ${html}
                                );
                              }
                            } else {
-                             // Показываем HTML превью в iframe
-                             console.log('[ProjectDocumentsModal] Inside iframe block, showVerstkaCode:', showVerstkaCode, 'content exists:', !!content);
-                             if (content) {
-                               const decodedHtml = decodeContent(content);
-                               const enhancedHtml = enhanceHtmlContent(decodedHtml);
-                               console.log('[ProjectDocumentsModal] Rendering iframe with height 200vh');
-                               return (
-                                 <div 
-                                   className="w-full overflow-hidden border-0 p-0 m-0 relative" 
-                                   style={{ 
-                                     width: '100%', 
-                                     height: '200vh', 
-                                     minHeight: '200vh', 
-                                     maxHeight: 'none',
-                                     padding: 0, 
-                                     margin: 0,
-                                     boxSizing: 'border-box'
-                                   }}
-                                 >
-                                   <iframe
-                                     srcDoc={enhancedHtml}
-                                     className="absolute inset-0 w-full h-full border-0"
-                                     style={{ 
-                                       position: 'absolute',
-                                       top: 0,
-                                       left: 0,
-                                       right: 0,
-                                       bottom: 0,
-                                       width: '100%',
-                                       height: '100%',
-                                       border: 'none',
-                                       margin: 0,
-                                       padding: 0,
-                                       display: 'block'
-                                     }}
-                                     title="HTML Preview"
-                                     sandbox="allow-same-origin allow-scripts"
-                                   />
-                                 </div>
-                               );
+                            // Показываем HTML превью в iframe
+                            if (content) {
+                              const decodedHtml = decodeContent(content);
+                              return (
+                                <div className="w-full h-full min-h-[600px]">
+                                  <iframe
+                                    srcDoc={decodedHtml}
+                                    className="w-full h-full border-0"
+                                    title="HTML Preview"
+                                    sandbox="allow-same-origin allow-scripts"
+                                  />
+                                </div>
+                              );
                              } else {
                                return (
                                  <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
@@ -784,7 +703,7 @@ ${html}
                          
                          // Обычный рендер для других табов
                          return (
-                           <div className="prose prose-invert prose-lg max-w-none overflow-x-auto overflow-y-auto break-words py-0 min-h-[60vh] [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0" style={{ paddingTop: 0, paddingBottom: 0, marginTop: 0, marginBottom: 0 }}>
+                           <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
                              <MarkdownRenderer content={decodeContent(content)} />
                            </div>
                          );

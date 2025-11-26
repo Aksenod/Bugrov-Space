@@ -34,9 +34,56 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' },
         }
-      }
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            color: 'rgba(255, 255, 255, 0.9)',
+            maxWidth: 'none',
+            '--tw-prose-body': 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-headings': 'rgba(255, 255, 255, 1)',
+            '--tw-prose-lead': 'rgba(255, 255, 255, 0.8)',
+            '--tw-prose-links': 'rgba(96, 165, 250, 1)',
+            '--tw-prose-bold': 'rgba(255, 255, 255, 1)',
+            '--tw-prose-counters': 'rgba(255, 255, 255, 0.7)',
+            '--tw-prose-bullets': 'rgba(255, 255, 255, 0.6)',
+            '--tw-prose-hr': 'rgba(255, 255, 255, 0.2)',
+            '--tw-prose-quotes': 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-quote-borders': 'rgba(99, 102, 241, 0.5)',
+            '--tw-prose-captions': 'rgba(255, 255, 255, 0.7)',
+            '--tw-prose-code': 'rgba(251, 191, 36, 1)',
+            '--tw-prose-pre-code': 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-pre-bg': 'rgba(30, 41, 59, 0.8)',
+            '--tw-prose-th-borders': 'rgba(255, 255, 255, 0.2)',
+            '--tw-prose-td-borders': 'rgba(255, 255, 255, 0.1)',
+          },
+        },
+        invert: {
+          css: {
+            color: 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-body': 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-headings': 'rgba(255, 255, 255, 1)',
+            '--tw-prose-lead': 'rgba(255, 255, 255, 0.8)',
+            '--tw-prose-links': 'rgba(96, 165, 250, 1)',
+            '--tw-prose-bold': 'rgba(255, 255, 255, 1)',
+            '--tw-prose-counters': 'rgba(255, 255, 255, 0.7)',
+            '--tw-prose-bullets': 'rgba(255, 255, 255, 0.6)',
+            '--tw-prose-hr': 'rgba(255, 255, 255, 0.2)',
+            '--tw-prose-quotes': 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-quote-borders': 'rgba(99, 102, 241, 0.5)',
+            '--tw-prose-captions': 'rgba(255, 255, 255, 0.7)',
+            '--tw-prose-code': 'rgba(251, 191, 36, 1)',
+            '--tw-prose-pre-code': 'rgba(255, 255, 255, 0.9)',
+            '--tw-prose-pre-bg': 'rgba(30, 41, 59, 0.8)',
+            '--tw-prose-th-borders': 'rgba(255, 255, 255, 0.2)',
+            '--tw-prose-td-borders': 'rgba(255, 255, 255, 0.1)',
+          },
+        },
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }
 

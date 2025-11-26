@@ -36,7 +36,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
         {message.text.length > 0 && <MarkdownRenderer content={message.text} isCompact />}
 
         {/* Timestamp */}
-        <div className={`text-[9px] mt-2 font-medium tracking-wide flex items-center gap-1 ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>
+        <div className={`text-xs mt-2 font-medium tracking-wide flex items-center gap-1 ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>
           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           {message.isStreaming && <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(129,140,248,0.9)]" />}
         </div>

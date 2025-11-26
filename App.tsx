@@ -181,9 +181,9 @@ export default function App() {
   // Документы проекта общие для всех агентов - всегда используем ключ 'all'
   const projectDocuments = summaryDocuments['all'] ?? [];
   
-  // Логирование для диагностики
+  // Логирование для диагностики (только в dev режиме)
   useEffect(() => {
-    if (activeAgent) {
+    if (import.meta.env.DEV && activeAgent) {
       console.log(`[Frontend] Active agent changed: ${activeAgent.name} (${activeAgent.id})`);
       console.log(`[Frontend] activeAgentId: ${activeAgentId}`);
       console.log(`[Frontend] realAgentIdForMessages: ${realAgentIdForMessages}`);
@@ -240,13 +240,17 @@ export default function App() {
 
     // Предотвращаем параллельные вызовы bootstrap
     if (bootstrapInProgressRef.current) {
-      console.log('[Bootstrap] Already in progress, skipping...');
+      if (import.meta.env.DEV) {
+        console.log('[Bootstrap] Already in progress, skipping...');
+      }
       return;
     }
 
     // Если bootstrap уже был выполнен с тем же токеном, пропускаем
     if (lastBootstrapTokenRef.current === token && hasBootstrappedRef.current) {
-      console.log('[Bootstrap] Already bootstrapped with this token, skipping...');
+      if (import.meta.env.DEV) {
+        console.log('[Bootstrap] Already bootstrapped with this token, skipping...');
+      }
       return;
     }
 
@@ -295,7 +299,9 @@ export default function App() {
               return prev;
             }
             const fallbackId = mappedAgents[0]?.id ?? null;
-            console.log(`[Bootstrap] Selecting agent as activeAgentId: ${fallbackId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[Bootstrap] Selecting agent as activeAgentId: ${fallbackId}`);
+            }
             return fallbackId;
           });
         } catch (error) {
@@ -345,7 +351,9 @@ export default function App() {
           const errorMessage = error?.message || 'Превышен лимит запросов. Пожалуйста, подождите минуту и обновите страницу.';
           showAlert(errorMessage, 'Превышен лимит запросов', 'warning', 10000);
         } else {
+          if (import.meta.env.DEV) {
           console.warn('Database temporarily unavailable, keeping user logged in');
+        }
         }
         // Не очищаем данные, если они уже были загружены - пользователь может продолжать работать
         // Очищаем только если это первая загрузка
@@ -485,7 +493,9 @@ export default function App() {
   // и только для активного агента (не для всех сразу)
   useEffect(() => {
     if (realAgentIdForMessages && !isBootstrapping) {
-      console.log(`[useEffect messages] Loading messages for realAgentId: ${realAgentIdForMessages}, activeAgentId: ${activeAgentId}`);
+      if (import.meta.env.DEV) {
+        console.log(`[useEffect messages] Loading messages for realAgentId: ${realAgentIdForMessages}, activeAgentId: ${activeAgentId}`);
+      }
       // Небольшая задержка, чтобы интерфейс успел отрендериться
       const timer = setTimeout(() => {
         ensureMessagesLoaded(realAgentIdForMessages);
@@ -510,18 +520,24 @@ export default function App() {
       
       try {
         // Используем agentId для запроса, но бэкенд вернет все файлы пользователя
-        console.log(`[Frontend] Loading project documents for agent: ${agentId}, project: ${activeProjectId}`);
+        if (import.meta.env.DEV) {
+          console.log(`[Frontend] Loading project documents for agent: ${agentId}, project: ${activeProjectId}`);
+        }
         const { files } = await api.getSummaryFiles(agentId, activeProjectId);
-        console.log(`[Frontend] ✅ Loaded project documents (ALL files from all agents):`, files.length, 'files');
-        console.log(`[Frontend] File details:`, files.map(f => ({
-          id: f.id,
-          name: f.name,
-          agentId: f.agentId,
-        })));
+        if (import.meta.env.DEV) {
+          console.log(`[Frontend] ✅ Loaded project documents (ALL files from all agents):`, files.length, 'files');
+          console.log(`[Frontend] File details:`, files.map(f => ({
+            id: f.id,
+            name: f.name,
+            agentId: f.agentId,
+          })));
+        }
         // Сохраняем под ключом 'all' для всех агентов - это ВСЕ документы всех агентов
         setSummaryDocuments((prev) => {
           const mapped = files.map(mapFile);
-          console.log(`[Frontend] Setting summaryDocuments['all'] with ${mapped.length} files`);
+          if (import.meta.env.DEV) {
+            console.log(`[Frontend] Setting summaryDocuments['all'] with ${mapped.length} files`);
+          }
           return {
             ...prev,
             [PROJECT_DOCS_KEY]: mapped,
@@ -531,7 +547,9 @@ export default function App() {
         // Если 404 - просто нет файлов, это нормально, устанавливаем пустой массив
         // Проверяем статус напрямую или по сообщению
         if (error?.status === 404 || error?.message?.includes('404') || error?.message?.includes('Not Found')) {
-          console.log(`[Frontend] No project documents found (404 is normal if no files exist)`);
+          if (import.meta.env.DEV) {
+            console.log(`[Frontend] No project documents found (404 is normal if no files exist)`);
+          }
           setSummaryDocuments((prev) => ({
             ...prev,
             [PROJECT_DOCS_KEY]: [],
@@ -560,7 +578,9 @@ export default function App() {
     const timer = setTimeout(() => {
       // Сбрасываем кеш, чтобы гарантировать загрузку всех документов всех агентов
       loadedSummaryRef.current.delete('all');
-      console.log(`[Frontend] useEffect: Переключение на агента ${realAgentIdForMessages}, сброс кеша и загрузка документов`);
+      if (import.meta.env.DEV) {
+        console.log(`[Frontend] useEffect: Переключение на агента ${realAgentIdForMessages}, сброс кеша и загрузка документов`);
+      }
       ensureSummaryLoaded(realAgentIdForMessages);
     }, 200); // Небольшая задержка для лучшего UX
 
@@ -733,7 +753,9 @@ export default function App() {
       } catch (bootstrapError: any) {
         // Если bootstrap не удался из-за временной проблемы с БД - не критично
         // Пользователь уже залогинен и может попробовать обновить страницу
-        console.warn('Bootstrap after registration failed, but user is logged in', bootstrapError);
+        if (import.meta.env.DEV) {
+          console.warn('Bootstrap after registration failed, but user is logged in', bootstrapError);
+        }
       }
     } catch (error: any) {
       const errorMessage = getErrorMessage(error);
@@ -875,23 +897,27 @@ export default function App() {
     if (!activeAgent || !activeAgentId || !realAgentIdForMessages || messages.length < 1 || !activeProjectId) return;
     setIsGeneratingSummary(true);
     try {
-      console.log('[Frontend] handleGenerateSummary called:', {
-        agentId: activeAgentId, // Используем ID шаблона для генерации
-        realAgentId: realAgentIdForMessages,
-        agentName: activeAgent.name,
-        messagesCount: messages.length,
-        projectId: activeProjectId,
-      });
+      if (import.meta.env.DEV) {
+        console.log('[Frontend] handleGenerateSummary called:', {
+          agentId: activeAgentId, // Используем ID шаблона для генерации
+          realAgentId: realAgentIdForMessages,
+          agentName: activeAgent.name,
+          messagesCount: messages.length,
+          projectId: activeProjectId,
+        });
+      }
       
       // Используем activeAgentId (ID шаблона), так как бэкенд ожидает ID шаблона
       // и сам создаст/найдет реальный агент через getOrCreateAgentFromTemplate
       const { file } = await api.generateSummary(activeAgentId, activeProjectId);
       
-      console.log('[Frontend] Summary generated successfully:', {
-        fileId: file.id,
-        fileName: file.name,
-        agentId: file.agentId,
-      });
+      if (import.meta.env.DEV) {
+        console.log('[Frontend] Summary generated successfully:', {
+          fileId: file.id,
+          fileName: file.name,
+          agentId: file.agentId,
+        });
+      }
       
       const uploaded = mapFile(file);
       // Добавляем созданный файл напрямую в summaryDocuments (документы проекта общие для всех агентов)
@@ -900,10 +926,12 @@ export default function App() {
           ...prev,
           'all': [uploaded, ...(prev['all'] ?? [])],
         };
-        console.log('[Frontend] Updated summaryDocuments:', {
-          totalFiles: updated['all'].length,
-          newFile: uploaded.name,
-        });
+        if (import.meta.env.DEV) {
+          console.log('[Frontend] Updated summaryDocuments:', {
+            totalFiles: updated['all'].length,
+            newFile: uploaded.name,
+          });
+        }
         return updated;
       });
       // Очищаем кеш загрузки, чтобы при следующем переключении файлы перезагрузились
@@ -911,12 +939,14 @@ export default function App() {
       setSummarySuccess(true);
       setTimeout(() => setSummarySuccess(false), 3000);
     } catch (error: any) {
-      console.error('[Frontend] Summary generation failed:', error);
-      console.error('[Frontend] Error details:', {
-        message: error?.message,
-        status: error?.status,
-        stack: error?.stack,
-      });
+      if (import.meta.env.DEV) {
+        console.error('[Frontend] Summary generation failed:', error);
+        console.error('[Frontend] Error details:', {
+          message: error?.message,
+          status: error?.status,
+          stack: error?.stack,
+        });
+      }
       showAlert(`Не удалось создать саммари: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
     } finally {
       setIsGeneratingSummary(false);
@@ -958,7 +988,9 @@ export default function App() {
         setAgents(mappedAgents);
         setActiveAgentId(mappedAgents[0]?.id ?? null);
       } catch (error) {
-        console.log('No agents in new project, this is expected');
+        if (import.meta.env.DEV) {
+          console.log('No agents in new project, this is expected');
+        }
         setAgents([]);
         setActiveAgentId(null);
       }
@@ -1056,7 +1088,9 @@ export default function App() {
     const fileToRemove = projectFiles.find(doc => doc.id === fileId);
     
     if (!fileToRemove) {
-      console.error('[Frontend] File not found in summary documents:', { fileId });
+      if (import.meta.env.DEV) {
+        console.error('[Frontend] File not found in summary documents:', { fileId });
+      }
       return;
     }
 
@@ -1069,7 +1103,9 @@ export default function App() {
       'Удалить файл?',
       `Файл "${fileToRemove.name}" будет удален.\n\nЭто действие нельзя отменить.`,
       async () => {
-        console.log('[Frontend] Calling api.deleteProjectFile:', { fileId });
+        if (import.meta.env.DEV) {
+          console.log('[Frontend] Calling api.deleteProjectFile:', { fileId });
+        }
         
         try {
           if (activeProjectId) {
@@ -1080,12 +1116,14 @@ export default function App() {
               if (!shouldFallback) {
                 throw projectDeleteError;
               }
-              console.warn('[Frontend] Project-scoped deletion failed, falling back to direct delete', {
-                fileId,
-                projectId: activeProjectId,
-                status: projectDeleteError?.status,
-                message: projectDeleteError?.message,
-              });
+              if (import.meta.env.DEV) {
+                console.warn('[Frontend] Project-scoped deletion failed, falling back to direct delete', {
+                  fileId,
+                  projectId: activeProjectId,
+                  status: projectDeleteError?.status,
+                  message: projectDeleteError?.message,
+                });
+              }
               await api.deleteFileById(fileId);
             }
           } else {

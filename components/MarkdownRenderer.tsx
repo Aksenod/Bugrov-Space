@@ -126,7 +126,7 @@ ${html}
 };
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isCompact = false }) => {
-  const lineHeightClass = isCompact ? 'leading-[1.2]' : 'leading-loose';
+  const lineHeightClass = isCompact ? 'leading-[1.5]' : 'leading-relaxed';
   const [htmlPreviews, setHtmlPreviews] = React.useState<{ [key: string]: boolean }>({});
   
   // Простая функция для создания хеша строки
@@ -141,7 +141,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
   };
 
   return (
-    <div className={`prose prose-invert prose-sm max-w-none break-words leading-relaxed py-0 [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${isCompact ? 'leading-[1.2]' : ''}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
+    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -214,10 +214,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             );
           },
           ul({ children }) {
-            return <ul className={`list-disc ml-5 my-3 space-y-2 text-white/90 ${lineHeightClass}`}>{children}</ul>;
+            return <ul className={`list-disc ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`}>{children}</ul>;
           },
           ol({ children }) {
-            return <ol className={`list-decimal ml-5 my-3 space-y-2 text-white/90 ${lineHeightClass}`}>{children}</ol>;
+            return <ol className={`list-decimal ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`}>{children}</ol>;
           },
           a({ href, children }) {
             return (
@@ -227,25 +227,25 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             );
           },
           p({ children }) {
-            return <p className={`mb-3 last:mb-0 text-white/90 ${lineHeightClass}`}>{children}</p>;
+            return <p className={`mb-3 last:mb-0 text-white/95 text-base ${lineHeightClass}`}>{children}</p>;
           },
           h1({ children }) {
-            return <h1 className="text-xl font-bold text-white mb-3 mt-4 first:mt-0">{children}</h1>;
+            return <h1 className="text-2xl font-bold text-white mb-3 mt-4 first:mt-0">{children}</h1>;
           },
           h2({ children }) {
-            return <h2 className="text-lg font-bold text-white mb-2 mt-4 first:mt-0">{children}</h2>;
+            return <h2 className="text-xl font-bold text-white mb-2 mt-4 first:mt-0">{children}</h2>;
           },
           h3({ children }) {
-            return <h3 className="text-base font-semibold text-white mb-2 mt-3 first:mt-0">{children}</h3>;
+            return <h3 className="text-lg font-semibold text-white mb-2 mt-3 first:mt-0">{children}</h3>;
           },
           strong({ children }) {
             return <strong className="font-semibold text-white">{children}</strong>;
           },
           em({ children }) {
-            return <em className="italic text-white/90">{children}</em>;
+            return <em className="italic text-white/95">{children}</em>;
           },
           blockquote({ children }) {
-            return <blockquote className="border-l-4 border-indigo-500/50 pl-4 my-3 text-white/80 italic">{children}</blockquote>;
+            return <blockquote className={`border-l-4 border-indigo-500/50 pl-4 my-3 text-white/90 italic text-base ${lineHeightClass}`}>{children}</blockquote>;
           }
         }}
       >

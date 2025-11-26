@@ -156,7 +156,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
           }}
           placeholder={disabled ? "Connecting..." : "Ask anything..."}
           disabled={disabled}
-          className="w-full bg-transparent text-white placeholder-white/30 text-sm px-3 py-3.5 max-h-[150px] min-h-[48px] focus:outline-none focus:ring-0 resize-none no-scrollbar font-medium leading-relaxed"
+          className="w-full bg-transparent text-white placeholder-white/30 text-base px-3 py-3.5 max-h-[150px] min-h-[48px] focus:outline-none focus:ring-0 resize-none no-scrollbar font-medium leading-relaxed"
           rows={1}
           style={{ height: '48px', overflowY: 'hidden' }}
         />
