@@ -77,7 +77,7 @@ const SortableAgentItem: React.FC<SortableAgentItemProps> = ({ agent, index }) =
         <GripVertical size={14} className="sm:w-4 sm:h-4" />
       </div>
       <span className="text-xs sm:text-sm text-white/50 font-medium w-6 sm:w-8 text-center">
-        {(agent.order ?? 0) + 1}
+        {index + 1}
       </span>
       {getAgentIcon(agent.id, 14, 'sm:w-4 sm:h-4')}
       <div className="flex-1 min-w-0">
