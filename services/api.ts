@@ -253,6 +253,13 @@ export interface ApiUser {
   role?: string; // 'admin' | 'user'
 }
 
+export interface ApiAdminUser {
+  id: string;
+  username: string;
+  createdAt: string;
+  projectsCount: number;
+}
+
 export interface ApiFile {
   id: string;
   name: string;
@@ -319,6 +326,12 @@ export interface ApiMessage {
   role: 'USER' | 'MODEL';
   text: string;
   createdAt: string;
+}
+
+export interface ApiGlobalPrompt {
+  content: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const setToken = (token: string | null) => {
@@ -601,6 +614,22 @@ export const api = {
 
   async detachAgentFromProjectType(agentId: string, projectTypeId: string) {
     return request<void>(`/admin/agents/${agentId}/project-types/${projectTypeId}`, { method: 'DELETE' });
+  },
+
+  async getGlobalPrompt() {
+    return request<{ globalPrompt: ApiGlobalPrompt }>('/admin/global-prompt');
+  },
+
+  async updateGlobalPrompt(payload: { content: string }) {
+    return request<{ globalPrompt: ApiGlobalPrompt }>('/admin/global-prompt', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Admin users API
+  async getUsers() {
+    return request<{ users: ApiAdminUser[] }>('/admin/users');
   },
 };
 
