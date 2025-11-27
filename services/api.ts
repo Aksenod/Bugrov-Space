@@ -629,7 +629,7 @@ export const api = {
 
   // Admin users API
   async getUsers() {
-    return request<{ users: ApiAdminUser[] }>('/admin/users');
+    return request<{ users: ApiAdminUser[]; totalUsers: number; totalProjects: number }>('/admin/users');
   },
 };
 

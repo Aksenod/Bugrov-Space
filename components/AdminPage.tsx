@@ -121,6 +121,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   // Users state
   const [users, setUsers] = useState<ApiAdminUser[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [totalProjects, setTotalProjects] = useState<number>(0);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<ApiProjectTypeAgent | null>(null);
   
@@ -216,8 +218,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       setInitialGlobalPrompt(content);
       setGlobalPromptUpdatedAt(prompt?.updatedAt ?? prompt?.createdAt ?? null);
     } catch (error: any) {
-      console.error('Failed to load global prompt', error);
-      setGlobalPromptError(error?.message || 'Не удалось загрузить глобальный промт');
+      // Если маршрут не найден (404), это нормально - возможно, функция еще не развернута
+      // Инициализируем пустым содержимым вместо показа ошибки
+      if (error?.status === 404) {
+        console.warn('Global prompt endpoint not found (404), initializing with empty content');
+        setGlobalPrompt('');
+        setInitialGlobalPrompt('');
+        setGlobalPromptUpdatedAt(null);
+      } else {
+        console.error('Failed to load global prompt', error);
+        setGlobalPromptError(error?.message || 'Не удалось загрузить глобальный промт');
+      }
     } finally {
       setIsLoadingGlobalPrompt(false);
     }
@@ -534,6 +545,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       }
       
       setUsers(usersList);
+      setTotalUsers(response?.totalUsers ?? 0);
+      setTotalProjects(response?.totalProjects ?? 0);
     } catch (error: any) {
       console.error('[AdminPage] Failed to load users', error);
       console.error('[AdminPage] Error details:', {
@@ -1070,7 +1083,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         3000,
       );
     } catch (error: any) {
-      const message = error?.message || 'Не удалось сохранить глобальный промт';
+      let message = error?.message || 'Не удалось сохранить глобальный промт';
+      if (error?.status === 404) {
+        message = 'Функция глобального промта не доступна на сервере (404). Возможно, требуется обновление сервера.';
+      }
       setGlobalPromptError(message);
       showAlert(message, 'Ошибка', 'error', 4000);
     } finally {
@@ -1869,7 +1885,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
               <>
                 {/* Users Tab */}
                 <div className="flex flex-col gap-3 sm:gap-4">
-                  <h2 className="text-base sm:text-lg font-bold text-white">Пользователи</h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-bold text-white">Пользователи</h2>
+                    {(totalUsers > 0 || totalProjects > 0) && (
+                      <span className="text-xs sm:text-sm text-white/60">
+                        ({totalUsers} {totalUsers === 1 ? 'пользователь' : totalUsers < 5 ? 'пользователя' : 'пользователей'}, {totalProjects} {totalProjects === 1 ? 'проект' : totalProjects < 5 ? 'проекта' : 'проектов'})
+                      </span>
+                    )}
+                  </div>
                   
                   {isLoadingUsers ? (
                     <div className="flex items-center justify-center py-8">

@@ -12,13 +12,21 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     console.log('[GET /admin/users] Request received');
     console.log('[GET /admin/users] Request headers:', JSON.stringify(req.headers, null, 2));
     
-    // Сначала проверяем, есть ли вообще пользователи в базе (простой запрос)
-    const totalUsersCount = await withRetry(
-      () => prisma.user.count(),
-      2,
-      'GET /admin/users - count users'
-    );
+    // Получаем общее количество пользователей и проектов
+    const [totalUsersCount, totalProjectsCount] = await Promise.all([
+      withRetry(
+        () => prisma.user.count(),
+        2,
+        'GET /admin/users - count users'
+      ),
+      withRetry(
+        () => prisma.project.count(),
+        2,
+        'GET /admin/users - count projects'
+      ),
+    ]);
     console.log(`[GET /admin/users] Total users in database: ${totalUsersCount}`);
+    console.log(`[GET /admin/users] Total projects in database: ${totalProjectsCount}`);
     
     const users = await withRetry(
       () => prisma.user.findMany({
@@ -63,7 +71,11 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 
     logger.info({ usersCount: usersWithCount.length }, 'Admin users fetched');
     console.log(`[GET /admin/users] Returning ${usersWithCount.length} users`);
-    res.json({ users: usersWithCount });
+    res.json({ 
+      users: usersWithCount,
+      totalUsers: totalUsersCount,
+      totalProjects: totalProjectsCount,
+    });
   } catch (error: any) {
     logger.error({ 
       error: error.message, 

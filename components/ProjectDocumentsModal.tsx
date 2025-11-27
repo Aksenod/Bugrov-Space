@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project } from '../types';
@@ -63,6 +63,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
   const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
+  const [isVerstkaFullscreen, setIsVerstkaFullscreen] = useState(false);
 
   // Helper function to check if agent has role
   const hasRole = (agentRole: string | undefined, roleName: string): boolean => {
@@ -92,6 +93,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       // Сбрасываем таб при закрытии модального окна
       setActiveTab('text');
       setShowVerstkaCode(false);
+      setIsVerstkaFullscreen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFileId, isOpen]);
@@ -242,6 +244,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
     return roles.includes('verstka');
   });
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'verstka' || !showVerstkaSubTabs) {
+      setIsVerstkaFullscreen(false);
+    }
+  }, [activeTab, isOpen, showVerstkaSubTabs]);
 
   const decodeContent = (base64: string) => {
     try {
@@ -403,8 +411,70 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   const shouldRenderDocumentsHint = shouldShowStep(documentsHintStep);
 
+  const renderVerstkaContent = (isFullscreenView = false) => {
+    const content = getDisplayContent();
+    if (showVerstkaCode) {
+      if (content) {
+        const decodedHtml = decodeContent(content);
+        return (
+          <div className="overflow-x-auto">
+            <SyntaxHighlighter
+              style={vscDarkPlus}
+              language="html"
+              PreTag="div"
+              customStyle={{
+                margin: 0,
+                borderRadius: isFullscreenView ? '1.5rem' : '1rem',
+                padding: isFullscreenView ? '1.5rem' : 0,
+              }}
+            >
+              {decodedHtml}
+            </SyntaxHighlighter>
+          </div>
+        );
+      }
+      return (
+        <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+          <p className="text-base font-medium mb-2">HTML код еще не сгенерирован</p>
+          <p className="text-sm text-white/20">
+            Код верстки будет отображен здесь после генерации
+          </p>
+        </div>
+      );
+    }
+
+    if (content) {
+      const decodedHtml = decodeContent(content);
+      return (
+        <div className="w-full h-full min-h-[60vh]">
+          <iframe
+            srcDoc={decodedHtml}
+            className="w-full h-full border-0"
+            title="HTML Preview"
+            sandbox="allow-same-origin allow-scripts"
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+        <p className="text-base font-medium mb-2">HTML верстка еще не сгенерирована</p>
+        <p className="text-sm text-white/20">
+          Результат верстки будет отображен здесь после генерации
+        </p>
+      </div>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex flex-col overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex flex-col overflow-hidden"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
         {shouldRenderDocumentsHint && (
           <div className="p-4 md:p-6 border-b border-white/10 bg-black/30 backdrop-blur-xl">
             <div className="max-w-4xl mx-auto w-full">
@@ -455,7 +525,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 md:no-scrollbar">
             {documents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
                 <div className="relative mb-4">
@@ -498,14 +568,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         <div className={`flex-1 flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
           
           {/* Mobile Header for Preview */}
-          <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-black/40 backdrop-blur-md flex-shrink-0">
-            <button onClick={() => setSelectedFileId(null)} className="p-2 text-white hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+          <div className="md:hidden sticky top-0 z-20 p-4 border-b border-white/10 flex items-center gap-3 bg-black/60 backdrop-blur-md flex-shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
+            <button onClick={() => setSelectedFileId(null)} className="p-2.5 text-white hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors" aria-label="К списку документов">
               <ArrowLeft size={20} className="font-bold" />
             </button>
             <span className="font-medium truncate text-white">
               {selectedFile ? getDocumentDisplayName(selectedFile) : ''}
             </span>
-            <button onClick={onClose} className="ml-auto p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+            <button onClick={onClose} className="ml-auto p-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Закрыть">
               <X size={20} />
             </button>
           </div>
@@ -518,9 +588,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className={`flex-1 min-h-0 ${activeTab === 'verstka' && showVerstkaSubTabs ? 'overflow-visible p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: 'auto', minHeight: '200vh', maxHeight: 'none' } : undefined}>
-              <div className={`${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'w-full h-full' : 'max-w-6xl mx-auto w-full'}`} style={activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? { height: '200vh', minHeight: '200vh', maxHeight: 'none' } : undefined}>
-                 {!(activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode) && (
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12">
+              <div className="max-w-6xl mx-auto w-full">
+                 {!(activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode && isVerstkaFullscreen) && (
                  <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
@@ -538,6 +608,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                                 className="px-4 py-2 text-sm font-medium transition-colors text-white/50 hover:text-white/70 border border-white/10 rounded-lg hover:bg-white/5"
                               >
                                 {showVerstkaCode ? 'Показать превью' : 'Показать код'}
+                              </button>
+                            )}
+                            {showVerstkaSubTabs && !showVerstkaCode && (
+                              <button
+                                onClick={() => setIsVerstkaFullscreen(true)}
+                                className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+                              >
+                                <Maximize2 size={16} />
+                                Развернуть
                               </button>
                             )}
                             
@@ -580,17 +659,21 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         <div className="flex items-center gap-2">
                           <button 
                             onClick={(e) => handleDownload(selectedFile, e)}
-                            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                            className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
                             title="Скачать"
+                            aria-label="Скачать документ"
                           >
+                            <span className="text-xs font-semibold hidden sm:inline">Скачать</span>
                             <Download size={16} />
                           </button>
                           {onRemoveFile && (
                             <button 
                               onClick={(e) => handleDelete(selectedFile.id, e)}
-                              className="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                              className="px-3 py-2 text-white/80 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2"
                               title="Удалить"
+                              aria-label="Удалить документ"
                             >
+                              <span className="text-xs font-semibold hidden sm:inline">Удалить</span>
                               <Trash2 size={16} />
                             </button>
                           )}
@@ -635,14 +718,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                    </div>
                  )}
                  
-                 <div className={`bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner ${activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'rounded-none overflow-visible' : 'rounded-[2rem] overflow-hidden'}`} style={{ 
-                   minHeight: activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? '200vh' : '60vh', 
-                   padding: 0, 
-                   margin: 0,
-                   height: activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? '200vh' : 'auto',
-                   maxHeight: activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode ? 'none' : undefined,
-                   display: 'block'
-                 }}>
+                <div
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-hidden p-4 sm:p-6 md:p-8"
+                  style={{ minHeight: '60vh', margin: 0, display: 'block' }}>
                     {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                        <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                     ) : (
@@ -669,63 +747,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                          });
                          
                          if (activeTab === 'verstka' && showVerstkaSubTabs) {
-                           const fileToUse = localSelectedFile || selectedFile;
-                           
-                           if (showVerstkaCode) {
-                             // Показываем HTML код с подсветкой синтаксиса
-                             if (content) {
-                               const decodedHtml = decodeContent(content);
-                              return (
-                                <div className="overflow-x-auto">
-                                  <SyntaxHighlighter
-                                    style={vscDarkPlus}
-                                    language="html"
-                                    PreTag="div"
-                                    customStyle={{
-                                      margin: 0,
-                                      borderRadius: '1rem',
-                                      padding: 0,
-                                    }}
-                                  >
-                                    {decodedHtml}
-                                  </SyntaxHighlighter>
-                                </div>
-                              );
-                             } else {
-                               return (
-                                 <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
-                                   <p className="text-base font-medium mb-2">HTML код еще не сгенерирован</p>
-                                   <p className="text-sm text-white/20">
-                                     Код верстки будет отображен здесь после генерации
-                                   </p>
-                                 </div>
-                               );
-                             }
-                           } else {
-                            // Показываем HTML превью в iframe
-                            if (content) {
-                              const decodedHtml = decodeContent(content);
-                              return (
-                                <div className="w-full h-full min-h-[600px]">
-                                  <iframe
-                                    srcDoc={decodedHtml}
-                                    className="w-full h-full border-0"
-                                    title="HTML Preview"
-                                    sandbox="allow-same-origin allow-scripts"
-                                  />
-                                </div>
-                              );
-                             } else {
-                               return (
-                                 <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
-                                   <p className="text-base font-medium mb-2">HTML верстка еще не сгенерирована</p>
-                                   <p className="text-sm text-white/20">
-                                     Результат верстки будет отображен здесь после генерации
-                                   </p>
-                                 </div>
-                               );
-                             }
-                           }
+                           return renderVerstkaContent();
                          }
                          
                          // Проверка на пустое состояние для других табов
@@ -768,6 +790,35 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           )}
         </div>
         </div>
+
+        {isVerstkaFullscreen && selectedFile && (
+          <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-xl flex flex-col">
+            <div className="flex items-center gap-3 border-b border-white/10 bg-black/70 px-4 py-4 sm:px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
+              <button
+                onClick={() => setIsVerstkaFullscreen(false)}
+                className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white flex items-center justify-center transition-colors"
+                aria-label="Закрыть полноэкранный режим"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/50 uppercase tracking-wide">Превью верстки</p>
+                <p className="text-white font-semibold truncate">{getDocumentDisplayName(selectedFile)}</p>
+              </div>
+              <button
+                onClick={() => setShowVerstkaCode(!showVerstkaCode)}
+                className="px-4 py-2 text-sm font-medium transition-colors text-white/70 hover:text-white border border-white/20 rounded-lg hover:bg-white/5"
+              >
+                {showVerstkaCode ? 'Показать превью' : 'Показать код'}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+              <div className="w-full h-full bg-black/40 border border-white/10 rounded-2xl p-4">
+                {renderVerstkaContent(true)}
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };
