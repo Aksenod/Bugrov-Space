@@ -155,7 +155,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
                 }
               });
             }
-            });
           }}
           placeholder={disabled ? "Connecting..." : "Ask anything..."}
           disabled={disabled}
