@@ -2,6 +2,7 @@ import { fetch } from 'undici';
 import { Buffer } from 'node:buffer';
 import { env } from '../env';
 import { logger } from '../utils/logger';
+import { getGlobalPromptText } from './globalPromptService';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-5.1';
@@ -81,8 +82,22 @@ function processFileContent(file: AgentFile): string | null {
   }
 }
 
-function buildSystemPrompt(agent: AgentWithFiles) {
-  const intro = `Ты выступаешь как агент "${agent.name}". ${agent.systemInstruction || ''}`.trim();
+async function buildSystemPrompt(agent: AgentWithFiles) {
+  const [globalPrompt] = await Promise.all([getGlobalPromptText()]);
+  const globalPromptText = globalPrompt.trim();
+  const agentInstruction = (agent.systemInstruction || '').trim();
+
+  const introParts = [`Ты выступаешь как агент "${agent.name}".`];
+
+  if (globalPromptText) {
+    introParts.push(`Глобальная инструкция (общая для всех агентов):\n${globalPromptText}`);
+  }
+
+  if (agentInstruction) {
+    introParts.push(agentInstruction);
+  }
+
+  const intro = introParts.join('\n\n').trim();
 
   // Логирование для диагностики
   logger.debug({
@@ -193,7 +208,7 @@ export async function generateAgentResponse(
   history: ConversationMessage[],
   newMessage: string,
 ): Promise<string> {
-  const systemPrompt = buildSystemPrompt(agent);
+  const systemPrompt = await buildSystemPrompt(agent);
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...mapHistory(history),
@@ -266,7 +281,7 @@ export async function generateDocumentResult(
     model: agent.model || null,
     files: agent.files,
   };
-  const systemPrompt = buildSystemPrompt(agentWithFiles);
+  const systemPrompt = await buildSystemPrompt(agentWithFiles);
   
   const roleInstruction = role === 'dsl' 
     ? 'Преобразуй предоставленный контент в DSL формат согласно твоей инструкции.'
