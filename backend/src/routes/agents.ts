@@ -1178,7 +1178,7 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
     };
 
     const dslAgent = findAgentByRole('dsl');
-    const verstkaAgent = findAgentByRole('verstka');
+    const verstkaAgent = findAgentByRole('layout');
 
     if (!dslAgent) {
       return res.status(400).json({ error: 'DSL agent not found in project' });
