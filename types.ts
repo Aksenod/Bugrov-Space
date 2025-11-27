@@ -32,6 +32,8 @@ export interface UploadedFile {
   data: string; // Base64 string
   agentId?: string;
   isKnowledgeBase?: boolean;
+  dslContent?: string; // Generated DSL content
+  verstkaContent?: string; // Generated HTML content
 }
 
 export interface Agent {

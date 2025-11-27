@@ -58,16 +58,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 }) => {
   const { shouldShowStep, completeStep } = useOnboarding();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka'>('text');
-  const [showVerstkaCode, setShowVerstkaCode] = useState(false); // false = превью, true = код
-  const [isGeneratingDSL, setIsGeneratingDSL] = useState(false);
-  const [isGeneratingVerstka, setIsGeneratingVerstka] = useState(false);
+  const [activeTab, setActiveTab] = useState<'text' | 'prototype'>('text');
+  const [showPrototypeCode, setShowPrototypeCode] = useState(false); // false = превью, true = код
+  const [isGeneratingPrototype, setIsGeneratingPrototype] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
   const [isVerstkaFullscreen, setIsVerstkaFullscreen] = useState(false);
 
-  function setActiveTabSafe(tab: 'text' | 'dsl' | 'verstka') {
+  function setActiveTabSafe(tab: 'text' | 'prototype') {
     setActiveTab(tab);
-    if (tab !== 'verstka') {
+    if (tab !== 'prototype') {
       setIsVerstkaFullscreen(false);
     }
   }
@@ -87,20 +86,20 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         const allAgents = agents;
         const creatorAgent = file.agentId ? allAgents.find(agent => agent.id === file.agentId) : null;
         const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "verstka");
-        
+
         if (hasVerstkaRole) {
-          setActiveTabSafe('verstka');
-          setShowVerstkaCode(false); // По умолчанию показываем превью
+          setActiveTabSafe('prototype');
+          setShowPrototypeCode(false); // По умолчанию показываем превью
         } else {
           setActiveTabSafe('text');
-          setShowVerstkaCode(false);
+          setShowPrototypeCode(false);
         }
         setIsVerstkaFullscreen(false);
       }
     } else if (!isOpen) {
       // Сбрасываем таб при закрытии модального окна
       setActiveTabSafe('text');
-      setShowVerstkaCode(false);
+      setShowPrototypeCode(false);
       setIsVerstkaFullscreen(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,11 +114,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         setLocalSelectedFile(prev => {
           // Если локальный файл уже существует и имеет dslContent или verstkaContent - сохраняем его
           if (prev && prev.id === selectedFileId) {
-            const hasLocalContent = (prev.dslContent && prev.dslContent.length > 0) || 
-                                    (prev.verstkaContent && prev.verstkaContent.length > 0);
-            const hasPropContent = (fileFromProps.dslContent && fileFromProps.dslContent.length > 0) || 
-                                   (fileFromProps.verstkaContent && fileFromProps.verstkaContent.length > 0);
-            
+            const hasLocalContent = (prev.dslContent && prev.dslContent.length > 0) ||
+              (prev.verstkaContent && prev.verstkaContent.length > 0);
+            const hasPropContent = (fileFromProps.dslContent && fileFromProps.dslContent.length > 0) ||
+              (fileFromProps.verstkaContent && fileFromProps.verstkaContent.length > 0);
+
             // Если локальный файл имеет контент, который есть и в prop - берем prop (он новее)
             // Если локальный файл имеет контент, которого нет в prop - оставляем локальный
             if (hasLocalContent && !hasPropContent) {
@@ -141,7 +140,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const getAgentName = (doc: UploadedFile) => {
     // Ищем агента в обоих массивах: реальные агенты проекта и шаблоны агентов
     const allAgents = agents;
-    
+
     // Сначала пытаемся найти по agentId
     if (doc.agentId) {
       const agent = allAgents.find(agent => agent.id === doc.agentId);
@@ -149,7 +148,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         return agent.name;
       }
     }
-    
+
     // Если агент не найден по ID, пытаемся извлечь название из имени файла
     // Формат имени: "Summary - {AgentName} - {Date}" или "Summary – {AgentName} – {Date}"
     // Поддерживаем разные типы тире: дефис (-), длинное тире (–), среднее тире (—)
@@ -164,13 +163,13 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       // Если агента с таким именем нет в списке, всё равно возвращаем имя из файла
       return agentNameFromFile;
     }
-    
+
     // Альтернативный формат: "Документ - {AgentName} - {Date}"
     const altNameMatch = doc.name.match(/^Документ\s*[-–—]\s*(.+?)\s*[-–—]\s*\d/);
     if (altNameMatch && altNameMatch[1]) {
       return altNameMatch[1].trim();
     }
-    
+
     // Если ничего не найдено, возвращаем "Документ"
     return 'Документ';
   };
@@ -230,19 +229,19 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   if (!isOpen) return null;
 
   const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
-  
+
   // Находим агента-создателя документа
   const allAgents = agents;
-  const documentCreatorAgent = selectedFile?.agentId 
+  const documentCreatorAgent = selectedFile?.agentId
     ? allAgents.find(agent => agent.id === selectedFile.agentId)
     : null;
-  
+
   // Показывать кнопки только если документ создан агентом-копирайтером
   const showDSLButtons = documentCreatorAgent && hasRole(documentCreatorAgent.role, "copywriter");
-  
+
   // Показывать подтабы только если документ создан агентом-верстальщиком
   const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "verstka");
-  
+
   // Находим агентов DSL и Верстка по ролям (могут быть отдельными агентами или частью копирайтера)
   const dslAgent = allAgents.find(agent => {
     const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
@@ -276,48 +275,27 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const handleDelete = async (fileId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!onRemoveFile) return;
-    
+
     // onRemoveFile в App.tsx уже показывает подтверждение, поэтому просто вызываем его
     // Но сначала сбрасываем выбор, если удаляемый файл был выбран
     if (selectedFileId === fileId) {
       setSelectedFileId(null);
       setLocalSelectedFile(null);
     }
-    
+
     // Вызываем onRemoveFile, который покажет подтверждение и выполнит удаление
     onRemoveFile(fileId);
   };
 
-  const handleGenerateResult = async (role: 'dsl' | 'verstka') => {
+  const handleGenerateResult = async () => {
     if (!selectedFile || !documentCreatorAgent) return;
 
-    // Ищем агента с нужной ролью (может быть отдельным агентом или частью копирайтера)
-    const allAgents = agents;
-    const targetAgent = allAgents.find(agent => {
-      return hasRole(agent.role, role === 'dsl' ? 'dsl' : 'verstka');
-    });
-
-    if (!targetAgent) {
-      if (onShowAlert) {
-        onShowAlert(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`, 'Ошибка', 'error');
-      } else {
-        // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
-        console.error(`${role === 'dsl' ? 'DSL' : 'Верстка'} агент не найден`);
-      }
-      return;
-    }
-
-    if (role === 'dsl') {
-      setIsGeneratingDSL(true);
-    } else {
-      setIsGeneratingVerstka(true);
-    }
+    setIsGeneratingPrototype(true);
 
     try {
-      const { file } = await api.generateDocumentResult(
+      const { file } = await api.generatePrototype(
         documentCreatorAgent.id,
-        selectedFile.id,
-        role
+        selectedFile.id
       );
 
       // Создаём обновлённый файл
@@ -332,7 +310,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       };
 
       console.log('[ProjectDocumentsModal] Generated result:', {
-        role,
         hasDSL: !!updatedFile.dslContent,
         hasVerstka: !!updatedFile.verstkaContent,
         dslLength: updatedFile.dslContent?.length || 0,
@@ -347,22 +324,19 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         onDocumentUpdate(updatedFile);
       }
 
-      // Переключаемся на соответствующий таб после небольшой задержки
-      // чтобы состояние успело обновиться
+      // Переключаемся на таб прототипа
       setTimeout(() => {
-        setActiveTabSafe(role);
+        setActiveTabSafe('prototype');
       }, 100);
     } catch (error: any) {
       console.error('Failed to generate result:', error);
       if (onShowAlert) {
-        onShowAlert(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+        onShowAlert(`Не удалось сгенерировать прототип: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
       } else {
-        // Если onShowAlert не передан, логируем ошибку (но это не должно происходить)
-        console.error(`Не удалось сгенерировать результат: ${error?.message || 'Неизвестная ошибка'}`);
+        console.error(`Не удалось сгенерировать прототип: ${error?.message || 'Неизвестная ошибка'}`);
       }
     } finally {
-      setIsGeneratingDSL(false);
-      setIsGeneratingVerstka(false);
+      setIsGeneratingPrototype(false);
     }
   };
 
@@ -374,18 +348,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
     if (activeTab === 'text') {
       return fileToUse.data;
-    } else if (activeTab === 'dsl') {
-      const content = fileToUse.dslContent || null;
-      console.log('[ProjectDocumentsModal] getDisplayContent DSL:', {
-        hasContent: !!content,
-        contentLength: content?.length || 0,
-        selectedFileId: fileToUse.id,
-        isLocalSelected: localSelectedFile?.id === fileToUse.id,
-      });
-      return content;
-    } else if (activeTab === 'verstka') {
+    } else if (activeTab === 'prototype') {
+      // Для таба прототипа возвращаем verstkaContent (HTML)
       const content = fileToUse.verstkaContent || null;
-      console.log('[ProjectDocumentsModal] getDisplayContent Verstka:', {
+      console.log('[ProjectDocumentsModal] getDisplayContent Prototype:', {
         hasContent: !!content,
         contentLength: content?.length || 0,
         selectedFileId: fileToUse.id,
@@ -414,9 +380,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   const shouldRenderDocumentsHint = shouldShowStep(documentsHintStep);
 
-  const renderVerstkaContent = (isFullscreenView = false) => {
+  const renderPrototypeContent = (isFullscreenView = false) => {
     const content = getDisplayContent();
-    if (showVerstkaCode) {
+    if (showPrototypeCode) {
       if (content) {
         const decodedHtml = decodeContent(content);
         return (
@@ -462,9 +428,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
     return (
       <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
-        <p className="text-base font-medium mb-2">HTML верстка еще не сгенерирована</p>
+        <p className="text-base font-medium mb-2">Прототип еще не сгенерирован</p>
         <p className="text-sm text-white/20">
-          Результат верстки будет отображен здесь после генерации
+          Используйте кнопку "Сгенерировать прототип" для создания HTML-макета
         </p>
       </div>
     );
@@ -478,28 +444,28 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-        {shouldRenderDocumentsHint && (
-          <div className="p-4 md:p-6 border-b border-white/10 bg-black/30 backdrop-blur-xl">
-            <div className="max-w-4xl mx-auto w-full">
-              <InlineHint
-                title="Документы проекта"
-                description="Здесь отображаются все документы вашего проекта. Документы доступны всем агентам проекта и используются ими для контекста при ответах. Вы можете сохранять диалоги с агентами через кнопку 'Save' в чате."
-                examples={[
-                  'Документы доступны всем агентам проекта',
-                  'Используйте кнопку "Save" в чате для сохранения диалогов',
-                  'Агенты используют документы для контекста при ответах',
-                ]}
-                variant="info"
-                collapsible={true}
-                defaultExpanded={true}
-                dismissible={true}
-                onDismiss={() => completeStep('documents-modal-hint')}
-              />
-            </div>
+      {shouldRenderDocumentsHint && (
+        <div className="p-4 md:p-6 border-b border-white/10 bg-black/30 backdrop-blur-xl">
+          <div className="max-w-4xl mx-auto w-full">
+            <InlineHint
+              title="Документы проекта"
+              description="Здесь отображаются все документы вашего проекта. Документы доступны всем агентам проекта и используются ими для контекста при ответах. Вы можете сохранять диалоги с агентами через кнопку 'Save' в чате."
+              examples={[
+                'Документы доступны всем агентам проекта',
+                'Используйте кнопку "Save" в чате для сохранения диалогов',
+                'Агенты используют документы для контекста при ответах',
+              ]}
+              variant="info"
+              collapsible={true}
+              defaultExpanded={true}
+              dismissible={true}
+              onDismiss={() => completeStep('documents-modal-hint')}
+            />
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Sidebar List */}
         <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
@@ -518,8 +484,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 )}
               </div>
               {/* Mobile Close Button */}
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 className="md:hidden p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
                 aria-label="Закрыть"
               >
@@ -527,7 +493,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
               </button>
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-4 space-y-2 md:no-scrollbar">
             {documents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
@@ -543,14 +509,13 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 <button
                   key={doc.id}
                   onClick={() => setSelectedFileId(doc.id)}
-                  className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-4 group relative overflow-hidden ${
-                    selectedFileId === doc.id 
-                      ? 'bg-white/10 shadow-lg border border-white/10' 
-                      : 'hover:bg-white/5 border border-transparent'
-                  }`}
+                  className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-4 group relative overflow-hidden ${selectedFileId === doc.id
+                    ? 'bg-white/10 shadow-lg border border-white/10'
+                    : 'hover:bg-white/5 border border-transparent'
+                    }`}
                 >
                   {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
-                  
+
                   <div className="min-w-0 flex-1">
                     <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
                       {getDocumentDisplayName(doc)}
@@ -564,7 +529,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
         {/* Preview Area */}
         <div className={`flex-1 flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
-          
+
           {/* Mobile Header for Preview */}
           <div className="md:hidden sticky top-0 z-20 p-4 border-b border-white/10 flex items-center gap-3 bg-black/60 backdrop-blur-md flex-shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
             <button onClick={() => setSelectedFileId(null)} className="p-2.5 text-white hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors" aria-label="К списку документов">
@@ -580,243 +545,205 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
           {/* Desktop Close Button */}
           <div className="absolute top-6 right-6 z-10 hidden md:block">
-             <button onClick={onClose} className="p-2.5 bg-black/60 backdrop-blur-md hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors border border-white/10 shadow-lg">
-                <X size={20} />
-             </button>
+            <button onClick={onClose} className="p-2.5 bg-black/60 backdrop-blur-md hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors border border-white/10 shadow-lg">
+              <X size={20} />
+            </button>
           </div>
 
           {selectedFile ? (
             <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12">
               <div className="max-w-6xl mx-auto w-full">
-                 {!(activeTab === 'verstka' && showVerstkaSubTabs && !showVerstkaCode && isVerstkaFullscreen) && (
-                 <div className="mb-8 pb-6 border-b border-white/10">
+                {!(activeTab === 'prototype' && showVerstkaSubTabs && !showPrototypeCode && isVerstkaFullscreen) && (
+                  <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
-                            {selectedFile ? getAgentName(selectedFile) : 'Документ'}
-                        </div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
+                        {selectedFile ? getAgentName(selectedFile) : 'Документ'}
+                      </div>
                     </div>
                     <div className="flex items-center justify-between gap-6 text-sm text-white/40">
-                        <div className="flex items-center gap-6">
-                            <span className="flex items-center gap-1.5"><Calendar size={14} /> {selectedFile ? formatDateTime(selectedFile) : new Date().toLocaleString()}</span>
-                            
-                            {/* Кнопка переключения для документов верстальщика */}
-                            {showVerstkaSubTabs && (
-                              <button
-                                onClick={() => setShowVerstkaCode(!showVerstkaCode)}
-                                className="px-4 py-2 text-sm font-medium transition-colors text-white/50 hover:text-white/70 border border-white/10 rounded-lg hover:bg-white/5"
-                              >
-                                {showVerstkaCode ? 'Показать превью' : 'Показать код'}
-                              </button>
-                            )}
-                            {showVerstkaSubTabs && !showVerstkaCode && (
-                              <button
-                                onClick={() => setIsVerstkaFullscreen(true)}
-                                className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
-                              >
-                                <Maximize2 size={16} />
-                                Развернуть
-                              </button>
-                            )}
-                            
-                            {showDSLButtons && (
-                              <>
-                                {dslAgent && (
-                                  <div className="flex items-center gap-1.5">
-                                    <button 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          handleGenerateResult('dsl');
-                                        }}
-                                        disabled={isGeneratingDSL}
-                                        className="text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                    >
-                                        {isGeneratingDSL && <Loader2 size={14} className="animate-spin" />}
-                                        DSL
-                                    </button>
-                                  </div>
-                                )}
-                                {verstkaAgent && (
-                                  <div className="flex items-center gap-1.5">
-                                    <button 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          handleGenerateResult('verstka');
-                                        }}
-                                        disabled={isGeneratingVerstka}
-                                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                    >
-                                        {isGeneratingVerstka && <Loader2 size={14} className="animate-spin" />}
-                                        Верстка
-                                    </button>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={(e) => handleDownload(selectedFile, e)}
-                            className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
-                            title="Скачать"
-                            aria-label="Скачать документ"
-                          >
-                            <span className="text-xs font-semibold hidden sm:inline">Скачать</span>
-                            <Download size={16} />
-                          </button>
-                          {onRemoveFile && (
-                            <button 
-                              onClick={(e) => handleDelete(selectedFile.id, e)}
-                              className="px-3 py-2 text-white/80 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2"
-                              title="Удалить"
-                              aria-label="Удалить документ"
-                            >
-                              <span className="text-xs font-semibold hidden sm:inline">Удалить</span>
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                    </div>
-                 </div>
-                 )}
+                      <div className="flex items-center gap-6">
+                        <span className="flex items-center gap-1.5"><Calendar size={14} /> {selectedFile ? formatDateTime(selectedFile) : new Date().toLocaleString()}</span>
 
-                 {/* Tabs for copywriter documents */}
-                 {showDSLButtons && (
-                   <div className="mb-6 flex items-center gap-2 border-b border-white/10">
-                     <button
-                       onClick={() => setActiveTabSafe('text')}
-                       className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                         activeTab === 'text'
-                           ? 'text-white border-white/40'
-                           : 'text-white/50 border-transparent hover:text-white/70'
-                       }`}
-                     >
-                       Текст
-                     </button>
-                     <button
-                       onClick={() => setActiveTabSafe('dsl')}
-                       className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                         activeTab === 'dsl'
-                           ? 'text-purple-400 border-purple-400/40'
-                           : 'text-white/50 border-transparent hover:text-white/70'
-                       }`}
-                     >
-                       DSL
-                     </button>
-                     <button
-                       onClick={() => setActiveTabSafe('verstka')}
-                       className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                         activeTab === 'verstka'
-                           ? 'text-cyan-400 border-cyan-400/40'
-                           : 'text-white/50 border-transparent hover:text-white/70'
-                       }`}
-                     >
-                       Верстка
-                     </button>
-                   </div>
-                 )}
-                 
+                        {/* Кнопка переключения для документов верстальщика */}
+                        {showVerstkaSubTabs && (
+                          <button
+                            onClick={() => setShowPrototypeCode(!showPrototypeCode)}
+                            className="px-4 py-2 text-sm font-medium transition-colors text-white/50 hover:text-white/70 border border-white/10 rounded-lg hover:bg-white/5"
+                          >
+                            {showPrototypeCode ? 'Показать превью' : 'Показать код'}
+                          </button>
+                        )}
+                        {showVerstkaSubTabs && !showPrototypeCode && (
+                          <button
+                            onClick={() => setIsVerstkaFullscreen(true)}
+                            className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+                          >
+                            <Maximize2 size={16} />
+                            Развернуть
+                          </button>
+                        )}
+
+                        {/* Кнопка генерации прототипа */}
+                        {showDSLButtons && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleGenerateResult();
+                            }}
+                            disabled={isGeneratingPrototype}
+                            className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                          >
+                            {isGeneratingPrototype && <Loader2 size={14} className="animate-spin" />}
+                            Сгенерировать прототип
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => handleDownload(selectedFile, e)}
+                          className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
+                          title="Скачать"
+                          aria-label="Скачать документ"
+                        >
+                          <span className="text-xs font-semibold hidden sm:inline">Скачать</span>
+                          <Download size={16} />
+                        </button>
+                        {onRemoveFile && (
+                          <button
+                            onClick={(e) => handleDelete(selectedFile.id, e)}
+                            className="px-3 py-2 text-white/80 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2"
+                            title="Удалить"
+                            aria-label="Удалить документ"
+                          >
+                            <span className="text-xs font-semibold hidden sm:inline">Удалить</span>
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabs for copywriter documents */}
+                {showDSLButtons && (
+                  <div className="mb-6 flex items-center gap-2 border-b border-white/10">
+                    <button
+                      onClick={() => setActiveTabSafe('text')}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'text'
+                        ? 'text-white border-white/40'
+                        : 'text-white/50 border-transparent hover:text-white/70'
+                        }`}
+                    >
+                      Текст
+                    </button>
+                    <button
+                      onClick={() => setActiveTabSafe('prototype')}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'prototype'
+                        ? 'text-cyan-400 border-cyan-400/40'
+                        : 'text-white/50 border-transparent hover:text-white/70'
+                        }`}
+                    >
+                      Прототип
+                    </button>
+                  </div>
+                )}
+
                 <div
                   className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-hidden p-4 sm:p-6 md:p-8"
                   style={{ minHeight: '60vh', margin: 0, display: 'block' }}>
-                    {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
-                       <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
-                    ) : (
-                       (() => {
-                         if (!selectedFile) {
-                           return (
-                             <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center px-4">
-                               <div className="relative mb-4">
-                                 <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-pulse"></div>
-                                 <FileText size={40} className="relative opacity-50" />
-                               </div>
-                               <p className="text-base font-semibold text-white/60">Выберите документ для просмотра</p>
-                             </div>
-                           );
-                         }
-                         const content = getDisplayContent();
-                         
-                         // Специальная обработка для документов верстальщика
-                         console.log('[ProjectDocumentsModal] Render check:', { 
-                           activeTab, 
-                           showVerstkaSubTabs, 
-                           showVerstkaCode, 
-                           hasContent: !!content 
-                         });
-                         
-                         if (activeTab === 'verstka' && showVerstkaSubTabs) {
-                           return renderVerstkaContent();
-                         }
-                         
-                         // Проверка на пустое состояние для других табов
-                         if (content === null) {
-                           // Пустое состояние для DSL или Верстка
-                           const roleName = activeTab === 'dsl' ? 'DSL' : 'Верстка';
-                           const isDSL = activeTab === 'dsl';
-                           return (
-                             <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
-                               <p className="text-base font-medium mb-2">Результат {roleName} еще не сгенерирован</p>
-                               <p className="text-sm text-white/20">
-                                 Используйте кнопку <span className={isDSL ? 'text-purple-400' : 'text-cyan-400'}>{roleName}</span> выше для генерации результата
-                               </p>
-                             </div>
-                           );
-                         }
-                         
-                         // Обычный рендер для других табов
-                         return (
-                           <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
-                             <MarkdownRenderer content={decodeContent(content)} />
-                           </div>
-                         );
-                       })()
-                    )}
-                 </div>
+                  {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
+                    <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
+                  ) : (
+                    (() => {
+                      if (!selectedFile) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center px-4">
+                            <div className="relative mb-4">
+                              <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-pulse"></div>
+                              <FileText size={40} className="relative opacity-50" />
+                            </div>
+                            <p className="text-base font-semibold text-white/60">Выберите документ для просмотра</p>
+                          </div>
+                        );
+                      }
+                      const content = getDisplayContent();
+
+                      // Специальная обработка для документов верстальщика или таба прототипа
+                      console.log('[ProjectDocumentsModal] Render check:', {
+                        activeTab,
+                        showVerstkaSubTabs,
+                        showPrototypeCode,
+                        hasContent: !!content
+                      });
+
+                      if ((activeTab === 'prototype' && showDSLButtons) || showVerstkaSubTabs) {
+                        return renderPrototypeContent();
+                      }
+
+                      // Проверка на пустое состояние для других табов
+                      if (content === null) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-60 text-white/30 text-center">
+                            <p className="text-base font-medium mb-2">Нет контента</p>
+                          </div>
+                        );
+                      }
+
+                      // Обычный рендер для других табов
+                      return (
+                        <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
+                          <MarkdownRenderer content={decodeContent(content)} />
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
               </div>
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-white/30 px-4">
-               <div className="relative mb-6">
-                 <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
-                 <div className="relative w-24 h-24 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                    <Eye size={48} className="opacity-50" />
-                 </div>
-               </div>
-               <p className="text-lg font-semibold text-white/60 mb-2">Выберите документ</p>
-               <p className="text-sm text-white/40 text-center max-w-sm">Выберите документ из списка слева для просмотра</p>
+              <div className="relative mb-6">
+                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
+                <div className="relative w-24 h-24 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                  <Eye size={48} className="opacity-50" />
+                </div>
+              </div>
+              <p className="text-lg font-semibold text-white/60 mb-2">Выберите документ</p>
+              <p className="text-sm text-white/40 text-center max-w-sm">Выберите документ из списка слева для просмотра</p>
             </div>
           )}
         </div>
-        </div>
+      </div>
 
-        {isVerstkaFullscreen && selectedFile && (
-          <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-xl flex flex-col">
-            <div className="flex items-center gap-3 border-b border-white/10 bg-black/70 px-4 py-4 sm:px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
-              <button
-                onClick={() => setIsVerstkaFullscreen(false)}
-                className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white flex items-center justify-center transition-colors"
-                aria-label="Закрыть полноэкранный режим"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-white/50 uppercase tracking-wide">Превью верстки</p>
-                <p className="text-white font-semibold truncate">{getDocumentDisplayName(selectedFile)}</p>
-              </div>
-              <button
-                onClick={() => setShowVerstkaCode(!showVerstkaCode)}
-                className="px-4 py-2 text-sm font-medium transition-colors text-white/70 hover:text-white border border-white/20 rounded-lg hover:bg-white/5"
-              >
-                {showVerstkaCode ? 'Показать превью' : 'Показать код'}
-              </button>
+      {isVerstkaFullscreen && selectedFile && (
+        <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-xl flex flex-col">
+          <div className="flex items-center gap-3 border-b border-white/10 bg-black/70 px-4 py-4 sm:px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
+            <button
+              onClick={() => setIsVerstkaFullscreen(false)}
+              className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white flex items-center justify-center transition-colors"
+              aria-label="Закрыть полноэкранный режим"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-white/50 uppercase tracking-wide">Превью верстки</p>
+              <p className="text-white font-semibold truncate">{getDocumentDisplayName(selectedFile)}</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8">
-              <div className="w-full h-full bg-black/40 border border-white/10 rounded-2xl p-4">
-                {renderVerstkaContent(true)}
-              </div>
+            <button
+              onClick={() => setShowPrototypeCode(!showPrototypeCode)}
+              className="px-4 py-2 text-sm font-medium transition-colors text-white/70 hover:text-white border border-white/20 rounded-lg hover:bg-white/5"
+            >
+              {showPrototypeCode ? 'Показать превью' : 'Показать код'}
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+            <div className="w-full h-full bg-black/40 border border-white/10 rounded-2xl p-4">
+              {renderPrototypeContent(true)}
             </div>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 };

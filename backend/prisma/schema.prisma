@@ -132,6 +132,8 @@ model File {
   name               String
   mimeType           String
   content            String // Base64 or text content
+  dslContent         String? // Generated DSL content
+  verstkaContent     String? // Generated HTML content
   isKnowledgeBase    Boolean  @default(false) // true = база знаний агента, false = документ проекта
   createdAt          DateTime @default(now())
 

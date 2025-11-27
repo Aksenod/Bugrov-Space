@@ -50,7 +50,7 @@ function ensureApiKey() {
  * Декодирует base64 строку в текст.
  * Обрабатывает ошибки и возвращает исходную строку, если декодирование не удалось.
  */
-function decodeBase64ToText(base64String: string): string {
+export function decodeBase64ToText(base64String: string): string {
   try {
     const buffer = Buffer.from(base64String, 'base64');
     return buffer.toString('utf-8');
@@ -68,13 +68,13 @@ function decodeBase64ToText(base64String: string): string {
 function processFileContent(file: AgentFile): string | null {
   try {
     const decodedContent = decodeBase64ToText(file.content);
-    
+
     // Ограничиваем размер содержимого
     if (decodedContent.length > MAX_FILE_CONTENT_SIZE) {
-      return decodedContent.substring(0, MAX_FILE_CONTENT_SIZE) + 
-             `\n\n[Содержимое обрезано. Файл слишком большой (${decodedContent.length} символов). Показаны первые ${MAX_FILE_CONTENT_SIZE} символов.]`;
+      return decodedContent.substring(0, MAX_FILE_CONTENT_SIZE) +
+        `\n\n[Содержимое обрезано. Файл слишком большой (${decodedContent.length} символов). Показаны первые ${MAX_FILE_CONTENT_SIZE} символов.]`;
     }
-    
+
     return decodedContent;
   } catch (error) {
     logger.warn({ fileName: file.name, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to process file');
@@ -124,11 +124,11 @@ async function buildSystemPrompt(agent: AgentWithFiles) {
   const fileContext =
     processedFiles.length > 0
       ? `Вот контекст из базы знаний и документов проекта:\n${processedFiles
-          .map(
-            ({ file, content }) =>
-              `---\nНазвание: ${file.name}\nТип: ${file.mimeType}\nСодержимое:\n${content}\n---`,
-          )
-          .join('\n')}`
+        .map(
+          ({ file, content }) =>
+            `---\nНазвание: ${file.name}\nТип: ${file.mimeType}\nСодержимое:\n${content}\n---`,
+        )
+        .join('\n')}`
       : 'Контекстных документов нет. Отвечай, исходя из своей инструкции.';
 
   return `${intro}\n\n${fileContext}`;
@@ -146,9 +146,9 @@ function normalizeModelName(model: string | null | undefined): string {
   if (!model) {
     return DEFAULT_MODEL;
   }
-  
+
   const normalized = model.trim().toLowerCase();
-  
+
   // Маппинг различных вариантов написания моделей
   const modelMap: Record<string, string> = {
     'gpt-5.1': 'gpt-5.1',
@@ -165,20 +165,20 @@ function normalizeModelName(model: string | null | undefined): string {
     'gpt-4o-mini': 'gpt-4o-mini',
     'gpt4o-mini': 'gpt-4o-mini',
   };
-  
+
   // Если есть точное совпадение в маппинге, используем его
   if (modelMap[normalized]) {
     return modelMap[normalized];
   }
-  
+
   // Если модель уже в правильном формате (начинается с gpt-), возвращаем как есть
   if (normalized.startsWith('gpt-')) {
     return normalized;
   }
-  
+
   // Если модель не распознана, логируем и возвращаем дефолтную модель
-  logger.warn({ 
-    originalModel: model, 
+  logger.warn({
+    originalModel: model,
     normalized,
     availableModels: Object.keys(modelMap)
   }, 'Unknown model format, using default');
@@ -287,7 +287,7 @@ export async function generateSummaryContent(
 ): Promise<string> {
   // Извлекаем последнее сообщение MODEL из транскрипта
   const modelMessages = transcript.split('\n\n').filter(msg => msg.startsWith('MODEL:'));
-  const lastModelMessage = modelMessages.length > 0 
+  const lastModelMessage = modelMessages.length > 0
     ? modelMessages[modelMessages.length - 1].replace(/^MODEL:\s*/, '')
     : null;
 
@@ -338,8 +338,8 @@ export async function generateDocumentResult(
     files: agent.files,
   };
   const systemPrompt = await buildSystemPrompt(agentWithFiles);
-  
-  const roleInstruction = role === 'dsl' 
+
+  const roleInstruction = role === 'dsl'
     ? 'Преобразуй предоставленный контент в DSL формат согласно твоей инструкции.'
     : 'Преобразуй предоставленный контент в формат верстки согласно твоей инструкции.';
 

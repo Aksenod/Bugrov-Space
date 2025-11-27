@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../db/prisma';
-import { generateAgentResponse, generateSummaryContent } from '../services/openaiService';
+import { generateAgentResponse, generateSummaryContent, generateDocumentResult, decodeBase64ToText } from '../services/openaiService';
 import { withRetry } from '../utils/prismaRetry';
 import { logger } from '../utils/logger';
 import { syncProjectAgentsForProject } from '../services/projectTypeSync';
@@ -71,7 +71,7 @@ const getOrCreateAgentFromTemplate = async (
   projectId?: string
 ): Promise<any | null> => {
   logger.debug({ agentId, userId, projectId }, 'getOrCreateAgentFromTemplate - starting');
-  
+
   // Сначала пытаемся найти агента в таблице Agent
   let agent = await withRetry(
     () => prisma.agent.findFirst({
@@ -148,11 +148,11 @@ const getOrCreateAgentFromTemplate = async (
     );
 
     if (existingAgent) {
-      logger.debug({ 
+      logger.debug({
         agentId: existingAgent.id,
         templateId: agentId,
         templateName: template.name,
-        projectId 
+        projectId
       }, 'getOrCreateAgentFromTemplate - found existing agent instance from template');
       return existingAgent;
     }
@@ -161,7 +161,7 @@ const getOrCreateAgentFromTemplate = async (
 
     // Создаем новый экземпляр агента проекта из шаблона
     const nextOrder = await getNextOrderValue(userId);
-    
+
     const agentData: Prisma.AgentUncheckedCreateInput & { projectTypeAgentId?: string | null } = {
       userId,
       projectId: projectId,
@@ -184,23 +184,23 @@ const getOrCreateAgentFromTemplate = async (
     );
     await cloneTemplateKnowledgeBase(template.id, agent.id);
 
-    logger.info({ 
+    logger.info({
       newAgentId: agent.id,
       templateId: agentId,
       projectId: projectId,
       userId,
-      agentName: agent.name 
+      agentName: agent.name
     }, 'getOrCreateAgentFromTemplate - created new agent instance from ProjectTypeAgent template');
 
     return agent;
   } catch (error: any) {
-    logger.error({ 
+    logger.error({
       agentId,
       userId,
       projectId,
       error: error.message,
       code: error.code,
-      stack: error.stack 
+      stack: error.stack
     }, 'getOrCreateAgentFromTemplate - failed to get or create agent from template');
     return null;
   }
@@ -281,24 +281,24 @@ router.get('/', async (req, res, next) => {
           3,
           `GET /agents - find connections for ${project.projectTypeId}`
         ) as any[];
-        
-        logger.debug({ 
-          projectTypeId: project.projectTypeId, 
-          connectionsCount: connections.length 
+
+        logger.debug({
+          projectTypeId: project.projectTypeId,
+          connectionsCount: connections.length
         }, 'Found project type agent connections');
-        
+
         // Преобразуем данные в нужный формат
         // Фильтруем только агентов, которые действительно связаны с типом проекта
         projectTypeAgents = connections
           .filter((conn: any) => {
             // Убеждаемся, что связь существует и projectTypeId совпадает
-            const isValid = conn.projectTypeAgent && 
-                           conn.projectType && 
-                           conn.projectType.id === project.projectTypeId;
+            const isValid = conn.projectTypeAgent &&
+              conn.projectType &&
+              conn.projectType.id === project.projectTypeId;
             if (!isValid) {
-              logger.warn({ 
-                connection: conn, 
-                projectTypeId: project.projectTypeId 
+              logger.warn({
+                connection: conn,
+                projectTypeId: project.projectTypeId
               }, 'Filtered out invalid project type agent connection');
             }
             return isValid;
@@ -311,24 +311,24 @@ router.get('/', async (req, res, next) => {
               order: conn.order ?? index,
             }],
           }));
-        
-        logger.debug({ 
-          projectTypeId: project.projectTypeId, 
+
+        logger.debug({
+          projectTypeId: project.projectTypeId,
           projectTypeAgentsCount: projectTypeAgents.length,
           agentIds: projectTypeAgents.map((a: any) => a.id)
         }, 'Filtered project type agents');
       } catch (error: any) {
         // Если таблица не существует или миграция не применена, просто возвращаем пустой массив
-        if (error?.code === 'P2021' || 
-            error?.message?.includes('does not exist') || 
-            error?.message?.includes('relation') ||
-            error?.message?.includes('column') ||
-            error?.message?.includes('Unknown argument') ||
-            error?.message?.includes('Unknown field')) {
-          logger.warn({ 
-            projectTypeId: project.projectTypeId, 
-            error: error.message, 
-            code: error.code 
+        if (error?.code === 'P2021' ||
+          error?.message?.includes('does not exist') ||
+          error?.message?.includes('relation') ||
+          error?.message?.includes('column') ||
+          error?.message?.includes('Unknown argument') ||
+          error?.message?.includes('Unknown field')) {
+          logger.warn({
+            projectTypeId: project.projectTypeId,
+            error: error.message,
+            code: error.code
           }, 'ProjectTypeAgent or ProjectTypeAgentProjectType table may not exist (migration not applied), returning empty array');
           projectTypeAgents = [];
         } else {
@@ -347,7 +347,7 @@ router.get('/', async (req, res, next) => {
     logger.debug({ userId, agentsCount: agents.length, projectTypeAgentsCount: projectTypeAgents.length }, 'Agents loaded');
 
     // Возвращаем как шаблоны, так и реальные агенты пользователя
-    res.json({ 
+    res.json({
       agents: agentsWithEmptyFiles,
       projectTypeAgents: projectTypeAgents.length > 0 ? projectTypeAgents : undefined
     });
@@ -378,17 +378,17 @@ router.get('/:agentId/messages', async (req, res) => {
   const { agentId } = req.params;
   const projectId = req.query.projectId as string | undefined;
 
-  logger.info({ 
-    agentId, 
+  logger.info({
+    agentId,
     userId,
     projectId,
-    hasProjectId: !!projectId 
+    hasProjectId: !!projectId
   }, 'GET /agents/:agentId/messages - request received');
 
   // Используем функцию для получения или создания агента из шаблона
   // Если projectId не указан, функция вернет null для ProjectTypeAgent
   let agent = null;
-  
+
   if (projectId) {
     // Если projectId указан, пытаемся получить или создать агента из шаблона
     agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
@@ -459,14 +459,14 @@ const messageSchema = z.object({
 router.post('/:agentId/messages', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
-  
-  logger.info({ 
-    agentId, 
+
+  logger.info({
+    agentId,
     userId,
     body: req.body,
-    hasProjectId: !!req.body?.projectId 
+    hasProjectId: !!req.body?.projectId
   }, 'POST /agents/:agentId/messages - request received');
-  
+
   const parsed = messageSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn({ agentId, userId, validationError: parsed.error.flatten() }, 'Message validation failed');
@@ -477,8 +477,8 @@ router.post('/:agentId/messages', async (req, res) => {
   // projectId обязателен для изоляции проектов
   if (!parsed.data.projectId) {
     logger.warn({ agentId, userId }, 'projectId is missing in request body');
-    return res.status(400).json({ 
-      error: 'projectId is required. Project isolation requires explicit project context.' 
+    return res.status(400).json({
+      error: 'projectId is required. Project isolation requires explicit project context.'
     });
   }
 
@@ -590,15 +590,15 @@ router.post('/:agentId/messages', async (req, res) => {
         3,
         `POST /agents/${agentId}/messages - load template knowledge base`
       );
-      
-      logger.debug({ 
-        templateId: agentId, 
-        templateKnowledgeBaseCount: templateKnowledgeBase.length 
+
+      logger.debug({
+        templateId: agentId,
+        templateKnowledgeBaseCount: templateKnowledgeBase.length
       }, 'Loaded template knowledge base');
     } catch (error: any) {
-      logger.warn({ 
-        templateId: agentId, 
-        error: error.message 
+      logger.warn({
+        templateId: agentId,
+        error: error.message
       }, 'Failed to load template knowledge base');
     }
   }
@@ -632,8 +632,8 @@ router.post('/:agentId/messages', async (req, res) => {
     ...allProjectFiles,
   ];
 
-  logger.debug({ 
-    agentId: agent.id, 
+  logger.debug({
+    agentId: agent.id,
     agentName: agent.name,
     agentKnowledgeBaseCount: agentKnowledgeBase.length,
     templateKnowledgeBaseCount: templateKnowledgeBase.length,
@@ -703,14 +703,14 @@ router.post('/:agentId/messages', async (req, res) => {
     return res.json(response);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to get response from OpenAI';
-    logger.error({ 
+    logger.error({
       agentId,
       agentName: agent.name,
       agentModel: agent.model,
       error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined 
+      stack: error instanceof Error ? error.stack : undefined
     }, 'OpenAI API error');
-    
+
     // Проверяем на специфические ошибки
     let userFriendlyMessage = 'Ошибка генерации. Попробуйте позже.';
     if (errorMessage.includes('API key') || errorMessage.includes('Invalid API key')) {
@@ -729,17 +729,17 @@ router.delete('/:agentId/messages', async (req, res) => {
   const { agentId } = req.params;
   const projectId = req.query.projectId as string | undefined;
 
-  logger.info({ 
-    agentId, 
+  logger.info({
+    agentId,
     userId,
     projectId,
-    hasProjectId: !!projectId 
+    hasProjectId: !!projectId
   }, 'DELETE /agents/:agentId/messages - request received');
 
   // Используем функцию для получения или создания агента из шаблона
   // Если projectId не указан, функция вернет null для ProjectTypeAgent
   let agent = null;
-  
+
   if (projectId) {
     // Если projectId указан, пытаемся получить или создать агента из шаблона
     agent = await getOrCreateAgentFromTemplate(agentId, userId, projectId);
@@ -912,22 +912,22 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
   const projectId = req.query.projectId as string | undefined;
   try {
     const userId = req.userId!;
-    
-    logger.info({ 
-      agentId, 
+
+    logger.info({
+      agentId,
       userId,
       projectId,
-      hasProjectId: !!projectId 
+      hasProjectId: !!projectId
     }, 'GET /agents/:agentId/files/summary - request received');
-    
+
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     if (!projectId) {
       logger.warn({ agentId, userId }, 'projectId query parameter is missing');
-      return res.status(400).json({ 
-        error: 'projectId query parameter is required. Project isolation requires explicit project context.' 
+      return res.status(400).json({
+        error: 'projectId query parameter is required. Project isolation requires explicit project context.'
       });
     }
 
@@ -963,7 +963,7 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
       3,
       `GET /agents/${agentId}/files/summary - find project agents`
     );
-    
+
     // Если новый агент был создан, убеждаемся что он в списке
     let agentIds = projectAgents.map(a => a.id);
     if (!agentIds.includes(agent.id)) {
@@ -1048,17 +1048,17 @@ router.post('/:agentId/summary', async (req, res) => {
   const { agentId } = req.params;
   const projectId = req.query.projectId as string | undefined;
 
-  logger.info({ 
-    agentId, 
+  logger.info({
+    agentId,
     userId,
     projectId,
-    hasProjectId: !!projectId 
+    hasProjectId: !!projectId
   }, 'POST /agents/:agentId/summary - request received');
 
   if (!projectId) {
     logger.warn({ agentId, userId }, 'projectId query parameter is missing');
-    return res.status(400).json({ 
-      error: 'projectId query parameter is required. Project isolation requires explicit project context.' 
+    return res.status(400).json({
+      error: 'projectId query parameter is required. Project isolation requires explicit project context.'
     });
   }
 
@@ -1112,24 +1112,130 @@ router.post('/:agentId/summary', async (req, res) => {
       `POST /agents/${agentId}/summary - create file`
     );
 
-    logger.info({ 
-      fileId: file.id, 
-      fileName: file.name, 
+    logger.info({
+      fileId: file.id,
+      fileName: file.name,
       agentId: file.agentId,
-      summaryLength: summaryText.length 
+      summaryLength: summaryText.length
     }, 'Summary file created');
 
     res.status(201).json({ file });
   } catch (error) {
-    logger.error({ 
-      agentId: actualAgentId, 
-      userId, 
+    logger.error({
+      agentId: actualAgentId,
+      userId,
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined 
+      stack: error instanceof Error ? error.stack : undefined
     }, 'Summary generation failed');
     res.status(500).json({ error: 'Failed to generate summary' });
   }
 });
 
-export default router;
 
+// POST /:agentId/files/:fileId/generate-prototype
+router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
+  const { agentId, fileId } = req.params;
+  const userId = (req as any).userId;
+
+  logger.info({ agentId, fileId, userId }, 'POST /agents/:agentId/files/:fileId/generate-prototype - request received');
+
+  try {
+    // 1. Get the file and verify ownership/access
+    const file = await withRetry(
+      () => prisma.file.findFirst({
+        where: { id: fileId },
+        include: { agent: true }
+      }),
+      3,
+      `POST /agents/${agentId}/files/${fileId}/generate-prototype - find file`
+    );
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // 2. Get the project to find other agents
+    const projectId = file.agent?.projectId;
+    if (!projectId) {
+      return res.status(400).json({ error: 'File is not associated with a project' });
+    }
+
+    // 3. Find DSL and Verstka agents in the project
+    const projectAgents = await withRetry(
+      () => prisma.agent.findMany({
+        where: { projectId }
+      }),
+      3,
+      `POST /agents/${agentId}/files/${fileId}/generate-prototype - find project agents`
+    );
+
+    // Helper to find agent by role
+    const findAgentByRole = (roleName: string) => {
+      return projectAgents.find(a => {
+        const roles = (a.role || '').split(',').map(r => r.trim().toLowerCase());
+        return roles.includes(roleName.toLowerCase());
+      });
+    };
+
+    const dslAgent = findAgentByRole('dsl');
+    const verstkaAgent = findAgentByRole('verstka');
+
+    if (!dslAgent) {
+      return res.status(400).json({ error: 'DSL agent not found in project' });
+    }
+    if (!verstkaAgent) {
+      return res.status(400).json({ error: 'Verstka agent not found in project' });
+    }
+
+    // 4. Generate DSL
+    logger.info({ fileId, dslAgentId: dslAgent.id }, 'Generating DSL content');
+
+    // Prepare agent with files (empty files list for now as we pass content directly)
+    const dslAgentWithFiles = { ...dslAgent, files: [] };
+
+    const dslContent = await generateDocumentResult(
+      dslAgentWithFiles,
+      decodeBase64ToText(file.content),
+      'dsl'
+    );
+
+    // 5. Generate HTML (Verstka)
+    logger.info({ fileId, verstkaAgentId: verstkaAgent.id }, 'Generating Verstka content');
+
+    const verstkaAgentWithFiles = { ...verstkaAgent, files: [] };
+
+    const verstkaContent = await generateDocumentResult(
+      verstkaAgentWithFiles,
+      dslContent,
+      'verstka'
+    );
+
+    // 6. Save to DB
+    const updatedFile = await withRetry(
+      () => prisma.file.update({
+        where: { id: fileId },
+        data: {
+          dslContent,
+          verstkaContent
+        }
+      }),
+      3,
+      `POST /agents/${agentId}/files/${fileId}/generate-prototype - update file`
+    );
+
+    logger.info({ fileId, hasDsl: !!dslContent, hasVerstka: !!verstkaContent }, 'Prototype generated and saved');
+
+    res.json({ file: updatedFile });
+  } catch (error) {
+    logger.error({
+      agentId,
+      fileId,
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 'Prototype generation failed');
+    res.status(500).json({ error: 'Failed to generate prototype' });
+  }
+});
+
+export default router;

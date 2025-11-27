@@ -18,23 +18,23 @@ const getHeaders = (custom: Record<string, string> = {}) => {
 const parseError = async (response: Response) => {
   try {
     const data = await response.json();
-    
+
     // Сначала проверяем поле message на верхнем уровне (приоритет)
     if (data?.message && typeof data.message === 'string') {
       return data.message;
     }
-    
+
     const error = data?.error;
-    
+
     // Если error - это строка, возвращаем её
     if (typeof error === 'string') {
       return error;
     }
-    
+
     // Если error - это объект (например, от zod.flatten())
     if (error && typeof error === 'object') {
       const errorMessages: string[] = [];
-      
+
       // Обработка fieldErrors: { field: ['error1', 'error2'] }
       if (error.fieldErrors && typeof error.fieldErrors === 'object') {
         Object.entries(error.fieldErrors).forEach(([field, errors]) => {
@@ -49,7 +49,7 @@ const parseError = async (response: Response) => {
           }
         });
       }
-      
+
       // Обработка formErrors: ['error1', 'error2']
       if (error.formErrors && Array.isArray(error.formErrors)) {
         error.formErrors.forEach((err) => {
@@ -58,7 +58,7 @@ const parseError = async (response: Response) => {
           }
         });
       }
-      
+
       // Если есть другие поля в объекте ошибки
       if (errorMessages.length === 0) {
         // Пытаемся найти сообщение в других полях
@@ -68,10 +68,10 @@ const parseError = async (response: Response) => {
         // Если ничего не найдено, возвращаем JSON строку
         return JSON.stringify(error);
       }
-      
+
       return errorMessages.join('. ') || 'Validation error';
     }
-    
+
     return response.statusText || 'Request failed';
   } catch {
     return response.statusText || 'Request failed';
@@ -104,17 +104,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   // Определяем timeout в зависимости от типа запроса
   // POST запросы к /agents/:agentId/messages и /agents/:agentId/summary требуют больше времени (OpenAI API)
-  const isOpenAiRequest = path.includes('/agents/') && 
-    (path.includes('/messages') || path.includes('/summary')) && 
+  const isOpenAiRequest = path.includes('/agents/') &&
+    (path.includes('/messages') || path.includes('/summary')) &&
     init.method === 'POST';
   const timeout = isOpenAiRequest ? OPENAI_REQUEST_TIMEOUT : REQUEST_TIMEOUT;
-  
+
   // Для запросов к агентам НЕ используем AbortController - позволяем запросу продолжаться
   // даже если он превышает таймаут, так как сервер может все равно вернуть ответ
   // Для обычных запросов используем таймаут с отменой
   let controller: AbortController | null = null;
   let timeoutId: NodeJS.Timeout | null = null;
-  
+
   if (!isOpenAiRequest) {
     // Для обычных запросов используем таймаут с отменой
     controller = new AbortController();
@@ -124,7 +124,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const startTime = Date.now();
   const isDev = import.meta.env.DEV;
-  
+
   try {
     if (isDev) {
       console.log(`[API] Request: ${init.method || 'GET'} ${url}`);
@@ -134,7 +134,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...(controller ? { signal: controller.signal } : {}),
       headers: getHeaders(init.headers as Record<string, string>),
     });
-    
+
     const duration = Date.now() - startTime;
     if (isDev) {
       console.log(`[API] Response: ${response.status} in ${duration}ms`);
@@ -143,7 +143,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-    
+
     // Если запрос к агенту занял больше 60 секунд, логируем предупреждение, но не ошибку
     if (isOpenAiRequest && duration > OPENAI_REQUEST_TIMEOUT && isDev) {
       console.warn(`[API] Request to agent took ${duration}ms (exceeded ${OPENAI_REQUEST_TIMEOUT}ms timeout), but response received successfully`);
@@ -162,7 +162,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       error.isRateLimit = true;
       throw error;
     }
-    
+
     // Если 429 на auth роуте - просто пробрасываем ошибку без блокировки
     if (response.status === 429 && isAuthRoute) {
       const message = await parseError(response);
@@ -189,7 +189,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       clearTimeout(timeoutId);
     }
     const duration = Date.now() - startTime;
-    
+
     // Если это 429 ошибка - устанавливаем блокировку (но не для auth роутов)
     if (error.status === 429 && !isAuthRoute) {
       rateLimitBlockedUntil = Date.now() + RATE_LIMIT_BLOCK_DURATION;
@@ -197,16 +197,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         console.warn(`[API] Rate limit error! Blocking all requests for ${RATE_LIMIT_BLOCK_DURATION / 1000} seconds`);
       }
     }
-    
+
     // Если уже заблокированы - не логируем как ошибку
     if (error.isRateLimit && rateLimitBlockedUntil && Date.now() < rateLimitBlockedUntil) {
       throw error;
     }
-    
+
     if (isDev) {
       console.error(`[API] Error after ${duration}ms:`, error.name, error.message);
     }
-    
+
     // Если запрос был отменен из-за таймаута
     // Для запросов к агентам НЕ показываем ошибку таймаута, так как сервер может все равно вернуть ответ
     // Для обычных запросов показываем ошибку таймаута как раньше
@@ -220,7 +220,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       timeoutError.isTimeout = true;
       throw timeoutError;
     }
-    
+
     // Для запросов к агентам, если произошла ошибка после таймаута, но это не AbortError,
     // значит запрос все еще выполняется - не показываем ошибку таймаута
     if (isOpenAiRequest && duration > OPENAI_REQUEST_TIMEOUT && error.name !== 'AbortError') {
@@ -230,7 +230,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       }
       // Продолжаем ждать - не бросаем ошибку таймаута
     }
-    
+
     // Обработка сетевых ошибок
     if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.message?.includes('Network request failed')) {
       if (isDev) {
@@ -241,7 +241,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       networkError.isNetworkError = true;
       throw networkError;
     }
-    
+
     // Пробрасываем другие ошибки
     throw error;
   }
@@ -265,6 +265,8 @@ export interface ApiFile {
   name: string;
   mimeType: string;
   content: string;
+  dslContent?: string;
+  verstkaContent?: string;
   agentId?: string;
   projectId?: string;
   isKnowledgeBase?: boolean;
@@ -441,6 +443,12 @@ export const api = {
   async getSummaryFiles(agentId: string, projectId?: string) {
     const query = projectId ? `?projectId=${projectId}` : '';
     return request<{ files: ApiFile[] }>(`/agents/${agentId}/files/summary${query}`);
+  },
+
+  async generatePrototype(agentId: string, fileId: string) {
+    return request<{ file: ApiFile }>(`/agents/${agentId}/files/${fileId}/generate-prototype`, {
+      method: 'POST',
+    });
   },
 
   // Projects API
