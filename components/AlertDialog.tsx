@@ -134,7 +134,7 @@ export const AlertDialog: React.FC<AlertDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-6 pointer-events-none"
+      className="fixed inset-0 z-[130] flex items-start justify-center p-4 pt-6 pointer-events-none"
     >
       {/* Alert */}
       <div className={`relative w-full max-w-md bg-gradient-to-br from-black/90 via-black/80 to-black/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] ${config.glow} shadow-2xl overflow-hidden pointer-events-auto transition-all duration-300 ease-out ${

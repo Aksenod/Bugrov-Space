@@ -141,16 +141,62 @@ function mapHistory(history: ConversationMessage[]): ChatMessage[] {
   }));
 }
 
+// Функция для нормализации имени модели (приводит к формату API OpenAI)
+function normalizeModelName(model: string | null | undefined): string {
+  if (!model) {
+    return DEFAULT_MODEL;
+  }
+  
+  const normalized = model.trim().toLowerCase();
+  
+  // Маппинг различных вариантов написания моделей
+  const modelMap: Record<string, string> = {
+    'gpt-5.1': 'gpt-5.1',
+    'gpt5.1': 'gpt-5.1',
+    'gpt 5.1': 'gpt-5.1',
+    'gpt-5-mini': 'gpt-5-mini',
+    'gpt5-mini': 'gpt-5-mini',
+    'gpt-5mini': 'gpt-5-mini',
+    'gpt5mini': 'gpt-5-mini',
+    'gpt-5 mini': 'gpt-5-mini',
+    'gpt 5 mini': 'gpt-5-mini',
+    'gpt-4o': 'gpt-4o',
+    'gpt4o': 'gpt-4o',
+    'gpt-4o-mini': 'gpt-4o-mini',
+    'gpt4o-mini': 'gpt-4o-mini',
+  };
+  
+  // Если есть точное совпадение в маппинге, используем его
+  if (modelMap[normalized]) {
+    return modelMap[normalized];
+  }
+  
+  // Если модель уже в правильном формате (начинается с gpt-), возвращаем как есть
+  if (normalized.startsWith('gpt-')) {
+    return normalized;
+  }
+  
+  // Если модель не распознана, логируем и возвращаем дефолтную модель
+  logger.warn({ 
+    originalModel: model, 
+    normalized,
+    availableModels: Object.keys(modelMap)
+  }, 'Unknown model format, using default');
+  return DEFAULT_MODEL;
+}
+
 async function callOpenAi(model: string, messages: ChatMessage[]) {
   const apiKey = ensureApiKey();
+  const modelToUse = normalizeModelName(model);
   const requestBody = {
-    model: model || DEFAULT_MODEL,
+    model: modelToUse,
     messages,
     temperature: 0.7,
   };
 
-  logger.debug({
-    model: requestBody.model,
+  logger.info({
+    originalModel: model,
+    normalizedModel: modelToUse,
     messagesCount: messages.length,
     apiKeyPrefix: apiKey.substring(0, 7) + '...',
   }, 'Sending request to OpenAI API');
@@ -215,7 +261,17 @@ export async function generateAgentResponse(
     { role: 'user', content: newMessage },
   ];
 
-  const completion = await callOpenAi(agent.model ?? DEFAULT_MODEL, messages);
+  const modelToUse = agent.model ?? DEFAULT_MODEL;
+  logger.info({
+    agentId: agent.id,
+    agentName: agent.name,
+    modelFromAgent: agent.model,
+    modelType: typeof agent.model,
+    modelToUse,
+    defaultModel: DEFAULT_MODEL,
+  }, 'Generating agent response with model');
+
+  const completion = await callOpenAi(modelToUse, messages);
   const text = extractMessageText(completion);
 
   if (!text) {

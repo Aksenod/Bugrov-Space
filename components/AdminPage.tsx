@@ -1155,11 +1155,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         newMap.set(projectTypeId, updatedOrder);
         return newMap;
       });
-      // Вызываем callback для перезагрузки агентов в App.tsx
-      // Вызываем сразу, так как await уже дождался завершения сохранения в БД
-      if (onAgentUpdatedRef.current) {
-        onAgentUpdatedRef.current();
-      }
+      // Перезагружаем список агентов для типа проекта, чтобы получить актуальный порядок с сервера
+      await loadAgentsForType(projectTypeId);
+      // Небольшая задержка перед перезагрузкой агентов в App.tsx, чтобы убедиться, что транзакция завершилась
+      // и порядок в ProjectTypeAgentProjectType обновился в базе данных
+      setTimeout(() => {
+        if (onAgentUpdatedRef.current) {
+          onAgentUpdatedRef.current();
+        }
+      }, 500);
     } catch (error: any) {
       console.error('Failed to reorder agents', error);
       showAlert(error?.message || 'Не удалось изменить порядок агентов', 'Ошибка', 'error');

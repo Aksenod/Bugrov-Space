@@ -555,11 +555,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
                       {getDocumentDisplayName(doc)}
                     </h4>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">
-                            {doc.type.includes('markdown') ? 'MD' : doc.type.split('/')[1]}
-                        </span>
-                    </div>
                   </div>
                 </button>
               ))

@@ -313,7 +313,9 @@ router.post('/:id/agents/reorder', authMiddleware, adminMiddleware, asyncHandler
   );
 
   logger.info({ projectTypeId: id, ordersCount: orders.length }, 'Project type agents reordered');
-  await syncProjectTypeAgents(id);
+  // Не вызываем syncProjectTypeAgents здесь, так как порядок уже сохранен в ProjectTypeAgentProjectType
+  // Синхронизация произойдет автоматически при следующем запросе GET /agents через syncProjectAgentsForProject
+  // Это избегает конфликтов и перезаписи порядка
   res.json({ success: true });
 }));
 

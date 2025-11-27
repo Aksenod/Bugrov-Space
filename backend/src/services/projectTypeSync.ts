@@ -105,7 +105,9 @@ const syncProjectAgents = async (
     for (const [index, connection] of connections.entries()) {
       const template = connection.projectTypeAgent;
       if (!template) continue;
-      const desiredOrder = typeof connection.order === 'number' ? connection.order : index;
+      // Используем порядок из connection.order, если он есть, иначе используем index
+      // connection.order должен быть установлен из ProjectTypeAgentProjectType
+      const desiredOrder = typeof connection.order === 'number' && connection.order !== null ? connection.order : index;
 
       let existing = existingByTemplate.get(template.id);
       if (!existing && template.name && existingByName.has(template.name)) {

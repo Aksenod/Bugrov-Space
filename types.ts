@@ -14,6 +14,7 @@ export interface Message {
 
 export enum LLMModel {
   GPT51 = 'gpt-5.1',
+  GPT5_MINI = 'gpt-5-mini',
   GPT4O_MINI = 'gpt-4o-mini',
   GPT4O = 'gpt-4o'
 }
@@ -90,6 +91,11 @@ export const MODELS: ModelConfig[] = [
     id: LLMModel.GPT51,
     name: 'GPT-5.1',
     description: 'Максимальная точность и рассуждение (Deep Reasoning)'
+  },
+  {
+    id: LLMModel.GPT5_MINI,
+    name: 'GPT-5 mini',
+    description: 'Быстрая и эффективная модель (Fast & Efficient)'
   },
   {
     id: LLMModel.GPT4O_MINI,

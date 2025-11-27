@@ -147,11 +147,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
           }}
           onBlur={(e) => {
             // Сохраняем высоту при потере фокуса
-            const currentHeight = e.currentTarget.style.height;
-            requestAnimationFrame(() => {
-              if (e.currentTarget.style.height !== currentHeight) {
-                e.currentTarget.style.height = currentHeight;
-              }
+            if (e.currentTarget) {
+              const currentHeight = e.currentTarget.style.height;
+              requestAnimationFrame(() => {
+                if (e.currentTarget && e.currentTarget.style.height !== currentHeight) {
+                  e.currentTarget.style.height = currentHeight;
+                }
+              });
+            }
             });
           }}
           placeholder={disabled ? "Connecting..." : "Ask anything..."}

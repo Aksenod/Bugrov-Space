@@ -647,6 +647,14 @@ router.post('/:agentId/messages', async (req, res) => {
     files: allFiles,
   };
 
+  logger.info({
+    agentId: agent.id,
+    agentName: agent.name,
+    agentModel: agent.model,
+    agentModelType: typeof agent.model,
+    projectId: parsed.data.projectId,
+  }, 'Preparing to generate agent response');
+
   const userMessage = await withRetry(
     () => prisma.message.create({
       data: {
@@ -694,20 +702,23 @@ router.post('/:agentId/messages', async (req, res) => {
 
     return res.json(response);
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get response from OpenAI';
     logger.error({ 
-      agentId, 
-      error: error instanceof Error ? error.message : 'Unknown error',
+      agentId,
+      agentName: agent.name,
+      agentModel: agent.model,
+      error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined 
     }, 'OpenAI API error');
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get response from OpenAI';
+    
     // Проверяем на специфические ошибки
     let userFriendlyMessage = 'Ошибка генерации. Попробуйте позже.';
-    if (errorMessage.includes('API key')) {
+    if (errorMessage.includes('API key') || errorMessage.includes('Invalid API key')) {
       userFriendlyMessage = 'Неверный API ключ OpenAI. Проверьте настройки сервера.';
-    } else if (errorMessage.includes('rate limit')) {
+    } else if (errorMessage.includes('rate limit') || errorMessage.includes('Rate limit')) {
       userFriendlyMessage = 'Превышен лимит запросов к OpenAI. Попробуйте позже.';
-    } else if (errorMessage.includes('model')) {
-      userFriendlyMessage = 'Ошибка модели OpenAI. Проверьте настройки агента.';
+    } else if (errorMessage.includes('model') || errorMessage.includes('Model') || errorMessage.includes('not found')) {
+      userFriendlyMessage = `Ошибка модели OpenAI. Модель "${agent.model || 'не указана'}" недоступна. Проверьте настройки агента.`;
     }
     return res.status(500).json({ error: userFriendlyMessage, details: errorMessage });
   }
