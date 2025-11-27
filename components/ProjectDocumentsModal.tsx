@@ -65,6 +65,13 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
   const [isVerstkaFullscreen, setIsVerstkaFullscreen] = useState(false);
 
+  function setActiveTabSafe(tab: 'text' | 'dsl' | 'verstka') {
+    setActiveTab(tab);
+    if (tab !== 'verstka') {
+      setIsVerstkaFullscreen(false);
+    }
+  }
+
   // Helper function to check if agent has role
   const hasRole = (agentRole: string | undefined, roleName: string): boolean => {
     if (!agentRole) return false;
@@ -246,12 +253,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     return roles.includes('verstka');
   });
 
-  const setActiveTabSafe = (tab: 'text' | 'dsl' | 'verstka') => {
-    setActiveTab(tab);
-    if (tab !== 'verstka') {
-      setIsVerstkaFullscreen(false);
-    }
-  };
 
   const decodeContent = (base64: string) => {
     try {
