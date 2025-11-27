@@ -82,16 +82,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         const hasVerstkaRole = creatorAgent && hasRole(creatorAgent?.role, "verstka");
         
         if (hasVerstkaRole) {
-          setActiveTab('verstka');
+          setActiveTabSafe('verstka');
           setShowVerstkaCode(false); // По умолчанию показываем превью
         } else {
-          setActiveTab('text');
+          setActiveTabSafe('text');
           setShowVerstkaCode(false);
         }
+        setIsVerstkaFullscreen(false);
       }
     } else if (!isOpen) {
       // Сбрасываем таб при закрытии модального окна
-      setActiveTab('text');
+      setActiveTabSafe('text');
       setShowVerstkaCode(false);
       setIsVerstkaFullscreen(false);
     }
@@ -245,11 +246,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     return roles.includes('verstka');
   });
 
-  useEffect(() => {
-    if (!isOpen || activeTab !== 'verstka' || !showVerstkaSubTabs) {
+  const setActiveTabSafe = (tab: 'text' | 'dsl' | 'verstka') => {
+    setActiveTab(tab);
+    if (tab !== 'verstka') {
       setIsVerstkaFullscreen(false);
     }
-  }, [activeTab, isOpen, showVerstkaSubTabs]);
+  };
 
   const decodeContent = (base64: string) => {
     try {
@@ -347,7 +349,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       // Переключаемся на соответствующий таб после небольшой задержки
       // чтобы состояние успело обновиться
       setTimeout(() => {
-        setActiveTab(role);
+        setActiveTabSafe(role);
       }, 100);
     } catch (error: any) {
       console.error('Failed to generate result:', error);
@@ -686,7 +688,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                  {showDSLButtons && (
                    <div className="mb-6 flex items-center gap-2 border-b border-white/10">
                      <button
-                       onClick={() => setActiveTab('text')}
+                       onClick={() => setActiveTabSafe('text')}
                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                          activeTab === 'text'
                            ? 'text-white border-white/40'
@@ -696,7 +698,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                        Текст
                      </button>
                      <button
-                       onClick={() => setActiveTab('dsl')}
+                       onClick={() => setActiveTabSafe('dsl')}
                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                          activeTab === 'dsl'
                            ? 'text-purple-400 border-purple-400/40'
@@ -706,7 +708,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                        DSL
                      </button>
                      <button
-                       onClick={() => setActiveTab('verstka')}
+                       onClick={() => setActiveTabSafe('verstka')}
                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
                          activeTab === 'verstka'
                            ? 'text-cyan-400 border-cyan-400/40'
