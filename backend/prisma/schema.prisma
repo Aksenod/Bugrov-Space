@@ -144,3 +144,12 @@ model File {
   @@index([agentId, createdAt]) // Оптимизация для запросов с сортировкой по createdAt
   @@index([projectTypeAgentId, createdAt])
 }
+
+model GlobalPrompt {
+  id        Int      @id @default(1)
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("GlobalPrompt")
+}
