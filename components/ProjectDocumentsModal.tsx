@@ -5,6 +5,8 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
+import { InlineHint } from './InlineHint';
+import { useOnboarding } from './OnboardingContext';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
 
@@ -54,6 +56,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onShowConfirm,
   onShowAlert
 }) => {
+  const { shouldShowStep, completeStep } = useOnboarding();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'dsl' | 'verstka'>('text');
   const [showVerstkaCode, setShowVerstkaCode] = useState(false); // false = превью, true = код
@@ -382,9 +385,48 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     return null;
   };
 
+  const documentsHintStep = {
+    id: 'documents-modal-hint',
+    component: 'inline' as const,
+    content: {
+      title: 'Документы проекта',
+      description:
+        'Здесь отображаются все документы вашего проекта. Документы доступны всем агентам проекта и используются ими для контекста при ответах. Вы можете сохранять диалоги с агентами через кнопку "Save" в чате.',
+      examples: [
+        'Документы доступны всем агентам проекта',
+        'Используйте кнопку "Save" в чате для сохранения диалогов',
+        'Агенты используют документы для контекста при ответах',
+      ],
+    },
+    showOnce: true,
+  };
+
+  const shouldRenderDocumentsHint = shouldShowStep(documentsHintStep);
+
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex flex-col md:flex-row overflow-hidden">
-        
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex flex-col overflow-hidden">
+        {shouldRenderDocumentsHint && (
+          <div className="p-4 md:p-6 border-b border-white/10 bg-black/30 backdrop-blur-xl">
+            <div className="max-w-4xl mx-auto w-full">
+              <InlineHint
+                title="Документы проекта"
+                description="Здесь отображаются все документы вашего проекта. Документы доступны всем агентам проекта и используются ими для контекста при ответах. Вы можете сохранять диалоги с агентами через кнопку 'Save' в чате."
+                examples={[
+                  'Документы доступны всем агентам проекта',
+                  'Используйте кнопку "Save" в чате для сохранения диалогов',
+                  'Агенты используют документы для контекста при ответах',
+                ]}
+                variant="info"
+                collapsible={true}
+                defaultExpanded={true}
+                dismissible={true}
+                onDismiss={() => completeStep('documents-modal-hint')}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Sidebar List */}
         <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
@@ -725,7 +767,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
             </div>
           )}
         </div>
-
+        </div>
     </div>
   );
 };

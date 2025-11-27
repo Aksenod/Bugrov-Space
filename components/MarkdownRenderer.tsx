@@ -93,6 +93,7 @@ const enhanceHtmlForIframe = (html: string): string => {
       }
       body {
         display: block;
+        padding: 12px;
       }
     </style>
   `;

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, HelpCircle } from 'lucide-react';
 import { api, ApiProjectType } from '../services/api';
 import { ProjectType } from '../types';
+import { InlineHint } from './InlineHint';
+import { useOnboarding } from './OnboardingContext';
 
 interface CreateProjectDialogProps {
   isOpen: boolean;
@@ -16,6 +18,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   onCreate,
   projectTypes: initialProjectTypes = [],
 }) => {
+  const { shouldShowStep, completeStep } = useOnboarding();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [projectTypeId, setProjectTypeId] = useState('');
@@ -28,7 +31,6 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
   const isOpenRef = useRef(isOpen);
-
   // Обновляем ref при изменении isOpen
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -310,6 +312,30 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
             <label htmlFor="projectType" className="block text-sm font-semibold text-white/90 mb-2">
               Тип проекта <span className="text-red-400">*</span>
             </label>
+            
+            {/* Подсказка о типах проектов */}
+            {shouldShowStep({
+              id: 'project-type-hint',
+              component: 'inline',
+              content: {
+                title: 'Что такое тип проекта?',
+                description: 'Тип проекта определяет набор агентов, которые будут созданы в вашем проекте. Каждый тип проекта имеет специализированных агентов для определенных задач. Выберите тип, который лучше всего подходит для вашей работы.',
+              },
+              showOnce: true,
+            }) && (
+              <div className="mb-3">
+                <InlineHint
+                  title="Что такое тип проекта?"
+                  description="Тип проекта определяет набор агентов, которые будут созданы в вашем проекте. Каждый тип проекта имеет специализированных агентов для определенных задач. Выберите тип, который лучше всего подходит для вашей работы."
+                  variant="info"
+                  collapsible={true}
+                  defaultExpanded={false}
+                  dismissible={true}
+                  onDismiss={() => completeStep('project-type-hint')}
+                />
+              </div>
+            )}
+            
             {isLoadingTypes || isLoadingAgents ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 size={20} className="animate-spin text-indigo-400" />

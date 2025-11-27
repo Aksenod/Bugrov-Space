@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain } from 'lucide-react';
+import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain, Briefcase, FileText, MessageSquare } from 'lucide-react';
 
 import { Message, Role, LLMModel, MODELS, UploadedFile, Agent, User, Project, ProjectType } from './types';
 import { MessageBubble } from './components/MessageBubble';
@@ -13,6 +13,10 @@ import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { AlertDialog } from './components/AlertDialog';
+import { OnboardingModal } from './components/OnboardingModal';
+import { InlineHint } from './components/InlineHint';
+import { useOnboarding } from './components/OnboardingContext';
+import { onboardingSteps } from './components/onboardingSteps';
 import { api, ApiAgent, ApiFile, ApiMessage, ApiUser, ApiProject, ApiProjectTypeAgent } from './services/api';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
@@ -111,7 +115,133 @@ const mapProject = (project: ApiProject): Project => ({
   updatedAt: project.updatedAt,
 });
 
+interface AgentHint {
+  title: string;
+  description: string;
+  examples: string[];
+}
+
+const QUESTION_PREFIXES = [
+  'как',
+  'что',
+  'зачем',
+  'почему',
+  'когда',
+  'какие',
+  'какой',
+  'какая',
+  'каких',
+  'сколько',
+  'можно ли',
+  'how',
+  'what',
+  'why',
+  'when',
+  'which',
+  'can',
+  'should',
+];
+
+const sanitizeLine = (text: string) =>
+  text
+    .replace(/^[-*•\d\)\(]+\s*/, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s([,.!?;:])/g, '$1')
+    .trim();
+
+const ensureEnding = (text: string, ending: string) => {
+  if (!text) return text;
+  return text.endsWith(ending) ? text : `${text}${ending}`;
+};
+
+const toSentenceCase = (text: string) => {
+  if (!text) return text;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+};
+
+const isQuestion = (text: string) => {
+  const lower = text.toLowerCase();
+  return QUESTION_PREFIXES.some(prefix => lower.startsWith(prefix));
+};
+
+const dedupe = (items: string[]) => {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const key = item.toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+const extractAgentPhrases = (agent?: Agent, max = 4): string[] => {
+  if (!agent) return [];
+  const raw = [agent.systemInstruction, agent.summaryInstruction, agent.description]
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  if (!raw) {
+    return [];
+  }
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map(line => sanitizeLine(line))
+    .filter(line => line.length >= 12 && /[a-zA-Zа-яА-Я]/.test(line));
+
+  const sentences = raw
+    .split(/[.!?]+/)
+    .map(sentence => sanitizeLine(sentence))
+    .filter(sentence => sentence.length >= 25 && /[a-zA-Zа-яА-Я]/.test(sentence));
+
+  const merged = dedupe([...lines, ...sentences]);
+  return merged.slice(0, max);
+};
+
+const formatExampleForAgent = (phrase: string, agentName: string) => {
+  const cleaned = sanitizeLine(phrase);
+  if (!cleaned) return '';
+
+  if (isQuestion(cleaned)) {
+    return `Спроси ${agentName}: ${ensureEnding(cleaned, '?')}`;
+  }
+
+  const imperative = cleaned.replace(/^(?:можешь|может|нужно|должен|обязан|ты|вы)\s+/i, '').trim();
+  const tail = imperative || cleaned;
+  return `Попроси ${agentName} ${ensureEnding(toSentenceCase(tail), '')}`.trim();
+};
+
+const getDefaultAgentExamples = (agentName: string): string[] => [
+  `Спроси ${agentName}, какие шаги он предложит для вашей задачи`,
+  `Попроси ${agentName} уточнить требования на основе документов проекта`,
+  `Попроси ${agentName} улучшить результат прошлой итерации`,
+  `Уточни у ${agentName}, какие данные ему нужны, чтобы начать работу`,
+];
+
+const buildAgentHint = (agent?: Agent): AgentHint | null => {
+  if (!agent) return null;
+  const descriptionSource = agent.description?.trim() || agent.systemInstruction?.trim() || '';
+  const description = descriptionSource
+    ? descriptionSource.slice(0, 260).trim() + (descriptionSource.length > 260 ? '…' : '')
+    : `Используйте ${agent.name}, чтобы получить экспертизу по его специализации.`;
+
+  const phrases = extractAgentPhrases(agent);
+  const examples = phrases
+    .map(phrase => formatExampleForAgent(phrase, agent.name))
+    .filter(Boolean);
+
+  return {
+    title: `${agent.name}: идеи запросов`,
+    description,
+    examples: examples.length ? examples.slice(0, 4) : getDefaultAgentExamples(agent.name),
+  };
+};
+
 export default function App() {
+  const onboarding = useOnboarding();
   const [authToken, setAuthToken] = useState(() => api.getToken());
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -154,6 +284,8 @@ export default function App() {
     isOpen: false,
     message: '',
   });
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
@@ -161,6 +293,8 @@ export default function App() {
   const bootstrapInProgressRef = useRef(false);
   const lastBootstrapTokenRef = useRef<string | null>(null);
   const hasBootstrappedRef = useRef(false);
+
+  const { shouldShowStep, completeStep, isStepCompleted } = useOnboarding();
 
   const activeAgent = useMemo(() => {
     if (!agents.length) {
@@ -223,7 +357,7 @@ export default function App() {
     lastBootstrapTokenRef.current = null;
     bootstrapInProgressRef.current = false;
     hasBootstrappedRef.current = false;
-  }, []);
+  }, [isNewUser, projects.length]);
 
   const bootstrap = useCallback(async () => {
     const token = api.getToken();
@@ -747,6 +881,10 @@ export default function App() {
       setChatHistories({});
       setSummaryDocuments({});
       
+      // Помечаем как нового пользователя и показываем приветствие
+      setIsNewUser(true);
+      setShowWelcomeModal(true);
+      
       // Пытаемся загрузить данные (но не критично, если не получится)
       try {
         await bootstrap();
@@ -973,7 +1111,12 @@ export default function App() {
     }
   }, []);
 
+  const [showProjectCreatedModal, setShowProjectCreatedModal] = useState(false);
+  
   const handleCreateProject = useCallback(async (name: string, projectTypeId: string, description?: string) => {
+    const isFirstProject = projects.length === 0;
+    const shouldShowProjectModal = isNewUser && isFirstProject;
+
     try {
       const { project } = await api.createProject({ name, projectTypeId, description });
       const mappedProject = mapProject(project);
@@ -996,11 +1139,16 @@ export default function App() {
       }
       
       setIsCreateProjectOpen(false);
+
+      if (shouldShowProjectModal) {
+        setShowProjectCreatedModal(true);
+        setIsNewUser(false);
+      }
     } catch (error: any) {
       console.error('Failed to create project', error);
       throw error;
     }
-  }, []);
+  }, [isNewUser, projects.length]);
 
   const handleEditProject = useCallback((project: Project) => {
     setEditingProject(project);
@@ -1216,16 +1364,41 @@ export default function App() {
             >
               Выйти
             </button>
-            <div className="text-center space-y-6 max-w-md">
+            <div className="text-center space-y-6 max-w-2xl">
               <div className="relative">
                 <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
                 <Bot size={80} className="relative mx-auto animate-bot" />
               </div>
               <div>
                 <p className="text-xl font-bold mb-2">Создайте первый проект</p>
-                <p className="text-sm text-white/60">Начните работу, создав ваш первый проект</p>
+                <p className="text-sm text-white/60 mb-4">Начните работу, создав ваш первый проект</p>
               </div>
+              
+              {/* Информационный блок о проектах */}
+              {shouldShowStep({
+                id: 'empty-projects-hint',
+                component: 'inline',
+                content: {
+                  title: 'Что такое проект?',
+                  description: 'Проект — это рабочее пространство для организации вашей работы с AI-агентами. В каждом проекте есть набор агентов, которые помогут вам с различными задачами. Выберите тип проекта, и система автоматически создаст подходящих агентов.',
+                },
+                showOnce: true,
+              }) && (
+                <div className="max-w-lg mx-auto">
+                  <InlineHint
+                    title="Что такое проект?"
+                    description="Проект — это рабочее пространство для организации вашей работы с AI-агентами. В каждом проекте есть набор агентов, которые помогут вам с различными задачами. Выберите тип проекта, и система автоматически создаст подходящих агентов."
+                    variant="info"
+                    collapsible={true}
+                    defaultExpanded={true}
+                    dismissible={true}
+                    onDismiss={() => completeStep('empty-projects-hint')}
+                  />
+                </div>
+              )}
+              
               <button
+                id="create-project-button"
                 className="px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
                 onClick={(e) => {
                   e.preventDefault();
@@ -1302,15 +1475,38 @@ export default function App() {
         {!activeAgent ? (
           // Если нет агента, показываем пустой экран
           <div className="flex-1 flex items-center justify-center bg-black text-white px-4">
-            <div className="text-center space-y-6 max-w-md">
+            <div className="text-center space-y-6 max-w-2xl">
               <div className="relative">
                 <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
                 <Bot size={80} className="relative mx-auto animate-bot" />
               </div>
               <div>
                 <p className="text-xl font-bold mb-2">Нет доступных агентов</p>
-                <p className="text-sm text-white/60">Агенты будут доступны после настройки проекта</p>
+                <p className="text-sm text-white/60 mb-4">Агенты будут доступны после настройки проекта</p>
               </div>
+              
+              {/* Информационный блок об агентах */}
+              {shouldShowStep({
+                id: 'empty-agents-hint',
+                component: 'inline',
+                content: {
+                  title: 'Откуда берутся агенты?',
+                  description: 'Агенты автоматически создаются при создании проекта на основе выбранного типа проекта. Каждый тип проекта имеет свой набор специализированных агентов. Если агентов нет, возможно, выбранный тип проекта еще не настроен администратором.',
+                },
+                showOnce: true,
+              }) && (
+                <div className="max-w-lg mx-auto">
+                  <InlineHint
+                    title="Откуда берутся агенты?"
+                    description="Агенты автоматически создаются при создании проекта на основе выбранного типа проекта. Каждый тип проекта имеет свой набор специализированных агентов. Если агентов нет, возможно, выбранный тип проекта еще не настроен администратором."
+                    variant="info"
+                    collapsible={true}
+                    defaultExpanded={true}
+                    dismissible={true}
+                    onDismiss={() => completeStep('empty-agents-hint')}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1374,9 +1570,38 @@ export default function App() {
                      <p className="text-base font-semibold text-white/60 mb-2">
                        Начните диалог с {activeAgent?.name || 'агентом'}
                      </p>
-                     <p className="text-sm text-white/40 text-center max-w-md">
+                     <p className="text-sm text-white/40 text-center max-w-md mb-4">
                        Задайте вопрос или попросите помочь с задачей
                      </p>
+                     
+                     {/* Примеры вопросов */}
+                     {shouldShowStep({
+                       id: 'empty-chat-hint',
+                       component: 'inline',
+                       content: {
+                         title: 'Примеры вопросов',
+                         description: 'Вы можете задавать любые вопросы агенту. Агент использует документы проекта для контекста, поэтому загрузите файлы, чтобы получить более точные ответы.',
+                       },
+                       showOnce: true,
+                     }) && (
+                       <div className="max-w-md mx-auto pointer-events-auto">
+                         <InlineHint
+                           title="Примеры вопросов"
+                           description="Вы можете задавать любые вопросы агенту. Агент использует документы проекта для контекста, поэтому загрузите файлы, чтобы получить более точные ответы."
+                           examples={[
+                             'Объясни концепцию из документа',
+                             'Помоги с задачей на основе контекста проекта',
+                             'Создай план работы',
+                             'Проанализируй данные',
+                           ]}
+                           variant="info"
+                           collapsible={true}
+                           defaultExpanded={false}
+                           dismissible={true}
+                           onDismiss={() => completeStep('empty-chat-hint')}
+                         />
+                       </div>
+                     )}
                   </div>
                )}
                
@@ -1474,6 +1699,57 @@ export default function App() {
         onDelete={handleDeleteProject}
         project={editingProject}
       />
+
+      {/* Welcome Modal for new users */}
+      {showWelcomeModal && isNewUser && (
+        <OnboardingModal
+          steps={onboardingSteps}
+          isVisible={showWelcomeModal}
+          onComplete={(stepId) => {
+            completeStep(stepId);
+            if (stepId === onboardingSteps[onboardingSteps.length - 1].id) {
+              setShowWelcomeModal(false);
+              setIsNewUser(false);
+            }
+          }}
+          onDismiss={() => {
+            onboardingSteps.forEach(step => completeStep(step.id));
+            setShowWelcomeModal(false);
+            setIsNewUser(false);
+          }}
+          startStep={0}
+        />
+      )}
+
+      {/* Project Created Modal */}
+      {showProjectCreatedModal && (
+        <OnboardingModal
+          steps={[{
+            id: 'project-created',
+            component: 'modal',
+            content: {
+              title: 'Проект создан! 🎉',
+              description: 'Отлично! Ваш проект создан, и агенты уже готовы к работе.\n\n**Что дальше?**\n\n• Агенты находятся в боковой панели слева\n• Выберите агента, чтобы начать диалог\n• Загрузите документы через кнопку "Documents"\n• Агенты используют документы проекта для контекста',
+              examples: [
+                'Выберите агента из списка слева',
+                'Начните диалог, задав вопрос',
+                'Загрузите документы для лучшего контекста',
+              ],
+            },
+            showOnce: true,
+          }]}
+          isVisible={showProjectCreatedModal}
+          onComplete={(stepId) => {
+            completeStep(stepId);
+            setShowProjectCreatedModal(false);
+          }}
+          onDismiss={() => {
+            completeStep('project-created');
+            setShowProjectCreatedModal(false);
+          }}
+          startStep={0}
+        />
+      )}
 
     </div>
   );

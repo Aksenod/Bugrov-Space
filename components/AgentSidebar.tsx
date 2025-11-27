@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Agent, User, Project } from '../types';
 import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Settings, Brain, Cpu, Zap, Rocket, Sparkles, CircuitBoard, Wand2 } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
+import { OnboardingTooltip } from './OnboardingTooltip';
+import { useOnboarding } from './OnboardingContext';
 
 const ADMIN_USERNAMES = new Set(['admin', 'aksenod']);
 
@@ -46,11 +48,41 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   onOpenAdmin,
   documentsCount = 0
 }) => {
+  const { shouldShowStep, completeStep, dismissStep } = useOnboarding();
+  const [showDocumentsTooltip, setShowDocumentsTooltip] = useState(false);
+  const [showSaveTooltip, setShowSaveTooltip] = useState(false);
+  const documentsButtonRef = useRef<HTMLButtonElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   
   // Проверка, является ли пользователь администратором
   const isAdmin =
     !!currentUser &&
     (currentUser.role === 'admin' || (currentUser?.username && ADMIN_USERNAMES.has(currentUser.username)));
+  
+  // Показываем тултипы при первом рендере, если нужно
+  useEffect(() => {
+    if (activeProject && agents.length > 0 && isOpen) {
+      const documentsStep = {
+        id: 'documents-button-tooltip',
+        component: 'tooltip' as const,
+        target: '#documents-button',
+        position: 'right' as const,
+        content: {
+          description: 'Документы проекта доступны всем агентам проекта.',
+        },
+        showOnce: true,
+      };
+      
+      if (shouldShowStep(documentsStep)) {
+        const timer = setTimeout(() => {
+          if (documentsButtonRef.current) {
+            setShowDocumentsTooltip(true);
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeProject, agents.length, isOpen, shouldShowStep]);
   
   const getIcon = (name: string, agentId?: string) => {
     const lower = name.toLowerCase();
@@ -91,6 +123,30 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       return orderA - orderB;
     });
   }, [agents]);
+
+  useEffect(() => {
+    if (activeProject && agents.length > 0 && isOpen) {
+      const saveStep = {
+        id: 'save-button-tooltip',
+        component: 'tooltip' as const,
+        target: '#save-button',
+        position: 'left' as const,
+        content: {
+          description: 'Сохраняет текущий диалог в документы проекта.',
+        },
+        showOnce: true,
+      };
+
+      if (shouldShowStep(saveStep)) {
+        const timer = setTimeout(() => {
+          if (saveButtonRef.current) {
+            setShowSaveTooltip(true);
+          }
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeProject, agents.length, isOpen, shouldShowStep]);
 
   return (
     <>
@@ -159,9 +215,23 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
              {/* Documents */}
              <div className="relative group">
                <button
+                 ref={documentsButtonRef}
+                 id="documents-button"
                  onClick={() => {
                     onOpenDocs();
                     onCloseMobile();
+                    if (shouldShowStep({
+                      id: 'documents-button-tooltip',
+                      component: 'tooltip',
+                      target: '#documents-button',
+                      position: 'right',
+                      content: {
+                        description: 'Документы проекта доступны всем агентам проекта.',
+                      },
+                      showOnce: true,
+                    })) {
+                      completeStep('documents-button-tooltip');
+                    }
                  }}
                  className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5 transition-all group-hover:border-white/10"
                >
@@ -179,9 +249,23 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                {/* Embedded Save Button */}
                <div className="absolute right-2 top-1/2 -translate-y-1/2">
                   <button
+                     ref={saveButtonRef}
+                     id="save-button"
                      onClick={(e) => {
                          e.stopPropagation();
                          onGenerateSummary();
+                         if (shouldShowStep({
+                           id: 'save-button-tooltip',
+                           component: 'tooltip',
+                           target: '#save-button',
+                           position: 'left',
+                           content: {
+                             description: 'Сохраняет текущий диалог в документы проекта.',
+                           },
+                           showOnce: true,
+                         })) {
+                           completeStep('save-button-tooltip');
+                         }
                      }}
                      disabled={isGeneratingSummary}
                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all duration-300 border ${
@@ -206,6 +290,95 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                   </button>
                </div>
              </div>
+             
+             {/* Tooltips */}
+             {showDocumentsTooltip && shouldShowStep({
+               id: 'documents-button-tooltip',
+               component: 'tooltip',
+               target: '#documents-button',
+               position: 'right',
+               content: {
+                 title: 'Документы проекта',
+                 description: 'Здесь вы можете загружать и просматривать документы проекта. Все агенты проекта имеют доступ к этим документам и используют их для контекста при ответах. Документы проекта отличаются от базы знаний агента — они общие для всех агентов проекта.',
+                 examples: [
+                   'Загрузите ТЗ, брендбук или примеры работ',
+                   'Агенты будут использовать эти документы при ответах',
+                   'Документы доступны всем агентам проекта',
+                 ],
+               },
+               showOnce: true,
+             }) && (
+               <OnboardingTooltip
+                 step={{
+                   id: 'documents-button-tooltip',
+                   component: 'tooltip',
+                   target: '#documents-button',
+                   position: 'right',
+                   content: {
+                     title: 'Документы проекта',
+                     description: 'Здесь вы можете загружать и просматривать документы проекта. Все агенты проекта имеют доступ к этим документам и используют их для контекста при ответах. Документы проекта отличаются от базы знаний агента — они общие для всех агентов проекта.',
+                     examples: [
+                       'Загрузите ТЗ, брендбук или примеры работ',
+                       'Агенты будут использовать эти документы при ответах',
+                       'Документы доступны всем агентам проекта',
+                     ],
+                   },
+                   showOnce: true,
+                 }}
+                 isVisible={showDocumentsTooltip}
+                 onComplete={() => {
+                   completeStep('documents-button-tooltip');
+                   setShowDocumentsTooltip(false);
+                 }}
+                 onDismiss={() => {
+                   dismissStep('documents-button-tooltip');
+                   setShowDocumentsTooltip(false);
+                 }}
+               />
+             )}
+             
+             {showSaveTooltip && shouldShowStep({
+               id: 'save-button-tooltip',
+               component: 'tooltip',
+               target: '#save-button',
+               position: 'left',
+               content: {
+                 title: 'Сохранить диалог',
+                 description: 'Эта кнопка сохраняет текущий диалог с агентом в документы проекта. Сохраненный диалог будет доступен всем агентам проекта и может использоваться как справочная информация.',
+                 examples: [
+                   'Сохраните важные решения и обсуждения',
+                   'Сохраненные диалоги доступны всем агентам',
+                 ],
+               },
+               showOnce: true,
+             }) && (
+               <OnboardingTooltip
+                 step={{
+                   id: 'save-button-tooltip',
+                   component: 'tooltip',
+                   target: '#save-button',
+                   position: 'left',
+                   content: {
+                     title: 'Сохранить диалог',
+                     description: 'Эта кнопка сохраняет текущий диалог с агентом в документы проекта. Сохраненный диалог будет доступен всем агентам проекта и может использоваться как справочная информация.',
+                     examples: [
+                       'Сохраните важные решения и обсуждения',
+                       'Сохраненные диалоги доступны всем агентам',
+                     ],
+                   },
+                   showOnce: true,
+                 }}
+                 isVisible={showSaveTooltip}
+                 onComplete={() => {
+                   completeStep('save-button-tooltip');
+                   setShowSaveTooltip(false);
+                 }}
+                 onDismiss={() => {
+                   dismissStep('save-button-tooltip');
+                   setShowSaveTooltip(false);
+                 }}
+               />
+             )}
 
              {/* User Profile / Logout */}
              {currentUser && (
