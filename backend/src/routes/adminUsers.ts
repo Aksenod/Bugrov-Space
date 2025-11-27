@@ -10,6 +10,16 @@ const router = Router();
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   try {
     console.log('[GET /admin/users] Request received');
+    console.log('[GET /admin/users] Request headers:', JSON.stringify(req.headers, null, 2));
+    
+    // Сначала проверяем, есть ли вообще пользователи в базе (простой запрос)
+    const totalUsersCount = await withRetry(
+      () => prisma.user.count(),
+      2,
+      'GET /admin/users - count users'
+    );
+    console.log(`[GET /admin/users] Total users in database: ${totalUsersCount}`);
+    
     const users = await withRetry(
       () => prisma.user.findMany({
         select: {
@@ -31,6 +41,18 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     );
 
     console.log(`[GET /admin/users] Found ${users.length} users in database`);
+    
+    // Логируем информацию о каждом пользователе для отладки
+    if (users.length > 0) {
+      console.log('[GET /admin/users] Users details:', users.map(u => ({
+        id: u.id,
+        username: u.username,
+        createdAt: u.createdAt,
+        projectsCount: u._count.projects
+      })));
+    } else {
+      console.log('[GET /admin/users] WARNING: No users found in database!');
+    }
     
     const usersWithCount = users.map(user => ({
       id: user.id,

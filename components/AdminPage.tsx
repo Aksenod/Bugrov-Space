@@ -512,18 +512,43 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const loadUsers = async () => {
     setIsLoadingUsers(true);
     try {
+      console.log('[AdminPage] Loading users...');
       const response = await api.getUsers();
       console.log('[AdminPage] Users API response:', response);
+      console.log('[AdminPage] Response type:', typeof response);
+      console.log('[AdminPage] Response keys:', response ? Object.keys(response) : 'null');
+      
       const usersList = response?.users || [];
-      console.log('[AdminPage] Users list:', usersList, 'Count:', usersList.length);
+      console.log('[AdminPage] Users list:', usersList);
+      console.log('[AdminPage] Users count:', usersList.length);
+      
+      if (usersList.length === 0) {
+        console.warn('[AdminPage] WARNING: Received empty users list from API');
+      } else {
+        console.log('[AdminPage] Users data:', usersList.map(u => ({
+          id: u.id,
+          username: u.username,
+          createdAt: u.createdAt,
+          projectsCount: u.projectsCount
+        })));
+      }
+      
       setUsers(usersList);
     } catch (error: any) {
       console.error('[AdminPage] Failed to load users', error);
+      console.error('[AdminPage] Error details:', {
+        status: error?.status,
+        statusText: error?.statusText,
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack
+      });
+      
       setUsers([]); // Устанавливаем пустой массив при ошибке
       
       // Если это 403, показываем специальное сообщение
       if (error?.status === 403) {
-        showAlert('Доступ запрещен. Требуются права администратора.', 'Ошибка доступа', 'error');
+        showAlert('Доступ запрещен. Требуются права администратора. Убедитесь, что вы вошли под учетной записью администратора.', 'Ошибка доступа', 'error');
       } else if (error?.status !== 404) {
         // Для других ошибок (кроме 404) показываем сообщение
         const errorMessage = error?.message || 'Неизвестная ошибка';
