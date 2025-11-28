@@ -17,6 +17,7 @@ const agentTemplateSchema = z.object({
   summaryInstruction: z.string().optional().default(''),
   model: z.string().optional().default('gpt-5.1'),
   role: z.string().optional().default(''),
+  isHiddenFromSidebar: z.boolean().optional().default(false),
 });
 
 // GET / - получить все агенты-шаблоны
@@ -76,6 +77,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
         summaryInstruction: agent.summaryInstruction || '',
         model: agent.model || 'gpt-5.1',
         role: agent.role || '',
+        isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
         projectTypes: (connectionsByAgentId[agent.id] || []).map((pt: any) => ({
@@ -114,6 +116,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
             summaryInstruction: agent.summaryInstruction || '',
             model: agent.model || 'gpt-5.1',
             role: agent.role || '',
+            isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
             createdAt: agent.createdAt,
             updatedAt: agent.updatedAt,
             projectTypes: [],
@@ -567,6 +570,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     summaryInstruction: agent.summaryInstruction || '',
     model: agent.model || 'gpt-5.1',
     role: agent.role || '',
+    isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
     projectTypes: (connections || []).map((pt: any) => ({
@@ -593,7 +597,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       return res.status(400).json({ error: `Validation error: ${errorMessages}` });
     }
 
-    const { name, description, systemInstruction, summaryInstruction, model, role } = parsed.data;
+    const { name, description, systemInstruction, summaryInstruction, model, role, isHiddenFromSidebar } = parsed.data;
 
     let agent: any;
     try {
@@ -607,6 +611,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
             summaryInstruction: summaryInstruction || '',
             model: model || 'gpt-5.1',
             role: role || '',
+            isHiddenFromSidebar: isHiddenFromSidebar || false,
             // НЕ передаем projectType - это many-to-many связь через ProjectTypeAgentProjectType
           },
         }),
