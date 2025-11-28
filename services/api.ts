@@ -290,6 +290,7 @@ export interface ApiAgent {
   projectTypeId?: string;
   projectTypeAgentId?: string;
   files: ApiFile[];
+  isHiddenFromSidebar?: boolean;
 }
 
 export interface ApiProjectType {
@@ -313,6 +314,7 @@ export interface ApiProjectTypeAgent {
   projectTypes?: Array<{ id: string; name: string; order?: number }>; // Новое поле для связи многие-ко-многим
   createdAt?: string;
   updatedAt?: string;
+  isHiddenFromSidebar?: boolean;
 }
 
 export interface ApiProject {

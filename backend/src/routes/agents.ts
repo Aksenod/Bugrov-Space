@@ -243,6 +243,13 @@ router.get('/', async (req, res, next) => {
     const agents = await withRetry(
       () => prisma.agent.findMany({
         where: { userId, projectId },
+        include: {
+          projectTypeAgent: {
+            select: {
+              isHiddenFromSidebar: true
+            }
+          }
+        } as any, // Cast to any to avoid TS error if types are outdated
         orderBy: [
           { order: 'asc' },
           { createdAt: 'asc' },
@@ -251,6 +258,8 @@ router.get('/', async (req, res, next) => {
       3,
       `GET /agents?projectId=${projectId}`
     );
+
+    // ... (logic for projectTypeAgents remains the same)
 
     // Загружаем агентов типа проекта, если проект найден
     // Используем связь many-to-many через ProjectTypeAgentProjectType
@@ -339,10 +348,15 @@ router.get('/', async (req, res, next) => {
     }
 
     // Добавляем пустой массив files для каждого агента (для совместимости с фронтендом)
-    const agentsWithEmptyFiles = agents.map(agent => ({
-      ...agent,
-      files: [],
-    }));
+    // И наследуем isHiddenFromSidebar от шаблона, если он есть
+    const agentsWithEmptyFiles = agents.map(agent => {
+      const isHidden = (agent as any).isHiddenFromSidebar || ((agent as any).projectTypeAgent?.isHiddenFromSidebar ?? false);
+      return {
+        ...agent,
+        files: [],
+        isHiddenFromSidebar: isHidden,
+      };
+    });
 
     logger.debug({ userId, agentsCount: agents.length, projectTypeAgentsCount: projectTypeAgents.length }, 'Agents loaded');
 

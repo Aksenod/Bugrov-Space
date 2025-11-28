@@ -251,11 +251,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   console.log('[ProjectDocumentsModal] Tab visibility:', {
     isAdmin,
-    showDSLButtons,
-    shouldShowTabs: showDSLButtons || isAdmin,
     currentUserRole: currentUser?.role,
-    documentCreatorAgentRole: documentCreatorAgent?.role,
+    showDSLButtons,
+    shouldShowTabs: activeTab === 'prototype' && showDSLButtons && isAdmin,
+    activeTab,
     documentCreatorAgentName: documentCreatorAgent?.name,
+    documentCreatorAgentRole: documentCreatorAgent?.role,
   });
 
   // Показывать подтабы только если документ создан агентом-верстальщиком
