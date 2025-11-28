@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2 } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
@@ -65,6 +65,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [isGeneratingPrototype, setIsGeneratingPrototype] = useState(false);
   const [localSelectedFile, setLocalSelectedFile] = useState<UploadedFile | null>(null);
   const [isVerstkaFullscreen, setIsVerstkaFullscreen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -135,13 +138,20 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           }
           return fileFromProps;
         });
+        // Сбрасываем режим редактирования при смене файла
+        setIsEditing(false);
+        setEditedContent('');
       } else {
         // Если выбранный файл не найден в списке документов (был удален), сбрасываем выбор
         setSelectedFileId(null);
         setLocalSelectedFile(null);
+        setIsEditing(false);
+        setEditedContent('');
       }
     } else {
       setLocalSelectedFile(null);
+      setIsEditing(false);
+      setEditedContent('');
     }
   }, [documents, selectedFileId]);
 
@@ -305,6 +315,64 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
     // Вызываем onRemoveFile, который покажет подтверждение и выполнит удаление
     onRemoveFile(fileId);
+  };
+
+  const handleEdit = () => {
+    if (!selectedFile) return;
+    const content = decodeContent(selectedFile.data);
+    setEditedContent(content);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedContent('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedFile) return;
+
+    setIsSaving(true);
+    try {
+      // Кодируем контент в base64
+      const encodedContent = window.btoa(unescape(encodeURIComponent(editedContent)));
+
+      const { file } = await api.updateFileContent(selectedFile.id, encodedContent);
+
+      // Создаём обновлённый файл
+      const updatedFile: UploadedFile = {
+        id: file.id,
+        name: file.name,
+        type: file.mimeType,
+        data: file.content,
+        agentId: file.agentId,
+        dslContent: file.dslContent,
+        verstkaContent: file.verstkaContent,
+      };
+
+      // Обновляем локальное состояние
+      setLocalSelectedFile(updatedFile);
+
+      // Обновляем документ в родительском компоненте
+      if (onDocumentUpdate) {
+        onDocumentUpdate(updatedFile);
+      }
+
+      // Выходим из режима редактирования
+      setIsEditing(false);
+      setEditedContent('');
+
+      if (onShowAlert) {
+        onShowAlert('Документ успешно обновлен', 'Успех', 'success');
+      }
+    } catch (error: any) {
+      console.error('Failed to update file:', error);
+      if (onShowAlert) {
+        onShowAlert(`Не удалось обновить документ: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleGenerateResult = async () => {
@@ -628,6 +696,43 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {activeTab === 'text' && !selectedFile.type.includes('image') && (
+                          isEditing ? (
+                            <>
+                              <button
+                                onClick={handleCancelEdit}
+                                disabled={isSaving}
+                                className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                                title="Отменить"
+                                aria-label="Отменить редактирование"
+                              >
+                                <span className="text-xs font-semibold hidden sm:inline">Отменить</span>
+                                <X size={16} />
+                              </button>
+                              <button
+                                onClick={handleSaveEdit}
+                                disabled={isSaving}
+                                className="px-3 py-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                                title="Сохранить"
+                                aria-label="Сохранить изменения"
+                              >
+                                {isSaving && <Loader2 size={14} className="animate-spin" />}
+                                <span className="text-xs font-semibold hidden sm:inline">Сохранить</span>
+                                <Save size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={handleEdit}
+                              className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
+                              title="Редактировать"
+                              aria-label="Редактировать документ"
+                            >
+                              <span className="text-xs font-semibold hidden sm:inline">Редактировать</span>
+                              <Edit size={16} />
+                            </button>
+                          )
+                        )}
                         <button
                           onClick={(e) => handleDownload(selectedFile, e)}
                           className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
@@ -756,6 +861,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       }
 
                       // Обычный рендер для других табов
+                      if (isEditing) {
+                        return (
+                          <textarea
+                            value={editedContent}
+                            onChange={(e) => setEditedContent(e.target.value)}
+                            className="w-full h-full min-h-[500px] bg-black/30 text-white p-4 rounded-xl border border-white/10 focus:border-white/30 focus:outline-none resize-none font-mono text-sm"
+                            placeholder="Введите текст документа..."
+                          />
+                        );
+                      }
+
                       return (
                         <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
                           <MarkdownRenderer content={decodeContent(content)} />

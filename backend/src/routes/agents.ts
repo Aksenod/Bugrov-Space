@@ -1059,6 +1059,81 @@ router.delete('/:agentId/files/:fileId', async (_req, res) => {
   return forbidAgentMutation(res);
 });
 
+// PATCH /agents/files/:fileId - Update file content
+router.patch('/files/:fileId', async (req, res) => {
+  const { fileId } = req.params;
+  const userId = (req as any).userId;
+  const { content } = req.body;
+
+  logger.info({ fileId, userId }, 'PATCH /agents/files/:fileId - request received');
+
+  if (!content || typeof content !== 'string') {
+    return res.status(400).json({ error: 'Content is required and must be a string' });
+  }
+
+  try {
+    // 1. Get the file and verify ownership/access
+    const file = await withRetry(
+      () => prisma.file.findFirst({
+        where: { id: fileId },
+        include: { agent: true },
+      }),
+      3,
+      `PATCH /agents/files/${fileId} - find file`
+    );
+
+    if (!file) {
+      logger.warn({ fileId, userId }, 'File not found for update');
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // 2. Check access (similar to delete logic)
+    if (file.agent) {
+      const agent = await withRetry(
+        () => prisma.agent.findUnique({ where: { id: file.agent!.id } }),
+        3,
+        `PATCH /agents/files/${fileId} - find agent`
+      );
+      if (agent && agent.projectId && agent.ownerId !== userId) {
+        logger.warn({ fileId, userId, agentOwnerId: agent.ownerId }, 'User does not have access to update this file');
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
+    // 3. Update file content
+    const updatedFile = await withRetry(
+      () => prisma.file.update({
+        where: { id: fileId },
+        data: { content },
+      }),
+      3,
+      `PATCH /agents/files/${fileId} - update file`
+    );
+
+    logger.info({ fileId, userId, contentLength: content.length }, 'File content updated');
+
+    res.status(200).json({
+      file: {
+        id: updatedFile.id,
+        name: updatedFile.name,
+        mimeType: updatedFile.mimeType,
+        content: updatedFile.content,
+        agentId: updatedFile.agentId,
+        dslContent: updatedFile.dslContent,
+        verstkaContent: updatedFile.verstkaContent,
+      }
+    });
+  } catch (error) {
+    logger.error({
+      fileId,
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 'File update failed');
+    res.status(500).json({ error: 'Failed to update file' });
+  }
+});
+
 router.post('/:agentId/summary', async (req, res) => {
   const userId = req.userId!;
   const { agentId } = req.params;
