@@ -41,11 +41,11 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: env.corsOrigin === '*' 
-      ? (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => callback(null, true) 
+    origin: env.corsOrigin === '*'
+      ? (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => callback(null, true)
       : env.corsOrigin,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     optionsSuccessStatus: 200, // Для старых браузеров
   }),

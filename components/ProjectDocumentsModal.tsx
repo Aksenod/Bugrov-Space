@@ -680,7 +680,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                         )}
 
                         {/* Кнопка генерации прототипа */}
-                        {showDSLButtons && (
+                        {showDSLButtons && !isEditing && (
                           <button
                             onClick={(e) => {
                               e.preventDefault();
