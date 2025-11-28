@@ -113,15 +113,18 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   };
 
   // Сортируем агентов по полю order для правильного отображения
+  // и фильтруем скрытые агенты
   const sortedAgents = useMemo(() => {
-    return [...agents].sort((a, b) => {
-      const orderA = a.order ?? 0;
-      const orderB = b.order ?? 0;
-      if (orderA === orderB) {
-        return a.id.localeCompare(b.id);
-      }
-      return orderA - orderB;
-    });
+    return [...agents]
+      .filter(agent => !agent.isHiddenFromSidebar)
+      .sort((a, b) => {
+        const orderA = a.order ?? 0;
+        const orderB = b.order ?? 0;
+        if (orderA === orderB) {
+          return a.id.localeCompare(b.id);
+        }
+        return orderA - orderB;
+      });
   }, [agents]);
 
   useEffect(() => {

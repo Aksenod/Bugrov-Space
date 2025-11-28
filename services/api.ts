@@ -589,6 +589,7 @@ export const api = {
     summaryInstruction?: string;
     model?: string;
     role?: string;
+    isHiddenFromSidebar?: boolean;
   }) {
     return request<{ agent: ApiProjectTypeAgent }>('/admin/agents', {
       method: 'POST',
@@ -603,6 +604,7 @@ export const api = {
     summaryInstruction?: string;
     model?: string;
     role?: string;
+    isHiddenFromSidebar?: boolean;
   }) {
     return request<{ agent: ApiProjectTypeAgent }>(`/admin/agents/${agentId}`, {
       method: 'PUT',

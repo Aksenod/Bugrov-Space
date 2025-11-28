@@ -146,6 +146,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [agentSummaryInstruction, setAgentSummaryInstruction] = useState('');
   const [agentModel, setAgentModel] = useState<LLMModel>(LLMModel.GPT51);
   const [agentRole, setAgentRole] = useState('');
+  const [agentIsHiddenFromSidebar, setAgentIsHiddenFromSidebar] = useState(false);
   const [selectedProjectTypeIds, setSelectedProjectTypeIds] = useState<string[]>([]);
   const [isSavingAgent, setIsSavingAgent] = useState(false);
   const [isProjectTypesDropdownOpen, setIsProjectTypesDropdownOpen] = useState(false);
@@ -407,6 +408,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           setAgentSummaryInstruction(agent.summaryInstruction || '');
           setAgentModel(resolveModel(agent.model));
           setAgentRole(agent.role || '');
+          setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
           setSelectedProjectTypeIds(projectTypes.map(pt => pt.id));
           setAgentFiles(agentFilesData);
           setIsAgentDialogOpen(true);
@@ -681,6 +683,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       setAgentSummaryInstruction(agent.summaryInstruction || '');
       setAgentModel(resolveModel(agent.model));
       setAgentRole(agent.role || '');
+      setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
       setSelectedProjectTypeIds(agent.projectTypes?.map(pt => pt.id) || []);
       // Загружаем файлы агента-шаблона
       try {
@@ -707,6 +710,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           systemInstruction: '',
           summaryInstruction: '',
           model: LLMModel.GPT51,
+          isHiddenFromSidebar: false,
         });
         setEditingAgent(newAgent);
         setAgentName(newAgent.name);
@@ -715,6 +719,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         setAgentSummaryInstruction(newAgent.summaryInstruction || '');
         setAgentModel(resolveModel(newAgent.model));
         setAgentRole(newAgent.role || '');
+        setAgentIsHiddenFromSidebar(newAgent.isHiddenFromSidebar || false);
         setSelectedProjectTypeIds([]);
         setAgentFiles([]);
         // Загружаем список агентов, чтобы новый агент появился в списке
@@ -759,6 +764,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       summaryInstruction: agentSummaryInstruction,
       model: agentModel,
       role: agentRole,
+      isHiddenFromSidebar: agentIsHiddenFromSidebar,
       selectedProjectTypeIds,
     };
     
@@ -783,6 +789,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         setAgentSummaryInstruction(draft.summaryInstruction || '');
         setAgentModel(draft.model || LLMModel.GPT51);
         setAgentRole(draft.role || '');
+        setAgentIsHiddenFromSidebar(draft.isHiddenFromSidebar || false);
         setSelectedProjectTypeIds(draft.selectedProjectTypeIds || []);
         return true;
       }
@@ -809,6 +816,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           summaryInstruction: agentSummaryInstruction.trim(),
           model: agentModel,
           role: agentRole.trim() || undefined,
+          isHiddenFromSidebar: agentIsHiddenFromSidebar,
         });
         // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
         try {
@@ -848,7 +856,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       autoSaveAgent();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, selectedProjectTypeIds, editingAgent?.id, onAgentUpdated]);
+  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, selectedProjectTypeIds, editingAgent?.id, onAgentUpdated]);
 
   // Восстанавливаем из localStorage при открытии диалога
   useEffect(() => {
@@ -1037,6 +1045,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         summaryInstruction: agentSummaryInstruction.trim(),
         model: agentModel,
         role: agentRole.trim() || undefined,
+        isHiddenFromSidebar: agentIsHiddenFromSidebar,
       });
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
       await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
@@ -1995,13 +2004,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                     {(() => {
                       if (!editingAgent) return null;
                       
-                      const hasChanges = 
+                      const hasChanges =
                         agentName.trim() !== (editingAgent.name || '') ||
                         agentDescription.trim() !== (editingAgent.description || '') ||
                         agentSystemInstruction.trim() !== (editingAgent.systemInstruction || '') ||
                         agentSummaryInstruction.trim() !== (editingAgent.summaryInstruction || '') ||
                         agentModel !== resolveModel(editingAgent.model) ||
-                        agentRole !== (editingAgent.role || '');
+                        agentRole !== (editingAgent.role || '') ||
+                        agentIsHiddenFromSidebar !== (editingAgent.isHiddenFromSidebar || false);
                       
                       if (isSavingAgent) {
                         return (
@@ -2689,7 +2699,40 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                 )}
               </section>
 
-              {/* Глобальный промт - Группа 6 */}
+              {/* Настройки отображения - Группа 6 */}
+              <section className="bg-gradient-to-br from-purple-900/20 to-indigo-900/10 p-3 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border border-purple-500/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="p-1 sm:p-1.5 bg-purple-500/20 rounded-lg">
+                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs sm:text-sm font-bold text-purple-300">
+                        Не отображать в сайдбаре
+                      </label>
+                      <p className="text-[9px] sm:text-[10px] text-purple-300/60 mt-0.5">
+                        Агент не будет виден в списке агентов проекта
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setAgentIsHiddenFromSidebar(!agentIsHiddenFromSidebar)}
+                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${
+                      agentIsHiddenFromSidebar ? 'bg-purple-500' : 'bg-white/10'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 sm:h-4 sm:w-4 transform rounded-full bg-white transition-transform ${
+                        agentIsHiddenFromSidebar ? 'translate-x-5 sm:translate-x-6' : 'translate-x-0.5 sm:translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </section>
+
+              {/* Глобальный промт - Группа 7 */}
               <section className="p-3 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border border-pink-500/20 bg-gradient-to-br from-pink-950/30 via-rose-950/20 to-purple-950/20 space-y-3">
                 <div className="flex items-start gap-2 sm:gap-3">
                   <div className="p-1 sm:p-1.5 bg-pink-500/20 rounded-lg">

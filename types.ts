@@ -48,6 +48,7 @@ export interface Agent {
   role?: string;
   order: number;
   projectTypeAgentId?: string;
+  isHiddenFromSidebar?: boolean; // Hide agent from sidebar
 }
 
 export interface User {
@@ -84,6 +85,7 @@ export interface ProjectTypeAgent {
   model: string;
   role?: string;
   order: number;
+  isHiddenFromSidebar?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
