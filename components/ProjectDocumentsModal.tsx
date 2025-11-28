@@ -568,7 +568,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Sidebar List */}
-        <div className={`w-full md:w-[27%] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`w-full md:!w-[15%] md:max-w-[220px] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
@@ -629,7 +629,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         </div>
 
         {/* Preview Area */}
-        <div className={`flex-1 flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 md:w-[85%] flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
 
           {/* Mobile Header for Preview */}
           <div className="md:hidden sticky top-0 z-20 p-4 border-b border-white/10 flex items-center gap-3 bg-black/60 backdrop-blur-md flex-shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
