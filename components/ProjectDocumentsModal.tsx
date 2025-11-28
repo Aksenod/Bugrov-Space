@@ -249,6 +249,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   // Показывать кнопки только если документ создан агентом-копирайтером
   const showDSLButtons = documentCreatorAgent && hasRole(documentCreatorAgent.role, "copywriter");
 
+  console.log('[ProjectDocumentsModal] Tab visibility:', {
+    isAdmin,
+    showDSLButtons,
+    shouldShowTabs: showDSLButtons || isAdmin,
+    currentUserRole: currentUser?.role,
+    documentCreatorAgentRole: documentCreatorAgent?.role,
+    documentCreatorAgentName: documentCreatorAgent?.name,
+  });
+
   // Показывать подтабы только если документ создан агентом-верстальщиком
   const showVerstkaSubTabs = documentCreatorAgent && hasRole(documentCreatorAgent.role, "verstka");
 
@@ -669,8 +678,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     </div>
 
 
-                    {/* Sub-tabs for Prototype */}
-                    {activeTab === 'prototype' && (
+                    {/* Sub-tabs for Prototype - only for admins on copywriter documents */}
+                    {activeTab === 'prototype' && showDSLButtons && isAdmin && (
                       <div className="flex items-center gap-1 mr-2">
                         <button
                           onClick={() => setPrototypeSubTab('preview')}

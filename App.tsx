@@ -666,6 +666,10 @@ export default function App() {
             id: f.id,
             name: f.name,
             agentId: f.agentId,
+            hasDSL: !!f.dslContent,
+            hasVerstka: !!f.verstkaContent,
+            dslLen: f.dslContent?.length,
+            verstkaLen: f.verstkaContent?.length,
           })));
         }
         // Сохраняем под ключом 'all' для всех агентов - это ВСЕ документы всех агентов
