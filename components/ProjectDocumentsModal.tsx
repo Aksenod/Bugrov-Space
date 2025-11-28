@@ -500,7 +500,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Sidebar List */}
-        <div className={`w-full md:w-[15%] md:max-w-[220px] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`w-full md:!w-[15%] md:max-w-[220px] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
