@@ -207,6 +207,8 @@ async function callOpenAi(model: string, messages: ChatMessage[]) {
     normalizedModel: modelToUse,
     messagesCount: messages.length,
     apiKeyPrefix: apiKey.substring(0, 7) + '...',
+    isGPT5,
+    temperature: requestBody.temperature || 'default',
   }, 'Sending request to OpenAI API');
 
   const response = await fetch(OPENAI_API_URL, {

@@ -41,6 +41,8 @@ const mapFile = (file: ApiFile): UploadedFile => ({
   data: file.content,
   agentId: file.agentId,
   isKnowledgeBase: file.isKnowledgeBase,
+  dslContent: file.dslContent,
+  verstkaContent: file.verstkaContent,
 });
 
 const pickColor = (id: string) => {

@@ -68,6 +68,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   const isAdmin = currentUser?.role === 'admin';
 
+
+
   function setActiveTabSafe(tab: 'text' | 'prototype') {
     setActiveTab(tab);
     if (tab !== 'prototype') {
@@ -234,7 +236,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   if (!isOpen) return null;
 
+
   const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
+
 
   // Находим агента-создателя документа
   const allAgents = agents;
@@ -639,8 +643,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                   </div>
                 )}
 
+
                 {/* Tabs for copywriter documents */}
-                {showDSLButtons && (
+                {(showDSLButtons || isAdmin) && (
                   <div className="mb-6 flex items-center justify-between border-b border-white/10">
                     <div className="flex items-center gap-2">
                       <button
@@ -663,8 +668,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       </button>
                     </div>
 
-                    {/* Admin Sub-tabs for Prototype */}
-                    {activeTab === 'prototype' && isAdmin && (
+
+                    {/* Sub-tabs for Prototype */}
+                    {activeTab === 'prototype' && (
                       <div className="flex items-center gap-1 mr-2">
                         <button
                           onClick={() => setPrototypeSubTab('preview')}
