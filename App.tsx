@@ -62,6 +62,7 @@ const mapAgent = (agent: ApiAgent): Agent => ({
   role: agent.role,
   order: agent.order ?? 0,
   projectTypeAgentId: agent.projectTypeAgentId,
+  isHiddenFromSidebar: agent.isHiddenFromSidebar,
 });
 
 const sortAgents = (agentList: Agent[]) =>
