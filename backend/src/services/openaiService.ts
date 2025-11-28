@@ -154,13 +154,13 @@ function normalizeModelName(model: string | null | undefined): string {
     'gpt-5.1': 'gpt-5.1',
     'gpt5.1': 'gpt-5.1',
     'gpt 5.1': 'gpt-5.1',
-    // gpt-5-mini требует полное имя с датой
-    'gpt-5-mini': 'gpt-5-mini-2025-08-07',
-    'gpt5-mini': 'gpt-5-mini-2025-08-07',
-    'gpt-5mini': 'gpt-5-mini-2025-08-07',
-    'gpt5mini': 'gpt-5-mini-2025-08-07',
-    'gpt-5 mini': 'gpt-5-mini-2025-08-07',
-    'gpt 5 mini': 'gpt-5-mini-2025-08-07',
+    // gpt-5-mini - попробуем простое имя без даты
+    'gpt-5-mini': 'gpt-5-mini',
+    'gpt5-mini': 'gpt-5-mini',
+    'gpt-5mini': 'gpt-5-mini',
+    'gpt5mini': 'gpt-5-mini',
+    'gpt-5 mini': 'gpt-5-mini',
+    'gpt 5 mini': 'gpt-5-mini',
     'gpt-4o': 'gpt-4o',
     'gpt4o': 'gpt-4o',
     'gpt-4o-mini': 'gpt-4o-mini',
@@ -189,11 +189,18 @@ function normalizeModelName(model: string | null | undefined): string {
 async function callOpenAi(model: string, messages: ChatMessage[]) {
   const apiKey = ensureApiKey();
   const modelToUse = normalizeModelName(model);
-  const requestBody = {
+
+  // GPT-5 models only support temperature: 1 (default)
+  const isGPT5 = modelToUse.startsWith('gpt-5');
+  const requestBody: any = {
     model: modelToUse,
     messages,
-    temperature: 0.7,
   };
+
+  // Only add temperature for non-GPT-5 models
+  if (!isGPT5) {
+    requestBody.temperature = 0.7;
+  }
 
   logger.info({
     originalModel: model,
