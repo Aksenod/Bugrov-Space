@@ -107,15 +107,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isOpenAiRequest = path.includes('/agents/') &&
     (path.includes('/messages') || path.includes('/summary')) &&
     init.method === 'POST';
-  const timeout = isOpenAiRequest ? OPENAI_REQUEST_TIMEOUT : REQUEST_TIMEOUT;
 
-  // Для запросов к агентам НЕ используем AbortController - позволяем запросу продолжаться
+  // Генерация прототипа требует еще больше времени (2 последовательных AI запроса)
+  const isPrototypeGeneration = path.includes('/generate-prototype') && init.method === 'POST';
+
+  const timeout = isPrototypeGeneration ? 120000 : (isOpenAiRequest ? OPENAI_REQUEST_TIMEOUT : REQUEST_TIMEOUT);
+
+  // Для запросов к агентам и генерации прототипа НЕ используем AbortController - позволяем запросу продолжаться
   // даже если он превышает таймаут, так как сервер может все равно вернуть ответ
   // Для обычных запросов используем таймаут с отменой
   let controller: AbortController | null = null;
   let timeoutId: NodeJS.Timeout | null = null;
 
-  if (!isOpenAiRequest) {
+  if (!isOpenAiRequest && !isPrototypeGeneration) {
     // Для обычных запросов используем таймаут с отменой
     controller = new AbortController();
     timeoutId = setTimeout(() => controller!.abort(), timeout);
@@ -144,9 +148,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       clearTimeout(timeoutId);
     }
 
-    // Если запрос к агенту занял больше 60 секунд, логируем предупреждение, но не ошибку
-    if (isOpenAiRequest && duration > OPENAI_REQUEST_TIMEOUT && isDev) {
-      console.warn(`[API] Request to agent took ${duration}ms (exceeded ${OPENAI_REQUEST_TIMEOUT}ms timeout), but response received successfully`);
+    // Если запрос к агенту или генерация прототипа заняли больше таймаута, логируем предупреждение, но не ошибку
+    if ((isOpenAiRequest || isPrototypeGeneration) && duration > timeout && isDev) {
+      console.warn(`[API] Request took ${duration}ms (exceeded ${timeout}ms timeout), but response received successfully`);
     }
 
     // Если получили 429 - блокируем все запросы на некоторое время
@@ -208,9 +212,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
 
     // Если запрос был отменен из-за таймаута
-    // Для запросов к агентам НЕ показываем ошибку таймаута, так как сервер может все равно вернуть ответ
+    // Для запросов к агентам и генерации прототипа НЕ показываем ошибку таймаута, так как сервер может все равно вернуть ответ
     // Для обычных запросов показываем ошибку таймаута как раньше
-    if ((error.name === 'AbortError' || (controller && controller.signal.aborted)) && !isOpenAiRequest) {
+    if ((error.name === 'AbortError' || (controller && controller.signal.aborted)) && !isOpenAiRequest && !isPrototypeGeneration) {
       if (isDev) {
         console.error(`[API] Request timeout: ${url}`);
       }
@@ -446,6 +450,7 @@ export const api = {
   },
 
   async generatePrototype(agentId: string, fileId: string) {
+    // Увеличенный таймаут (120 сек) обрабатывается в функции request
     return request<{ file: ApiFile }>(`/agents/${agentId}/files/${fileId}/generate-prototype`, {
       method: 'POST',
     });

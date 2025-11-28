@@ -1171,10 +1171,33 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
 
     // Helper to find agent by role
     const findAgentByRole = (roleName: string) => {
-      return projectAgents.find(a => {
+      const found = projectAgents.find(a => {
         const roles = (a.role || '').split(',').map(r => r.trim().toLowerCase());
-        return roles.includes(roleName.toLowerCase());
+        const hasRole = roles.includes(roleName.toLowerCase());
+
+        // Detailed logging for debugging
+        logger.info({
+          agentId: a.id,
+          agentName: a.name,
+          agentRole: a.role,
+          parsedRoles: roles,
+          searchingFor: roleName.toLowerCase(),
+          hasRole
+        }, `Checking agent for role ${roleName}`);
+
+        return hasRole;
       });
+
+      logger.info({
+        roleName,
+        found: !!found,
+        foundAgentId: found?.id,
+        foundAgentName: found?.name,
+        totalProjectAgents: projectAgents.length,
+        allAgentRoles: projectAgents.map(a => ({ id: a.id, name: a.name, role: a.role }))
+      }, `Find agent by role ${roleName} result`);
+
+      return found;
     };
 
     const dslAgent = findAgentByRole('dsl');
