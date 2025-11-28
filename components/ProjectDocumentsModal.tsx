@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
@@ -428,6 +428,18 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
+  const handleOpenInNewTab = () => {
+    const content = getDisplayContent();
+    if (!content) return;
+
+    // Создаем новое окно с HTML контентом
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(content);
+      newWindow.document.close();
+    }
+  };
+
   // Получаем контент для отображения в зависимости от активного таба
   const getDisplayContent = () => {
     // Используем localSelectedFile если он есть (может содержать обновленные данные), иначе selectedFile
@@ -670,13 +682,22 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                           /* Но пока используем новую логику табов */
                         }
                         {showVerstkaSubTabs && prototypeSubTab === 'preview' && (
-                          <button
-                            onClick={() => setIsVerstkaFullscreen(true)}
-                            className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
-                          >
-                            <Maximize2 size={16} />
-                            Развернуть
-                          </button>
+                          <>
+                            <button
+                              onClick={() => setIsVerstkaFullscreen(true)}
+                              className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+                            >
+                              <Maximize2 size={16} />
+                              Развернуть
+                            </button>
+                            <button
+                              onClick={handleOpenInNewTab}
+                              className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+                            >
+                              <ExternalLink size={16} />
+                              Открыть в новой вкладке
+                            </button>
+                          </>
                         )}
 
                         {/* Кнопка генерации прототипа */}
