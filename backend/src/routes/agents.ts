@@ -1088,16 +1088,13 @@ router.patch('/files/:fileId', async (req, res) => {
     }
 
     // 2. Check access (similar to delete logic)
-    if (file.agent) {
-      const agent = await withRetry(
-        () => prisma.agent.findUnique({ where: { id: file.agent!.id } }),
-        3,
-        `PATCH /agents/files/${fileId} - find agent`
-      );
-      if (agent && agent.projectId && agent.ownerId !== userId) {
-        logger.warn({ fileId, userId, agentOwnerId: agent.ownerId }, 'User does not have access to update this file');
-        return res.status(403).json({ error: 'Access denied' });
+    if (!file.agent || file.agent.userId !== userId) {
+      if (!file.agent) {
+        logger.warn({ fileId, userId }, 'File does not belong to an agent');
+      } else {
+        logger.warn({ fileId, fileUserId: file.agent.userId, currentUserId: userId }, 'Attempt to update file belonging to different user');
       }
+      return res.status(403).json({ error: 'Access denied. File belongs to different user.' });
     }
 
     // 3. Update file content
