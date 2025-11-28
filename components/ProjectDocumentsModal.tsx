@@ -384,7 +384,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     const content = getDisplayContent();
     if (showPrototypeCode) {
       if (content) {
-        const decodedHtml = decodeContent(content);
+        // verstkaContent уже является обычным текстом (не base64), используем напрямую
         return (
           <div className="overflow-x-auto">
             <SyntaxHighlighter
@@ -397,7 +397,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 padding: isFullscreenView ? '1.5rem' : 0,
               }}
             >
-              {decodedHtml}
+              {content}
             </SyntaxHighlighter>
           </div>
         );
@@ -413,11 +413,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
 
     if (content) {
-      const decodedHtml = decodeContent(content);
+      // verstkaContent уже является обычным текстом (не base64), используем напрямую
       return (
         <div className="w-full h-full min-h-[60vh]">
           <iframe
-            srcDoc={decodedHtml}
+            srcDoc={content}
             className="w-full h-full border-0"
             title="HTML Preview"
             sandbox="allow-same-origin allow-scripts"

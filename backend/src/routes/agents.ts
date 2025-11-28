@@ -981,6 +981,8 @@ router.get('/:agentId/files/summary', async (req, res, next) => {
           name: true,
           mimeType: true,
           content: true,
+          dslContent: true,
+          verstkaContent: true,
           agentId: true,
           isKnowledgeBase: true,
           createdAt: true,
