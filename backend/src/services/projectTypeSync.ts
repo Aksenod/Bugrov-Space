@@ -126,6 +126,7 @@ const syncProjectAgents = async (
             role: template.role ?? '',
             order: desiredOrder,
             projectTypeAgentId: template.id,
+            isHiddenFromSidebar: template.isHiddenFromSidebar ?? false,
           },
         });
 
@@ -146,6 +147,7 @@ const syncProjectAgents = async (
             model: template.model ?? 'gpt-5.1',
             role: template.role ?? '',
             order: desiredOrder,
+            isHiddenFromSidebar: template.isHiddenFromSidebar ?? false,
           },
         });
         await cloneKnowledgeBase(template.id, newAgent.id, templateKnowledgeMap, tx);

@@ -173,6 +173,7 @@ const getOrCreateAgentFromTemplate = async (
       model: template.model ?? 'gpt-5.1',
       role: template.role ?? '',
       order: nextOrder,
+      isHiddenFromSidebar: template.isHiddenFromSidebar ?? false,
     };
 
     agent = await withRetry(
