@@ -189,11 +189,18 @@ function normalizeModelName(model: string | null | undefined): string {
 async function callOpenAi(model: string, messages: ChatMessage[]) {
   const apiKey = ensureApiKey();
   const modelToUse = normalizeModelName(model);
-  const requestBody = {
+
+  // GPT-5 models only support temperature: 1 (default)
+  const isGPT5 = modelToUse.startsWith('gpt-5');
+  const requestBody: any = {
     model: modelToUse,
     messages,
-    temperature: 0.7,
   };
+
+  // Only add temperature for non-GPT-5 models
+  if (!isGPT5) {
+    requestBody.temperature = 0.7;
+  }
 
   logger.info({
     originalModel: model,
