@@ -561,7 +561,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         </div>
 
         {/* Preview Area */}
-        <div className={`flex-1 flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 md:w-[85%] flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
 
           {/* Mobile Header for Preview */}
           <div className="md:hidden sticky top-0 z-20 p-4 border-b border-white/10 flex items-center gap-3 bg-black/60 backdrop-blur-md flex-shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
