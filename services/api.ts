@@ -509,6 +509,13 @@ export const api = {
     return request<void>(`/agents/files/${fileId}`, { method: 'DELETE' });
   },
 
+  async updateFileContent(fileId: string, content: string) {
+    return request<{ file: ApiFile }>(`/agents/files/${fileId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    });
+  },
+
   // Project Types API
   async getProjectTypes() {
     return request<{ projectTypes: ApiProjectType[] }>('/project-types');
