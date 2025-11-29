@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, Upload } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, Upload, ExternalLink } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
@@ -430,6 +430,18 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
+  const handleOpenInNewTab = () => {
+    const content = getDisplayContent();
+    if (!content) return;
+
+    // Создаем новое окно с HTML контентом
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(content);
+      newWindow.document.close();
+    }
+  };
+
   // Получаем контент для отображения в зависимости от активного таба
   const getDisplayContent = () => {
     // Используем localSelectedFile если он есть (может содержать обновленные данные), иначе selectedFile
@@ -502,7 +514,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (prototypeSubTab === 'dsl' || prototypeSubTab === 'html') {
       if (content) {
         return (
-          <div className="overflow-x-auto w-full h-full flex-1 flex flex-col" style={{ minHeight: '60vh' }}>
+          <div className="overflow-x-auto w-full h-full flex-1 flex flex-col">
             <SyntaxHighlighter
               style={vscDarkPlus}
               language={prototypeSubTab === 'dsl' ? 'markdown' : 'html'}
@@ -538,7 +550,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (content) {
       // verstkaContent уже является обычным текстом (не base64), используем напрямую
       return (
-        <div className="w-full h-full flex-1 relative" style={{ minHeight: '60vh' }}>
+        <div className="w-full h-full flex-1 relative">
           <iframe
             srcDoc={content}
             className="absolute inset-0 w-full h-full border-0"
@@ -685,9 +697,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12">
-              <div className="max-w-6xl mx-auto w-full">
-                {!(activeTab === 'prototype' && showVerstkaSubTabs && prototypeSubTab !== 'preview' && isVerstkaFullscreen) && (
+            <div className={`flex-1 min-h-0 ${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'flex flex-col p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`}>
+              <div className={`${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'w-full h-full flex flex-col' : 'max-w-6xl mx-auto w-full'}`}>
+                {!(activeTab === 'prototype' && prototypeSubTab === 'preview') && !(activeTab === 'prototype' && showVerstkaSubTabs && prototypeSubTab !== 'preview' && isVerstkaFullscreen) && (
                   <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
@@ -703,13 +715,22 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                           /* Но пока используем новую логику табов */
                         }
                         {showVerstkaSubTabs && prototypeSubTab === 'preview' && (
-                          <button
-                            onClick={() => setIsVerstkaFullscreen(true)}
-                            className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
-                          >
-                            <Maximize2 size={16} />
-                            Развернуть
-                          </button>
+                          <>
+                            <button
+                              onClick={() => setIsVerstkaFullscreen(true)}
+                              className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+                            >
+                              <Maximize2 size={16} />
+                              Развернуть
+                            </button>
+                            <button
+                              onClick={handleOpenInNewTab}
+                              className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5"
+                            >
+                              <ExternalLink size={16} />
+                              Открыть в новой вкладке
+                            </button>
+                          </>
                         )}
 
                         {/* Кнопка генерации прототипа */}
