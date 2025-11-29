@@ -9,9 +9,12 @@ const __dirname = path.dirname(__filename);
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     const isDev = mode === 'development';
-    
+
+    // Support dynamic base path for PR previews
+    const basePath = env.VITE_BASE_PATH || '/';
+
     return {
-      base: '/',
+      base: basePath,
       server: {
         port: 3000,
         host: '0.0.0.0',
