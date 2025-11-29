@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, Upload } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
@@ -7,6 +7,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
 import { InlineHint } from './InlineHint';
 import { useOnboarding } from './OnboardingContext';
+import { FileUploadModal } from './FileUploadModal';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
 
@@ -68,6 +69,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -473,6 +475,26 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   const shouldRenderDocumentsHint = shouldShowStep(documentsHintStep);
 
+  const handleUploadFiles = async (files: File[]) => {
+    if (!onFileUpload) {
+      throw new Error('Обработчик загрузки файлов не определен');
+    }
+
+    // Преобразуем массив File в FileList-подобный объект
+    const fileList = {
+      length: files.length,
+      item: (index: number) => files[index] || null,
+      [Symbol.iterator]: function* () {
+        for (let i = 0; i < files.length; i++) {
+          yield files[i];
+        }
+      },
+    } as FileList;
+
+    // Вызываем обработчик загрузки
+    onFileUpload(fileList);
+  };
+
   const renderPrototypeContent = (isFullscreenView = false) => {
     const content = getDisplayContent();
 
@@ -595,6 +617,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
             </div>
           </div>
 
+          {/* Upload Button */}
+          <div className="px-4 pt-2 pb-4">
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+            >
+              <Upload size={18} />
+              Загрузить документ
+            </button>
+          </div>
+
           <div className="flex-1 overflow-y-auto p-4 space-y-2 md:no-scrollbar">
             {documents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
@@ -603,7 +636,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                   <FileText size={40} className="relative opacity-60" />
                 </div>
                 <p className="text-base font-semibold text-white/70 mb-2">Нет документов</p>
-                <p className="text-xs text-white/50 max-w-[200px]">Используйте кнопку "Сохранить" в чате для создания отчетов.</p>
+                <p className="text-xs text-white/50 max-w-[200px]">Используйте кнопку "Загрузить документ" выше или кнопку "Сохранить" в чате.</p>
               </div>
             ) : (
               documents.map(doc => (
@@ -914,6 +947,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* File Upload Modal */}
+      <FileUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={handleUploadFiles}
+        projectName={project?.name}
+      />
     </div>
   );
 };

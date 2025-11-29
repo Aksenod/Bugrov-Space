@@ -1331,6 +1331,80 @@ export default function App() {
     );
   };
 
+  const handleFileUpload = async (files: FileList) => {
+    if (!activeProjectId) {
+      showAlert('Не выбран активный проект', 'Ошибка', 'error', 4000);
+      return;
+    }
+
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) {
+      return;
+    }
+
+    try {
+      // Конвертируем файлы в Base64 и загружаем их
+      const uploadPromises = fileArray.map(async (file) => {
+        // Читаем файл в Base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Загружаем файл на сервер
+        const { file: uploadedFile } = await api.uploadProjectFile(activeProjectId, {
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          content: base64,
+        });
+
+        return uploadedFile;
+      });
+
+      const uploadedFiles = await Promise.all(uploadPromises);
+
+      // Обновляем список документов
+      if (realAgentIdForMessages && activeProjectId) {
+        loadedSummaryRef.current.delete('all');
+        try {
+          const { files: reloadedFiles } = await api.getSummaryFiles(realAgentIdForMessages, activeProjectId);
+          const mapped = reloadedFiles.map(mapFile);
+          setSummaryDocuments((prev) => ({
+            ...prev,
+            'all': mapped,
+          }));
+        } catch (reloadError: any) {
+          console.error('[Frontend] Failed to reload documents after upload:', reloadError);
+          // Добавляем загруженные файлы вручную, если перезагрузка не удалась
+          const mappedUploaded = uploadedFiles.map(mapFile);
+          setSummaryDocuments((prev) => ({
+            ...prev,
+            'all': [...(prev['all'] ?? []), ...mappedUploaded],
+          }));
+        }
+      } else {
+        // Добавляем загруженные файлы в состояние
+        const mappedUploaded = uploadedFiles.map(mapFile);
+        setSummaryDocuments((prev) => ({
+          ...prev,
+          'all': [...(prev['all'] ?? []), ...mappedUploaded],
+        }));
+      }
+
+      const filesText = fileArray.length === 1 ? 'файл' : fileArray.length < 5 ? 'файла' : 'файлов';
+      showAlert(`Успешно загружено ${fileArray.length} ${filesText}`, 'Успех', 'success', 3000);
+    } catch (error: any) {
+      console.error('[Frontend] Failed to upload files:', error);
+      showAlert(`Не удалось загрузить файлы: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
+      throw error; // Пробрасываем ошибку для обработки в FileUploadModal
+    }
+  };
+
   const renderAuthOrLoader = () => {
     if (authToken && isBootstrapping) {
       return (
@@ -1643,6 +1717,7 @@ export default function App() {
         onClose={() => setIsDocsOpen(false)}
         documents={projectDocuments}
         onRemoveFile={handleRemoveFile}
+        onFileUpload={handleFileUpload}
         agents={agents}
         project={projects.find(p => p.id === activeProjectId) || null}
         onAgentClick={(agentId) => {
