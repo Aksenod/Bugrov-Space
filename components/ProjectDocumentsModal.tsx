@@ -492,7 +492,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (prototypeSubTab === 'dsl' || prototypeSubTab === 'html') {
       if (content) {
         return (
-          <div className="overflow-x-auto w-full h-full flex-1 flex flex-col" style={{ minHeight: '60vh' }}>
+          <div className="overflow-x-auto w-full h-full flex-1 flex flex-col">
             <SyntaxHighlighter
               style={vscDarkPlus}
               language={prototypeSubTab === 'dsl' ? 'markdown' : 'html'}
@@ -528,7 +528,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (content) {
       // verstkaContent уже является обычным текстом (не base64), используем напрямую
       return (
-        <div className="w-full h-full flex-1 relative" style={{ minHeight: '60vh' }}>
+        <div className="w-full h-full flex-1 relative">
           <iframe
             srcDoc={content}
             className="absolute inset-0 w-full h-full border-0"
@@ -664,9 +664,9 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12">
-              <div className="max-w-6xl mx-auto w-full">
-                {!(activeTab === 'prototype' && showVerstkaSubTabs && prototypeSubTab !== 'preview' && isVerstkaFullscreen) && (
+            <div className={`flex-1 min-h-0 ${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'flex flex-col p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`}>
+              <div className={`${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'w-full h-full flex flex-col' : 'max-w-6xl mx-auto w-full'}`}>
+                {!(activeTab === 'prototype' && prototypeSubTab === 'preview') && !(activeTab === 'prototype' && showVerstkaSubTabs && prototypeSubTab !== 'preview' && isVerstkaFullscreen) && (
                   <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold tracking-wider uppercase">
