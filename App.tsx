@@ -1636,7 +1636,7 @@ export default function App() {
               <ChatInput onSend={handleSendMessage} disabled={isLoading || !activeAgent} />
             </div>
 
-            <Footer telegramUsername="aksenod" />
+            <Footer telegramUsername="BugrovExperience" />
           </>
         )}
       </main>

@@ -217,7 +217,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
              {/* Feedback Button */}
              <a
-               href="https://t.me/aksenod"
+               href="https://t.me/BugrovExperience"
                target="_blank"
                rel="noopener noreferrer"
                onClick={onCloseMobile}
