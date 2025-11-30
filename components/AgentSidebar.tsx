@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Agent, User, Project } from '../types';
-import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Settings, Brain, Cpu, Zap, Rocket, Sparkles, CircuitBoard, Wand2 } from 'lucide-react';
+import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Settings, Brain, Cpu, Zap, Rocket, Sparkles, CircuitBoard, Wand2, MessageSquare } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { OnboardingTooltip } from './OnboardingTooltip';
 import { useOnboarding } from './OnboardingContext';
@@ -19,6 +19,7 @@ interface AgentSidebarProps {
   isOpen: boolean;
   onCloseMobile: () => void;
   onOpenDocs: () => void;
+  onOpenFeedback: () => void;
   onGenerateSummary: () => void;
   isGeneratingSummary: boolean;
   summarySuccess: boolean;
@@ -40,6 +41,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   isOpen,
   onCloseMobile,
   onOpenDocs,
+  onOpenFeedback,
   onGenerateSummary,
   isGeneratingSummary,
   summarySuccess,
@@ -214,7 +216,21 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
 
         {/* Project Space & User Section */}
         <div className="flex-shrink-0 flex flex-col gap-1 p-2 border-t border-white/5">
-             
+
+             {/* Feedback Button */}
+             <button
+               onClick={() => {
+                 onOpenFeedback();
+                 onCloseMobile();
+               }}
+               className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5 transition-all hover:border-white/10"
+             >
+               <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors">
+                 <MessageSquare size={16} />
+               </div>
+               <span className="font-medium text-xs">Обратная связь</span>
+             </button>
+
              {/* Documents */}
              <div className="relative group">
                <button

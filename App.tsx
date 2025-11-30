@@ -7,6 +7,7 @@ import { MessageSkeleton } from './components/MessageSkeleton';
 import { ChatInput } from './components/ChatInput';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
+import { FeedbackPage } from './components/FeedbackPage';
 import { AuthPage } from './components/AuthPage';
 import { AdminPage } from './components/AdminPage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
@@ -256,6 +257,7 @@ export default function App() {
   const [summarySuccess, setSummarySuccess] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -1466,6 +1468,7 @@ export default function App() {
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
         onOpenDocs={() => setIsDocsOpen(true)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
         onGenerateSummary={handleGenerateSummary}
         isGeneratingSummary={isGeneratingSummary}
         summarySuccess={summarySuccess}
@@ -1671,6 +1674,10 @@ export default function App() {
         onShowAlert={showAlert}
         currentUser={currentUser}
       />
+
+      {isFeedbackOpen && (
+        <FeedbackPage onClose={() => setIsFeedbackOpen(false)} />
+      )}
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
