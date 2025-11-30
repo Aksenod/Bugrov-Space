@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bugrov Space</title>
+    <script>
+      // GitHub Pages SPA redirect - redirect all 404s to index.html
+      // This is required for client-side routing to work on GitHub Pages
+      (function() {
+        var path = window.location.pathname;
+        var search = window.location.search;
+        var hash = window.location.hash;
+        
+        // Если путь уже index.html, не редиректим
+        if (path.includes('index.html')) {
+          return;
+        }
+        
+        // Редиректим на index.html с сохранением query параметров и hash
+        var newPath = '/index.html' + search + hash;
+        window.location.replace(newPath);
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Redirecting...</p>
+  </body>
+</html>
