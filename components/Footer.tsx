@@ -18,21 +18,21 @@ export const Footer: React.FC<FooterProps> = ({ telegramUsername = 'your_usernam
           {/* Right: Links */}
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 order-1 sm:order-2">
             <a
-              href="/docs/offer.pdf"
+              href="#/offer"
               className="text-white/50 hover:text-white/80 transition-colors"
             >
               Публичная оферта
             </a>
             <span className="text-white/20">•</span>
             <a
-              href="/docs/privacy.pdf"
+              href="#/privacy"
               className="text-white/50 hover:text-white/80 transition-colors"
             >
               Политика конфиденциальности
             </a>
             <span className="text-white/20">•</span>
             <a
-              href="/docs/requisites.pdf"
+              href="#/requisites"
               className="text-white/50 hover:text-white/80 transition-colors"
             >
               Реквизиты
