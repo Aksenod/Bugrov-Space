@@ -49,7 +49,7 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = `https://bugrov.space/pr-${prNumber}/`;
+            const previewUrl = 'https://bugrov.space/pr-' + prNumber + '/';
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -63,11 +63,7 @@ jobs:
               comment.body.includes('Preview deployed')
             );
 
-            const body = `## ✅ Preview deployed!
-
-**Preview URL:** ${previewUrl}
-
-This preview will be automatically updated when you push new commits to this PR.`;
+            const body = '## ✅ Preview deployed!\n\n**Preview URL:** ' + previewUrl + '\n\nThis preview will be automatically updated when you push new commits to this PR.';
 
             if (botComment) {
               await github.rest.issues.updateComment({
