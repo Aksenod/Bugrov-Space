@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
     // Support dynamic base path for PR previews
     const basePath = env.VITE_BASE_PATH || '/';
 
+    // Generate build timestamp for cache busting
+    const buildTimestamp = Date.now();
+
     return {
       base: basePath,
       server: {
@@ -28,10 +31,23 @@ export default defineConfig(({ mode }) => {
           interval: 100,
         },
       },
-      plugins: [react()],
+      plugins: [
+        react(),
+        {
+          name: 'html-transform',
+          transformIndexHtml(html) {
+            // Add version meta tag with timestamp for cache busting
+            return html.replace(
+              '<meta http-equiv="Expires" content="0" />',
+              `<meta http-equiv="Expires" content="0" />\n    <meta name="version" content="${buildTimestamp}" />`
+            );
+          },
+        },
+      ],
       define: {
         'process.env.API_KEY': JSON.stringify(env.OPENAI_API_KEY),
-        'process.env.OPENAI_API_KEY': JSON.stringify(env.OPENAI_API_KEY)
+        'process.env.OPENAI_API_KEY': JSON.stringify(env.OPENAI_API_KEY),
+        '__BUILD_TIMESTAMP__': JSON.stringify(buildTimestamp)
       },
       resolve: {
         alias: {
