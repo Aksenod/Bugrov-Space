@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain, Briefcase, FileText, MessageSquare } from 'lucide-react';
+import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain, Briefcase, FileText } from 'lucide-react';
 
 import { Message, Role, LLMModel, MODELS, UploadedFile, Agent, User, Project, ProjectType } from './types';
 import { MessageBubble } from './components/MessageBubble';
@@ -7,7 +7,7 @@ import { MessageSkeleton } from './components/MessageSkeleton';
 import { ChatInput } from './components/ChatInput';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
-import { FeedbackPage } from './components/FeedbackPage';
+import { Footer } from './components/Footer';
 import { AuthPage } from './components/AuthPage';
 import { AdminPage } from './components/AdminPage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
@@ -257,7 +257,6 @@ export default function App() {
   const [summarySuccess, setSummarySuccess] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
-  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -1468,7 +1467,6 @@ export default function App() {
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
         onOpenDocs={() => setIsDocsOpen(true)}
-        onOpenFeedback={() => setIsFeedbackOpen(true)}
         onGenerateSummary={handleGenerateSummary}
         isGeneratingSummary={isGeneratingSummary}
         summarySuccess={summarySuccess}
@@ -1637,6 +1635,8 @@ export default function App() {
             <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
               <ChatInput onSend={handleSendMessage} disabled={isLoading || !activeAgent} />
             </div>
+
+            <Footer telegramUsername="aksenod" />
           </>
         )}
       </main>
@@ -1674,10 +1674,6 @@ export default function App() {
         onShowAlert={showAlert}
         currentUser={currentUser}
       />
-
-      {isFeedbackOpen && (
-        <FeedbackPage onClose={() => setIsFeedbackOpen(false)} />
-      )}
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
