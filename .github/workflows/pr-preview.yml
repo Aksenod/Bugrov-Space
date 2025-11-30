@@ -2,19 +2,15 @@ name: PR Preview
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
   pull-requests: write
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  deploy-preview:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
@@ -31,7 +27,7 @@ jobs:
 
       - name: Build with PR base path
         env:
-          VITE_BASE_PATH: /
+          VITE_BASE_PATH: /pr-${{ github.event.pull_request.number }}/
           VITE_API_URL: https://bugrov-space.onrender.com/api
         run: npm run build
 
@@ -40,24 +36,20 @@ jobs:
           cp 404.html dist/404.html
           echo '' > dist/.nojekyll
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: './dist'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: pr-${{ github.event.pull_request.number }}
+          keep_files: true
 
       - name: Comment PR with preview link
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = '${{ steps.deployment.outputs.page_url }}';
+            const previewUrl = 'https://bugrov.space/pr-' + prNumber + '/';
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -88,3 +80,34 @@ jobs:
                 body: body
               });
             }
+
+  cleanup-preview:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Remove PR preview directory
+        run: |
+          rm -rf pr-${{ github.event.pull_request.number }}
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add .
+          git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
+          git push
+
+      - name: Comment PR about cleanup
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: '## 🧹 Preview cleaned up\n\nThe preview for this PR has been removed.'
+            });
