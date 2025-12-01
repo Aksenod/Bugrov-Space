@@ -6,6 +6,7 @@ import projectTypesRouter from './projectTypes';
 import adminAgentsRouter from './adminAgents';
 import adminGlobalPromptRouter from './adminGlobalPrompt';
 import adminUsersRouter from './adminUsers';
+import publicRoutes from './publicRoutes';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { adminMiddleware } from '../middleware/adminMiddleware';
 
@@ -18,6 +19,7 @@ router.use('/project-types', projectTypesRouter);
 router.use('/admin/agents', authMiddleware, adminAgentsRouter);
 router.use('/admin/global-prompt', authMiddleware, adminMiddleware, adminGlobalPromptRouter);
 router.use('/admin/users', authMiddleware, adminMiddleware, adminUsersRouter);
+router.use('/public', publicRoutes);
 
 export default router;
 

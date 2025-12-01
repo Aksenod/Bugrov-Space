@@ -658,14 +658,14 @@ export const api = {
 
   // Public Prototype API
   async createPublicPrototype(fileId: string) {
-    return request<{ hash: string; url: string }>(`/public/prototypes`, {
+    return request<{ hash: string; url: string }>(`/public/prototype`, {
       method: 'POST',
       body: JSON.stringify({ fileId }),
     });
   },
 
   async getPublicPrototype(hash: string) {
-    return request<{ htmlContent: string }>(`/public/prototypes/${hash}`);
+    return request<{ htmlContent: string }>(`/public/prototype/${hash}`);
   },
 };
 
