@@ -492,7 +492,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (prototypeSubTab === 'dsl' || prototypeSubTab === 'html') {
       if (content) {
         return (
-          <div className="overflow-x-auto w-full h-full flex-1 flex flex-col">
+          <div className="overflow-auto w-full flex-1 flex flex-col" style={{ minHeight: 0, maxHeight: '100%' }}>
             <SyntaxHighlighter
               style={vscDarkPlus}
               language={prototypeSubTab === 'dsl' ? 'markdown' : 'html'}
@@ -501,8 +501,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 margin: 0,
                 borderRadius: isFullscreenView ? '1.5rem' : '1rem',
                 padding: isFullscreenView ? '1.5rem' : '1.5rem',
-                height: '100%',
-                flex: 1,
+                minHeight: 0,
+                maxHeight: '100%',
               }}
             >
               {content}
@@ -528,10 +528,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (content) {
       // verstkaContent уже является обычным текстом (не base64), используем напрямую
       return (
-        <div className="w-full h-full flex-1 relative">
+        <div className="w-full flex-1 relative" style={{ minHeight: 0, maxHeight: '100%' }}>
           <iframe
             srcDoc={content}
-            className="absolute inset-0 w-full h-full border-0"
+            className="absolute inset-0 w-full h-full border-0 rounded-xl"
             title="HTML Preview"
             sandbox="allow-same-origin allow-scripts"
           />
@@ -664,8 +664,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className={`flex-1 min-h-0 ${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'flex flex-col p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'}`}>
-              <div className={`${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'w-full h-full flex flex-col' : 'max-w-6xl mx-auto w-full'}`}>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12">
+              <div className="max-w-6xl mx-auto w-full h-full flex flex-col">
                 {!(activeTab === 'prototype' && prototypeSubTab === 'preview') && !(activeTab === 'prototype' && showVerstkaSubTabs && prototypeSubTab !== 'preview' && isVerstkaFullscreen) && (
                   <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
@@ -841,8 +841,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 )}
 
                 <div
-                  className={`bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-hidden flex-1 ${activeTab === 'prototype' ? 'p-0' : 'p-4 sm:p-6 md:p-8'}`}
-                  style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-hidden flex-1 p-4 sm:p-6 md:p-8"
+                  style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                     <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                   ) : (
