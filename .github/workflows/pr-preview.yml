@@ -31,6 +31,9 @@ jobs:
           VITE_API_URL: https://bugrov-space.onrender.com/api
         run: npm run build
 
+      - name: Copy 404.html to dist for SPA routing
+        run: cp 404.html dist/404.html
+
       - name: Setup GitHub Pages files
         run: |
           echo '' > dist/.nojekyll
@@ -63,21 +66,21 @@ jobs:
           script: |
             const prNumber = context.payload.pull_request.number;
             const previewUrl = 'https://bugrov.space/pr-' + prNumber + '/';
-
+            
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
             });
-
+            
             const botComment = comments.find(comment =>
               comment.user.type === 'Bot' &&
               comment.body.includes('Preview deployed')
             );
-
+            
             const body = '## ✅ Preview deployed!\n\n**Preview URL:** ' + previewUrl + '\n\nThis preview will be automatically updated when you push new commits to this PR.';
-
+            
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -98,12 +101,12 @@ jobs:
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout gh-pages branch
+      - name: Checkout gh-pages
         uses: actions/checkout@v4
         with:
           ref: gh-pages
 
-      - name: Remove PR preview directory
+      - name: Remove PR preview
         run: |
           rm -rf pr-${{ github.event.pull_request.number }}
           git config user.name github-actions[bot]
@@ -111,16 +114,3 @@ jobs:
           git add .
           git commit -m "Remove preview for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
           git push
-
-      - name: Comment PR about cleanup
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = context.payload.pull_request.number;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: '## 🧹 Preview cleaned up\n\nThe preview for this PR has been removed.'
-            });
