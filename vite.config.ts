@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     const isDev = mode === 'development';
 
+    // Trigger workflow
     // Support dynamic base path for PR previews
     const basePath = env.VITE_BASE_PATH  ? './' : '/'
 
