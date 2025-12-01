@@ -6,11 +6,16 @@ import projectTypesRouter from './projectTypes';
 import adminAgentsRouter from './adminAgents';
 import adminGlobalPromptRouter from './adminGlobalPrompt';
 import adminUsersRouter from './adminUsers';
+import publicRouter from './publicRoutes';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { adminMiddleware } from '../middleware/adminMiddleware';
 
 const router = Router();
 
+// Публичные маршруты (без авторизации)
+router.use('/public', publicRouter);
+
+// Защищенные маршруты
 router.use('/auth', authRouter);
 router.use('/projects', authMiddleware, projectsRouter);
 router.use('/agents', authMiddleware, agentsRouter);
@@ -20,4 +25,5 @@ router.use('/admin/global-prompt', authMiddleware, adminMiddleware, adminGlobalP
 router.use('/admin/users', authMiddleware, adminMiddleware, adminUsersRouter);
 
 export default router;
+
 
