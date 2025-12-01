@@ -12,8 +12,14 @@
         var search = window.location.search;
         var hash = window.location.hash;
 
+        // Debug logging
+        console.log('[404 Debug] Current path:', path);
+        console.log('[404 Debug] Search:', search);
+        console.log('[404 Debug] Hash:', hash);
+
         // Если путь уже index.html, не редиректим
         if (path.includes('index.html')) {
+          console.log('[404 Debug] Already on index.html, skipping redirect');
           return;
         }
 
@@ -22,12 +28,19 @@
 
         // Проверяем паттерн /pr-XX/ или /pr-XX (с или без слеша в конце)
         var prMatch = path.match(/^(\/pr-\d+)/);
+        console.log('[404 Debug] PR match result:', prMatch);
+
         if (prMatch) {
           basePath = prMatch[1] + '/';
+          console.log('[404 Debug] Detected PR preview, base path:', basePath);
+        } else {
+          console.log('[404 Debug] No PR detected, using root base path');
         }
 
         // Редиректим на index.html в правильной директории с сохранением параметров
         var newPath = basePath + 'index.html' + search + hash;
+        console.log('[404 Debug] Redirecting to:', newPath);
+
         window.location.replace(newPath);
       })();
     </script>
