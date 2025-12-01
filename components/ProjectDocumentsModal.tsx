@@ -621,7 +621,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 className="w-full mt-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium"
               >
                 <Upload size={16} />
-                Загрузить файлы
+                Загрузить
               </button>
             )}
           </div>

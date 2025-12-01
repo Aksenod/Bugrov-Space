@@ -118,7 +118,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
               <Upload size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Загрузить документы</h2>
+              <h2 className="text-xl font-bold text-white">Загрузить файлы</h2>
               <p className="text-sm text-white/50 mt-0.5">Добавьте файлы в проект</p>
             </div>
           </div>
@@ -204,7 +204,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
           <div className="mt-6 p-4 bg-white/5 border border-white/10 rounded-xl">
             <h3 className="text-sm font-semibold text-white mb-2">Поддерживаемые форматы:</h3>
             <ul className="text-xs text-white/60 space-y-1">
-              <li>📄 Документы: TXT, MD, DOC, DOCX</li>
+              <li>📄 Файлы: TXT, MD, DOC, DOCX</li>
               <li>⚠️ Максимальный размер файла: 2MB</li>
             </ul>
           </div>
