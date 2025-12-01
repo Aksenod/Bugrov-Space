@@ -922,11 +922,21 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         <div className="fixed inset-0 z-[60] bg-black flex flex-col">
           <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10">
             <h3 className="text-white font-medium">Просмотр верстки</h3>
-            <button
-              className="p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleOpenInNewTab}
+                className="px-4 py-2 text-sm font-medium flex items-center gap-2 text-white/70 hover:text-white border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <ExternalLink size={16} />
+                Открыть в новой вкладке
+              </button>
+              <button
+                onClick={() => setIsVerstkaFullscreen(false)}
+                className="p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 sm:p-8">
             <div className="w-full h-full bg-black/40 border border-white/10 rounded-2xl p-4">
