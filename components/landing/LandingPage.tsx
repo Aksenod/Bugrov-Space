@@ -8,28 +8,30 @@ import { LandingFooter } from './LandingFooter';
 
 export const LandingPage: React.FC = () => {
   return (
-    <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
-      {/* Hero Section */}
-      <HeroSection />
+    <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-black">
+      <div className="relative min-h-screen text-white">
+        {/* Hero Section */}
+        <HeroSection />
 
-      {/* Pain Points Section */}
-      <PainPointsSection />
+        {/* Pain Points Section */}
+        <PainPointsSection />
 
-      {/* Agent Chains Section */}
-      <AgentChainsSection />
+        {/* Agent Chains Section */}
+        <AgentChainsSection />
 
-      {/* Pricing Section */}
-      <div id="pricing">
-        <PricingSection />
+        {/* Pricing Section */}
+        <div id="pricing">
+          <PricingSection />
+        </div>
+
+        {/* FAQ Section */}
+        <div id="faq">
+          <FAQSection />
+        </div>
+
+        {/* Footer */}
+        <LandingFooter />
       </div>
-
-      {/* FAQ Section */}
-      <div id="faq">
-        <FAQSection />
-      </div>
-
-      {/* Footer */}
-      <LandingFooter />
     </div>
   );
 };
