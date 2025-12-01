@@ -89,16 +89,17 @@ const syncProjectAgents = async (
         id: true,
         projectTypeAgentId: true,
         name: true,
+        order: true,
       },
     });
 
-    const existingByTemplate = new Map<string, { id: string }>();
-    const existingByName = new Map<string, { id: string }>();
+    const existingByTemplate = new Map<string, { id: string; order: number | null }>();
+    const existingByName = new Map<string, { id: string; order: number | null }>();
     existingAgents.forEach((agent: any) => {
       if (agent.projectTypeAgentId) {
-        existingByTemplate.set(agent.projectTypeAgentId, { id: agent.id });
+        existingByTemplate.set(agent.projectTypeAgentId, { id: agent.id, order: agent.order });
       } else if (agent.name) {
-        existingByName.set(agent.name, { id: agent.id });
+        existingByName.set(agent.name, { id: agent.id, order: agent.order });
       }
     });
 
@@ -115,6 +116,14 @@ const syncProjectAgents = async (
         existingByName.delete(template.name);
       }
       if (existing) {
+        // ВАЖНО: Сохраняем существующий order агента, если connection.order невалидный
+        // Это предотвращает сброс пользовательского порядка при каждой синхронизации
+        const finalOrder = typeof connection.order === 'number' && connection.order !== null
+          ? connection.order  // Используем order из шаблона (если админ изменил порядок)
+          : (typeof existing.order === 'number' && existing.order !== null
+              ? existing.order  // Сохраняем существующий order агента
+              : desiredOrder);  // Fallback на index
+
         await (tx as any).agent.update({
           where: { id: existing.id },
           data: {
@@ -124,7 +133,7 @@ const syncProjectAgents = async (
             summaryInstruction: template.summaryInstruction ?? '',
             model: template.model ?? 'gpt-5.1',
             role: template.role ?? '',
-            order: desiredOrder,
+            order: finalOrder,
             projectTypeAgentId: template.id,
           },
         });
