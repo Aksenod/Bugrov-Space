@@ -440,29 +440,21 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const handleOpenInNewTab = async () => {
     if (!selectedFile) return;
 
-    try {
-      // Создаем публичную ссылку на прототип
-      const response = await api.createPublicPrototype(selectedFile.id);
+    // Открываем прототип в новой вкладке через хэш-роутинг
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
+    window.open(url, '_blank');
+  };
 
       // Открываем в новом окне
       const fullUrl = `${window.location.origin}${window.location.pathname}#/prototype/${response.hash}`;
       window.open(fullUrl, '_blank');
 
-      if (onShowAlert) {
-        onShowAlert('Прототип открыт в новом окне. Ссылка скопирована в буфер обмена.', 'Успех', 'success');
-      }
-
-      // Копируем ссылку в буфер обмена
-      try {
-        await navigator.clipboard.writeText(fullUrl);
-      } catch (err) {
-        console.warn('Failed to copy to clipboard:', err);
-      }
-    } catch (error: any) {
-      console.error('Failed to create public prototype link:', error);
-      if (onShowAlert) {
-        onShowAlert(`Не удалось создать публичную ссылку: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
-      }
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      // Можно добавить уведомление об успехе, если есть такая возможность
+    } catch (err) {
+      console.error('Failed to copy link:', err);
     }
   };
 
