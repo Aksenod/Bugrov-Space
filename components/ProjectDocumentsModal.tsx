@@ -504,7 +504,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (prototypeSubTab === 'dsl' || prototypeSubTab === 'html') {
       if (content) {
         return (
-          <div className="overflow-x-auto w-full h-full flex-1 flex flex-col">
+          <div className="overflow-auto w-full flex-1 flex flex-col" style={{ minHeight: 0, maxHeight: '100%' }}>
             <SyntaxHighlighter
               style={vscDarkPlus}
               language={prototypeSubTab === 'dsl' ? 'markdown' : 'html'}
@@ -513,8 +513,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 margin: 0,
                 borderRadius: isFullscreenView ? '1.5rem' : '1rem',
                 padding: isFullscreenView ? '1.5rem' : '1.5rem',
-                height: '100%',
-                flex: 1,
+                minHeight: 0,
+                maxHeight: '100%',
               }}
             >
               {content}
@@ -540,10 +540,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (content) {
       // verstkaContent уже является обычным текстом (не base64), используем напрямую
       return (
-        <div className="w-full h-full flex-1 relative">
+        <div className="w-full flex-1 relative" style={{ minHeight: 0, maxHeight: '100%' }}>
           <iframe
             srcDoc={content}
-            className="absolute inset-0 w-full h-full border-0"
+            className="absolute inset-0 w-full h-full border-0 rounded-xl"
             title="HTML Preview"
             sandbox="allow-same-origin allow-scripts"
           />
