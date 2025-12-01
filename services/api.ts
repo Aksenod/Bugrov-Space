@@ -665,7 +665,7 @@ export const api = {
   },
 
   async getPublicPrototype(hash: string) {
-    return request<{ htmlContent: string }>(`/public/prototype/${hash}`);
+    return request<{ prototype: { id: string; name: string; html: string; dsl: string | null } }>(`/public/prototype/${hash}`);
   },
 };
 
