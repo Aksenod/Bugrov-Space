@@ -437,17 +437,18 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
-  const handleOpenInNewTab = async () => {
-    if (!selectedFile) return;
+  const handleOpenInNewTab = () => {
+    const fileToUse = localSelectedFile || selectedFile;
+    if (!fileToUse) return;
 
     // Открываем прототип в новой вкладке через хэш-роутинг
     const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
     window.open(url, '_blank');
   };
 
-      // Открываем в новом окне
-      const fullUrl = `${window.location.origin}${window.location.pathname}#/prototype/${response.hash}`;
-      window.open(fullUrl, '_blank');
+  const handleCopyLink = async () => {
+    const fileToUse = localSelectedFile || selectedFile;
+    if (!fileToUse) return;
 
     const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
     try {
