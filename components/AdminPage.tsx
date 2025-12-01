@@ -557,18 +557,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       setAgentRole(agent.role || '');
       setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
       setSelectedProjectTypeIds(agent.projectTypes?.map(pt => pt.id) || []);
-      // Загружаем файлы агента-шаблона
-      try {
-        const { files } = await api.getAdminAgentFiles(agent.id);
-        setAgentFiles(files.map(file => ({
-          id: file.id,
-          name: file.name,
-          type: file.mimeType,
-          data: file.content,
-          agentId: file.agentId,
-        })));
-      } catch (error) {
-        console.error('Failed to load agent files', error);
+      // Загружаем файлы агента-шаблона только если есть ID
+      if (agent.id) {
+        try {
+          const { files } = await api.getAdminAgentFiles(agent.id);
+          setAgentFiles(files.map(file => ({
+            id: file.id,
+            name: file.name,
+            type: file.mimeType,
+            data: file.content,
+            agentId: file.agentId,
+          })));
+        } catch (error) {
+          console.error('Failed to load agent files', error);
+          setAgentFiles([]);
+        }
+      } else {
         setAgentFiles([]);
       }
       // Очищаем черновик при редактировании существующего агента
@@ -673,7 +677,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
 
   // Автосохранение в API с debounce
   const autoSaveAgent = async () => {
-    if (!editingAgent || !agentName.trim()) return;
+    if (!editingAgent || !agentName?.trim()) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -682,12 +686,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         await api.updateAgentTemplate(editingAgent.id, {
-          name: agentName.trim(),
-          description: agentDescription.trim(),
-          systemInstruction: agentSystemInstruction.trim(),
-          summaryInstruction: agentSummaryInstruction.trim(),
+          name: agentName?.trim() || '',
+          description: agentDescription?.trim() || '',
+          systemInstruction: agentSystemInstruction?.trim() || '',
+          summaryInstruction: agentSummaryInstruction?.trim() || '',
           model: agentModel,
-          role: agentRole.trim() || undefined,
+          role: agentRole?.trim() || undefined,
           isHiddenFromSidebar: agentIsHiddenFromSidebar,
         });
         // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
@@ -899,7 +903,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   };
 
   const handleSaveAgent = async () => {
-    if (!editingAgent || !agentName.trim()) return;
+    if (!editingAgent || !agentName?.trim()) return;
 
     // Очищаем таймер автосохранения
     if (saveTimeoutRef.current) {
@@ -911,12 +915,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     try {
       // Обновление агента
       await api.updateAgentTemplate(editingAgent.id, {
-        name: agentName.trim(),
-        description: agentDescription.trim(),
-        systemInstruction: agentSystemInstruction.trim(),
-        summaryInstruction: agentSummaryInstruction.trim(),
+        name: agentName?.trim() || '',
+        description: agentDescription?.trim() || '',
+        systemInstruction: agentSystemInstruction?.trim() || '',
+        summaryInstruction: agentSummaryInstruction?.trim() || '',
         model: agentModel,
-        role: agentRole.trim() || undefined,
+        role: agentRole?.trim() || undefined,
         isHiddenFromSidebar: agentIsHiddenFromSidebar,
       });
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
