@@ -7,13 +7,14 @@ import { MessageSkeleton } from './components/MessageSkeleton';
 import { ChatInput } from './components/ChatInput';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
+import { FileUploadModal } from './components/FileUploadModal';
 import { Footer } from './components/Footer';
 import { AuthPage } from './components/AuthPage';
 import { AdminPage } from './components/AdminPage';
 import { OfferPage } from './components/OfferPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { RequisitesPage } from './components/RequisitesPage';
-import { PrototypePage } from './components/PrototypePage';
+import { PublicPrototypePage } from './components/PublicPrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -261,10 +262,13 @@ export default function App() {
   const [summarySuccess, setSummarySuccess] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
+  const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isOfferOpen, setIsOfferOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isRequisitesOpen, setIsRequisitesOpen] = useState(false);
+  const [prototypeHash, setPrototypeHash] = useState<string | null>(null);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -297,8 +301,6 @@ export default function App() {
   });
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [isPrototypeOpen, setIsPrototypeOpen] = useState(false);
-  const [prototypeId, setPrototypeId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
@@ -594,7 +596,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentUser, activeAgent, isDocsOpen, isSidebarOpen]);
 
-  // Проверяем, находимся ли мы на странице админ-панели, документов или прототипа
+  // Проверяем, находимся ли мы на странице админ-панели или документов
   // ВАЖНО: Этот хук должен быть вызван ДО условного возврата, чтобы соблюдать правила хуков
   useEffect(() => {
     const handleHashChange = () => {
@@ -602,33 +604,22 @@ export default function App() {
 
       if (hash === '#/admin') {
         setIsAdminOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash === '#/offer') {
         setIsOfferOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash === '#/privacy') {
         setIsPrivacyOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash === '#/requisites') {
         setIsRequisitesOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash.startsWith('#/prototype/')) {
-        const id = hash.replace('#/prototype/', '');
-        setPrototypeId(id);
-        setIsPrototypeOpen(true);
-        // Закрываем другие модалки
-        setIsAdminOpen(false);
-        setIsOfferOpen(false);
-        setIsPrivacyOpen(false);
-        setIsRequisitesOpen(false);
+        const hashValue = hash.replace('#/prototype/', '');
+        setPrototypeHash(hashValue);
       } else if (hash === '') {
         // Закрываем все открытые страницы
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
         setIsRequisitesOpen(false);
-        setIsPrototypeOpen(false);
-        setPrototypeId(null);
+        setPrototypeHash(null);
         setAdminInitialAgentId(undefined);
       }
     };
@@ -646,20 +637,14 @@ export default function App() {
     } else if (hash === '#/requisites') {
       setIsRequisitesOpen(true);
     } else if (hash.startsWith('#/prototype/')) {
-      const id = hash.replace('#/prototype/', '');
-      setPrototypeId(id);
-      setIsPrototypeOpen(true);
+      const hashValue = hash.replace('#/prototype/', '');
+      setPrototypeHash(hashValue);
     }
 
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen, isPrototypeOpen]);
-
-  // Рендерим страницу прототипа, если она открыта
-  if (isPrototypeOpen && prototypeId) {
-    return <PrototypePage documentId={prototypeId} />;
-  }
+  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
@@ -1385,6 +1370,61 @@ export default function App() {
     );
   };
 
+  const handleFileUpload = async (files: FileList) => {
+    if (!activeProjectId) {
+      showAlert('Выберите проект для загрузки файлов', 'Ошибка', 'error');
+      return;
+    }
+
+    if (files.length === 0) {
+      setIsFileUploadOpen(false);
+      return;
+    }
+
+    setIsUploadingFiles(true);
+
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const base64Content = await readFileToBase64(file);
+        return api.uploadProjectFile(activeProjectId, {
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          content: base64Content,
+        });
+      });
+
+      await Promise.all(uploadPromises);
+
+      // Reload documents
+      if (realAgentIdForMessages && activeProjectId) {
+        loadedSummaryRef.current.delete('all');
+        try {
+          const { files: reloadedFiles } = await api.getSummaryFiles(realAgentIdForMessages, activeProjectId);
+          const mapped = reloadedFiles.map(mapFile);
+          setSummaryDocuments((prev) => ({
+            ...prev,
+            'all': mapped,
+          }));
+        } catch (reloadError: any) {
+          console.error('[Frontend] Failed to reload documents after upload:', reloadError);
+        }
+      }
+
+      showAlert(
+        files.length === 1 ? 'Файл успешно загружен' : `${files.length} файлов успешно загружено`,
+        'Успех',
+        'success',
+        3000
+      );
+      setIsFileUploadOpen(false);
+    } catch (error: any) {
+      console.error('[Frontend] Failed to upload files:', error);
+      showAlert(`Не удалось загрузить файлы: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
+    } finally {
+      setIsUploadingFiles(false);
+    }
+  };
+
   const renderAuthOrLoader = () => {
     if (authToken && isBootstrapping) {
       return (
@@ -1530,6 +1570,18 @@ export default function App() {
     return <RequisitesPage
       onClose={() => {
         setIsRequisitesOpen(false);
+        window.location.hash = '';
+        window.history.replaceState(null, '', window.location.pathname);
+      }}
+    />;
+  }
+
+  if (prototypeHash || window.location.hash.startsWith('#/prototype/')) {
+    const hash = prototypeHash || window.location.hash.replace('#/prototype/', '');
+    return <PublicPrototypePage
+      prototypeHash={hash}
+      onClose={() => {
+        setPrototypeHash(null);
         window.location.hash = '';
         window.history.replaceState(null, '', window.location.pathname);
       }}
@@ -1756,6 +1808,14 @@ export default function App() {
         onShowConfirm={showConfirm}
         onShowAlert={showAlert}
         currentUser={currentUser}
+        onFileUpload={() => setIsFileUploadOpen(true)}
+      />
+
+      <FileUploadModal
+        isOpen={isFileUploadOpen}
+        onClose={() => setIsFileUploadOpen(false)}
+        onUpload={handleFileUpload}
+        isUploading={isUploadingFiles}
       />
 
       <ConfirmDialog

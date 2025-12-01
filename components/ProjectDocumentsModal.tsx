@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, FileText, Code, Eye, ExternalLink, RefreshCw, Copy, Calendar, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
@@ -7,8 +7,6 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
 import { InlineHint } from './InlineHint';
 import { useOnboarding } from './OnboardingContext';
-
-
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
 
@@ -34,7 +32,7 @@ interface ProjectDocumentsModalProps {
   onOpenAgentSettings?: (agentId: string) => void;
   onDocumentUpdate?: (file: UploadedFile) => void;
   onUpdateAgent?: (updatedAgent: Agent) => void;
-  onFileUpload?: (files: FileList) => void;
+  onFileUpload?: () => void;
   onRemoveAgentFile?: (fileId: string) => void;
   onAgentFilesUpdate?: (agentId: string, files: UploadedFile[]) => void;
   onShowConfirm?: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'warning' | 'info') => void;
@@ -212,7 +210,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       const hours = date.getHours().toString().padStart(2, '0');
       const minutes = date.getMinutes().toString().padStart(2, '0');
       const seconds = date.getSeconds().toString().padStart(2, '0');
-      return `${hours}:${minutes}:${seconds} `;
+      return `${hours}:${minutes}:${seconds}`;
     } catch (e) {
       return timestamp;
     }
@@ -235,14 +233,23 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       const hours = date.getHours().toString().padStart(2, '0');
       const minutes = date.getMinutes().toString().padStart(2, '0');
       const seconds = date.getSeconds().toString().padStart(2, '0');
-      return `${day}.${month}.${year} ${hours}:${minutes}:${seconds} `;
+      return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
     } catch (e) {
       return timestamp;
     }
   };
 
   const getDocumentDisplayName = (doc: UploadedFile) => {
-    return `${getAgentName(doc)} - ${extractTimestamp(doc)} `;
+    // Проверяем, является ли это summary документом (начинается с "Summary" или "Документ")
+    const isSummaryDocument = doc.name.match(/^(Summary|Документ)\s*[-–—]/);
+
+    // Для загруженных пользователем файлов показываем оригинальное название
+    if (!isSummaryDocument) {
+      return doc.name;
+    }
+
+    // Для summary документов показываем имя агента и дату
+    return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
   };
 
 
@@ -297,7 +304,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const handleDownload = (file: UploadedFile, e: React.MouseEvent) => {
     e.stopPropagation();
     const link = document.createElement('a');
-    link.href = `data:${file.type}; base64, ${file.data} `;
+    link.href = `data:${file.type};base64,${file.data}`;
     link.download = file.name;
     document.body.appendChild(link);
     link.click();
@@ -370,7 +377,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     } catch (error: any) {
       console.error('Failed to update file:', error);
       if (onShowAlert) {
-        onShowAlert(`Не удалось обновить документ: ${error?.message || 'Неизвестная ошибка'} `, 'Ошибка', 'error');
+        onShowAlert(`Не удалось обновить документ: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
       }
     } finally {
       setIsSaving(false);
@@ -421,27 +428,26 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     } catch (error: any) {
       console.error('Failed to generate result:', error);
       if (onShowAlert) {
-        onShowAlert(`Не удалось сгенерировать прототип: ${error?.message || 'Неизвестная ошибка'} `, 'Ошибка', 'error');
+        onShowAlert(`Не удалось сгенерировать прототип: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
       } else {
-        console.error(`Не удалось сгенерировать прототип: ${error?.message || 'Неизвестная ошибка'} `);
+        console.error(`Не удалось сгенерировать прототип: ${error?.message || 'Неизвестная ошибка'}`);
       }
     } finally {
       setIsGeneratingPrototype(false);
     }
   };
 
-  const handleOpenInNewTab = () => {
-    const fileToUse = localSelectedFile || selectedFile;
-    if (!fileToUse) return;
+  const handleOpenInNewTab = async () => {
+    if (!selectedFile) return;
 
     // Открываем прототип в новой вкладке через хэш-роутинг
     const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
     window.open(url, '_blank');
   };
 
-  const handleCopyLink = async () => {
-    const fileToUse = localSelectedFile || selectedFile;
-    if (!fileToUse) return;
+      // Открываем в новом окне
+      const fullUrl = `${window.location.origin}${window.location.pathname}#/prototype/${response.hash}`;
+      window.open(fullUrl, '_blank');
 
     const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
     try {
@@ -592,7 +598,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Sidebar List */}
-        <div className={`w - full md: !w - [15 %] md: max - w - [220px] border - r border - white / 10 flex flex - col bg - black / 40 backdrop - blur - xl ${selectedFile ? 'hidden md:flex' : 'flex'} `}>
+        <div className={`w-full md:!w-[15%] md:max-w-[220px] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
@@ -607,25 +613,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     {project.projectType.name}
                   </p>
                 )}
-                {/* Кнопки действий для прототипа */}
-                {(activeTab === 'prototype') && (
-                  <div className="flex items-center gap-2 mt-2 ml-11 sm:ml-12">
-                    <button
-                      onClick={handleCopyLink}
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                      title="Скопировать ссылку на прототип"
-                    >
-                      <Copy size={18} />
-                    </button>
-                    <button
-                      onClick={handleOpenInNewTab}
-                      className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                      title="Открыть в отдельной вкладке"
-                    >
-                      <ExternalLink size={18} />
-                    </button>
-                  </div>
-                )}
               </div>
               {/* Mobile Close Button */}
               <button
@@ -636,6 +623,16 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 <X size={20} />
               </button>
             </div>
+            {/* Upload Button */}
+            {onFileUpload && (
+              <button
+                onClick={onFileUpload}
+                className="w-full mt-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+              >
+                <Upload size={16} />
+                Загрузить
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2 md:no-scrollbar">
@@ -656,12 +653,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                   className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-4 group relative overflow-hidden ${selectedFileId === doc.id
                     ? 'bg-white/10 shadow-lg border border-white/10'
                     : 'hover:bg-white/5 border border-transparent'
-                    } `}
+                    }`}
                 >
                   {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
 
                   <div className="min-w-0 flex-1">
-                    <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'} `}>
+                    <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
                       {getDocumentDisplayName(doc)}
                     </h4>
                   </div>
@@ -672,7 +669,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         </div>
 
         {/* Preview Area */}
-        <div className={`flex-1 md:w-[85%] flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'} `}>
+        <div className={`flex-1 md:w-[85%] flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
 
           {/* Mobile Header for Preview */}
           <div className="md:hidden sticky top-0 z-20 p-4 border-b border-white/10 flex items-center gap-3 bg-black/60 backdrop-blur-md flex-shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
@@ -695,8 +692,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
 
           {selectedFile ? (
-            <div className={`flex - 1 min - h - 0 ${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'flex flex-col p-0' : 'overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12'} `}>
-              <div className={`${activeTab === 'prototype' && prototypeSubTab === 'preview' ? 'w-full h-full flex flex-col' : 'max-w-6xl mx-auto w-full'} `}>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 md:p-8 lg:p-12">
+              <div className="max-w-6xl mx-auto w-full h-full flex flex-col">
                 {!(activeTab === 'prototype' && prototypeSubTab === 'preview') && !(activeTab === 'prototype' && showVerstkaSubTabs && prototypeSubTab !== 'preview' && isVerstkaFullscreen) && (
                   <div className="mb-8 pb-6 border-b border-white/10">
                     <div className="flex items-center gap-3 mb-4">
@@ -817,19 +814,19 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setActiveTabSafe('text')}
-                        className={`px - 4 py - 2 text - sm font - medium transition - colors border - b - 2 ${activeTab === 'text'
+                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'text'
                           ? 'text-white border-white/40'
                           : 'text-white/50 border-transparent hover:text-white/70'
-                          } `}
+                          }`}
                       >
                         Текст
                       </button>
                       <button
                         onClick={() => setActiveTabSafe('prototype')}
-                        className={`px - 4 py - 2 text - sm font - medium transition - colors border - b - 2 ${activeTab === 'prototype'
+                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'prototype'
                           ? 'text-cyan-400 border-cyan-400/40'
                           : 'text-white/50 border-transparent hover:text-white/70'
-                          } `}
+                          }`}
                       >
                         Прототип
                       </button>
@@ -837,34 +834,48 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
 
                     {/* Sub-tabs for Prototype - only for admins on copywriter documents */}
-                    {activeTab === 'prototype' && showDSLButtons && isAdmin && (
-                      <div className="flex items-center gap-1 mr-2">
+                    {activeTab === 'prototype' && (
+                      <div className="flex items-center gap-2 mr-2">
+                        {showDSLButtons && isAdmin && (
+                          <>
+                            <button
+                              onClick={() => setPrototypeSubTab('preview')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'preview'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              Preview
+                            </button>
+                            <button
+                              onClick={() => setPrototypeSubTab('dsl')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'dsl'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              DSL
+                            </button>
+                            <button
+                              onClick={() => setPrototypeSubTab('html')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'html'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              HTML
+                            </button>
+                          </>
+                        )}
+
+                        {/* Open in new window button - available for all users */}
                         <button
-                          onClick={() => setPrototypeSubTab('preview')}
-                          className={`px - 3 py - 1 text - xs font - medium rounded - md transition - colors ${prototypeSubTab === 'preview'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            } `}
+                          onClick={handleOpenInNewTab}
+                          className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5"
+                          title="Открыть в новом окне"
                         >
-                          Preview
-                        </button>
-                        <button
-                          onClick={() => setPrototypeSubTab('dsl')}
-                          className={`px - 3 py - 1 text - xs font - medium rounded - md transition - colors ${prototypeSubTab === 'dsl'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            } `}
-                        >
-                          DSL
-                        </button>
-                        <button
-                          onClick={() => setPrototypeSubTab('html')}
-                          className={`px - 3 py - 1 text - xs font - medium rounded - md transition - colors ${prototypeSubTab === 'html'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            } `}
-                        >
-                          HTML
+                          <ExternalLink size={14} />
+                          <span>Открыть</span>
                         </button>
                       </div>
                     )}
@@ -872,10 +883,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 )}
 
                 <div
-                  className={`bg - black / 50 backdrop - blur - sm border - [5px] border - white / 10 shadow - inner rounded - [2rem] overflow - hidden flex - 1 ${activeTab === 'prototype' ? 'p-0' : 'p-4 sm:p-6 md:p-8'} `}
-                  style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-hidden flex-1 p-4 sm:p-6 md:p-8"
+                  style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
-                    <img src={`data:${selectedFile.type}; base64, ${selectedFile.data} `} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
+                    <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />
                   ) : (
                     (() => {
                       if (!selectedFile) {

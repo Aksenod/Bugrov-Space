@@ -656,32 +656,16 @@ export const api = {
     return request<{ users: ApiAdminUser[]; totalUsers: number; totalProjects: number }>('/admin/users');
   },
 
-  // Public API (без авторизации)
-  async getPublicPrototype(documentId: string) {
-    // Публичный запрос без токена авторизации
-    const url = `${API_BASE_URL}/public/prototype/${documentId}`;
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+  // Public Prototype API
+  async createPublicPrototype(fileId: string) {
+    return request<{ hash: string; url: string }>(`/public/prototypes`, {
+      method: 'POST',
+      body: JSON.stringify({ fileId }),
     });
+  },
 
-    if (!response.ok) {
-      const message = await parseError(response);
-      const error = new Error(message || 'Failed to load prototype') as Error & { status?: number };
-      error.status = response.status;
-      throw error;
-    }
-
-    return (await response.json()) as {
-      prototype: {
-        id: string;
-        name: string;
-        html: string;
-        dsl?: string;
-        project: { id: string; name: string } | null;
-      };
-    };
+  async getPublicPrototype(hash: string) {
+    return request<{ htmlContent: string }>(`/public/prototypes/${hash}`);
   },
 };
 
