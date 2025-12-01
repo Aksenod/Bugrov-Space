@@ -17,7 +17,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
       try {
         setIsLoading(true);
         const response = await api.getPublicPrototype(prototypeHash);
-        setHtmlContent(response.htmlContent);
+        setHtmlContent(response.prototype.html);
         setError(null);
       } catch (err: any) {
         console.error('Failed to load prototype:', err);
