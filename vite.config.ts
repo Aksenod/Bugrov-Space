@@ -12,7 +12,8 @@ export default defineConfig(({ mode }) => {
 
     // Trigger workflow
     // Support dynamic base path for PR previews
-    const basePath = env.VITE_BASE_PATH || '/'
+    // Use process.env to read environment variables from GitHub Actions
+    const basePath = process.env.VITE_BASE_PATH || '/'
 
     // Generate build timestamp for cache busting
     const buildTimestamp = Date.now();
