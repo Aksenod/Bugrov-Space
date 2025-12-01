@@ -438,14 +438,24 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   };
 
   const handleOpenInNewTab = () => {
-    const content = getDisplayContent();
-    if (!content) return;
+    const fileToUse = localSelectedFile || selectedFile;
+    if (!fileToUse) return;
 
-    // Создаем новое окно с HTML контентом
-    const newWindow = window.open('', '_blank');
-    if (newWindow) {
-      newWindow.document.write(content);
-      newWindow.document.close();
+    // Открываем прототип в новой вкладке через хэш-роутинг
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
+    window.open(url, '_blank');
+  };
+
+  const handleCopyLink = async () => {
+    const fileToUse = localSelectedFile || selectedFile;
+    if (!fileToUse) return;
+
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      // Можно добавить уведомление об успехе, если есть такая возможность
+    } catch (err) {
+      console.error('Failed to copy link:', err);
     }
   };
 
@@ -825,34 +835,48 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
 
                     {/* Sub-tabs for Prototype - only for admins on copywriter documents */}
-                    {activeTab === 'prototype' && showDSLButtons && isAdmin && (
-                      <div className="flex items-center gap-1 mr-2">
+                    {activeTab === 'prototype' && (
+                      <div className="flex items-center gap-2 mr-2">
+                        {showDSLButtons && isAdmin && (
+                          <>
+                            <button
+                              onClick={() => setPrototypeSubTab('preview')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'preview'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              Preview
+                            </button>
+                            <button
+                              onClick={() => setPrototypeSubTab('dsl')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'dsl'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              DSL
+                            </button>
+                            <button
+                              onClick={() => setPrototypeSubTab('html')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'html'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              HTML
+                            </button>
+                          </>
+                        )}
+
+                        {/* Open in new window button - available for all users */}
                         <button
-                          onClick={() => setPrototypeSubTab('preview')}
-                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'preview'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            }`}
+                          onClick={handleOpenInNewTab}
+                          className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5"
+                          title="Открыть в новом окне"
                         >
-                          Preview
-                        </button>
-                        <button
-                          onClick={() => setPrototypeSubTab('dsl')}
-                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'dsl'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            }`}
-                        >
-                          DSL
-                        </button>
-                        <button
-                          onClick={() => setPrototypeSubTab('html')}
-                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'html'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            }`}
-                        >
-                          HTML
+                          <ExternalLink size={14} />
+                          <span>Открыть</span>
                         </button>
                       </div>
                     )}
