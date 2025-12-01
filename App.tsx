@@ -13,7 +13,6 @@ import { AdminPage } from './components/AdminPage';
 import { OfferPage } from './components/OfferPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { RequisitesPage } from './components/RequisitesPage';
-import { PrototypePage } from './components/PrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -297,8 +296,6 @@ export default function App() {
   });
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [isPrototypeOpen, setIsPrototypeOpen] = useState(false);
-  const [prototypeId, setPrototypeId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedAgentsRef = useRef(new Set<string>());
@@ -594,7 +591,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentUser, activeAgent, isDocsOpen, isSidebarOpen]);
 
-  // Проверяем, находимся ли мы на странице админ-панели, документов или прототипа
+  // Проверяем, находимся ли мы на странице админ-панели или документов
   // ВАЖНО: Этот хук должен быть вызван ДО условного возврата, чтобы соблюдать правила хуков
   useEffect(() => {
     const handleHashChange = () => {
@@ -602,33 +599,18 @@ export default function App() {
 
       if (hash === '#/admin') {
         setIsAdminOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash === '#/offer') {
         setIsOfferOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash === '#/privacy') {
         setIsPrivacyOpen(true);
-        setIsPrototypeOpen(false);
       } else if (hash === '#/requisites') {
         setIsRequisitesOpen(true);
-        setIsPrototypeOpen(false);
-      } else if (hash.startsWith('#/prototype/')) {
-        const id = hash.replace('#/prototype/', '');
-        setPrototypeId(id);
-        setIsPrototypeOpen(true);
-        // Закрываем другие модалки
-        setIsAdminOpen(false);
-        setIsOfferOpen(false);
-        setIsPrivacyOpen(false);
-        setIsRequisitesOpen(false);
       } else if (hash === '') {
         // Закрываем все открытые страницы
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
         setIsRequisitesOpen(false);
-        setIsPrototypeOpen(false);
-        setPrototypeId(null);
         setAdminInitialAgentId(undefined);
       }
     };
@@ -645,21 +627,12 @@ export default function App() {
       setIsPrivacyOpen(true);
     } else if (hash === '#/requisites') {
       setIsRequisitesOpen(true);
-    } else if (hash.startsWith('#/prototype/')) {
-      const id = hash.replace('#/prototype/', '');
-      setPrototypeId(id);
-      setIsPrototypeOpen(true);
     }
 
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen, isPrototypeOpen]);
-
-  // Рендерим страницу прототипа, если она открыта
-  if (isPrototypeOpen && prototypeId) {
-    return <PrototypePage documentId={prototypeId} />;
-  }
+  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
