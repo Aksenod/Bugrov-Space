@@ -3,12 +3,10 @@ import { X, Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024; // 2MB
 
-// Supported file types (only text documents)
+// Supported file types (only text files)
 const ACCEPTED_FILE_TYPES = {
   'text/plain': ['.txt'],
   'text/markdown': ['.md'],
-  'application/msword': ['.doc'],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
 };
 
 const getAllowedExtensions = () => {
@@ -57,7 +55,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
       const allowedExtensions = Object.values(ACCEPTED_FILE_TYPES).flat();
 
       if (!allowedExtensions.includes(extension)) {
-        setError(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только: TXT, MD, DOC, DOCX.`);
+        setError(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только: TXT, MD.`);
         return false;
       }
     }
@@ -181,7 +179,10 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
 
               {!isUploading && (
                 <button
-                  onClick={handleBrowseClick}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBrowseClick();
+                  }}
                   className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-medium transition-colors"
                 >
                   Выбрать файлы
@@ -204,7 +205,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
           <div className="mt-6 p-4 bg-white/5 border border-white/10 rounded-xl">
             <h3 className="text-sm font-semibold text-white mb-2">Поддерживаемые форматы:</h3>
             <ul className="text-xs text-white/60 space-y-1">
-              <li>📄 Файлы: TXT, MD, DOC, DOCX</li>
+              <li>📄 Файлы: TXT, MD</li>
               <li>⚠️ Максимальный размер файла: 2MB</li>
             </ul>
           </div>
