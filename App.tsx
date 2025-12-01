@@ -14,6 +14,7 @@ import { AdminPage } from './components/AdminPage';
 import { OfferPage } from './components/OfferPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { RequisitesPage } from './components/RequisitesPage';
+import { LandingPage } from './components/landing/LandingPage';
 import { PublicPrototypePage } from './components/PublicPrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
@@ -268,6 +269,7 @@ export default function App() {
   const [isOfferOpen, setIsOfferOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isRequisitesOpen, setIsRequisitesOpen] = useState(false);
+  const [isLandingOpen, setIsLandingOpen] = useState(false);
   const [prototypeHash, setPrototypeHash] = useState<string | null>(null);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -602,14 +604,27 @@ export default function App() {
     const handleHashChange = () => {
       const hash = window.location.hash;
 
-      if (hash === '#/admin') {
+      if (hash === '#/landing' || hash === '#/' || hash === '') {
+        setIsLandingOpen(true);
+        setIsAdminOpen(false);
+        setIsOfferOpen(false);
+        setIsPrivacyOpen(false);
+        setIsRequisitesOpen(false);
+      } else if (hash === '#/admin') {
         setIsAdminOpen(true);
+        setIsLandingOpen(false);
       } else if (hash === '#/offer') {
         setIsOfferOpen(true);
+        setIsLandingOpen(false);
       } else if (hash === '#/privacy') {
         setIsPrivacyOpen(true);
+        setIsLandingOpen(false);
       } else if (hash === '#/requisites') {
         setIsRequisitesOpen(true);
+        setIsLandingOpen(false);
+      } else if (hash === '#/auth') {
+        // Закрываем все страницы для показа AuthPage
+        setIsLandingOpen(false);
       } else if (hash.startsWith('#/prototype/')) {
         const hashValue = hash.replace('#/prototype/', '');
         setPrototypeHash(hashValue);
@@ -628,7 +643,9 @@ export default function App() {
 
     // Проверяем при монтировании
     const hash = window.location.hash;
-    if (hash === '#/admin') {
+    if (hash === '#/landing' || hash === '#/' || hash === '') {
+      setIsLandingOpen(true);
+    } else if (hash === '#/admin') {
       setIsAdminOpen(true);
     } else if (hash === '#/offer') {
       setIsOfferOpen(true);
@@ -644,7 +661,7 @@ export default function App() {
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen]);
+  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen, isLandingOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
@@ -1525,6 +1542,11 @@ export default function App() {
     // Но при этом возвращаем null, чтобы основное приложение рендерилось (для показа сайдбара и интерфейса)
     return null;
   };
+
+  // Landing page check - should be first
+  if (isLandingOpen || window.location.hash === '#/landing' || window.location.hash === '#/' || window.location.hash === '') {
+    return <LandingPage />;
+  }
 
   const authView = renderAuthOrLoader();
   if (authView) {
