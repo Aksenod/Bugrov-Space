@@ -1,100 +1,28 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Plus, Edit2, Trash2, Loader2, Bot, Brain, Cpu, Zap, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, GripVertical, ChevronDown, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, Rocket, Sparkles, CircuitBoard, Wand2, Sparkle, Calendar } from 'lucide-react';
-import {
-  DndContext,
-  closestCorners,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  useSortable,
-  arrayMove,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown } from 'lucide-react';
+import { arrayMove } from '@dnd-kit/sortable';
+import { DragEndEvent } from '@dnd-kit/core';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile, ApiAdminUser } from '../services/api';
 import { LLMModel, MODELS, UploadedFile } from '../types';
 import { AlertDialog } from './AlertDialog';
 import { ConfirmDialog } from './ConfirmDialog';
-
-interface AdminPageProps {
-  onClose: () => void;
-  initialAgentId?: string;
-  onAgentUpdated?: () => void;
-}
-
-interface SortableAgentItemProps {
-  agent: ApiProjectTypeAgent;
-  index: number;
-}
-
-// Функция для выбора разнообразной иконки робота на основе ID агента
-const getAgentIcon = (agentId: string, size: number = 16, className: string = '') => {
-  // Создаем хеш из ID для детерминированного выбора
-  const hash = Array.from(agentId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const iconIndex = hash % 8;
-
-  const iconProps = { size, className: `text-indigo-400 shrink-0 ${className}` };
-
-  const icons = [
-    <Bot key="bot" {...iconProps} />,
-    <Brain key="brain" {...iconProps} />,
-    <Cpu key="cpu" {...iconProps} />,
-    <Zap key="zap" {...iconProps} />,
-    <Rocket key="rocket" {...iconProps} />,
-    <Sparkles key="sparkles" {...iconProps} />,
-    <CircuitBoard key="circuit" {...iconProps} />,
-    <Wand2 key="wand" {...iconProps} />,
-  ];
-
-  return icons[iconIndex];
-};
-
-const SortableAgentItem: React.FC<SortableAgentItemProps> = ({ agent, index }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: agent.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  } as React.CSSProperties;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors ${isDragging ? 'opacity-50 z-20' : ''
-        }`}
-    >
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-white/40 hover:text-white/60 transition-colors"
-      >
-        <GripVertical size={14} className="sm:w-4 sm:h-4" />
-      </div>
-      <span className="text-xs sm:text-sm text-white/50 font-medium w-6 sm:w-8 text-center">
-        {index + 1}
-      </span>
-      {getAgentIcon(agent.id, 14, 'sm:w-4 sm:h-4')}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs sm:text-sm text-white font-medium truncate">
-          {agent.name}
-        </div>
-        {agent.description && (
-          <div className="text-[10px] sm:text-xs text-white/60 truncate mt-0.5">
-            {agent.description}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+import {
+  AdminPageProps,
+  TabType,
+  SortBy,
+  SortOrder,
+  ConfirmDialogState,
+  AlertDialogState,
+  getAgentIcon,
+  resolveModel,
+  formatDate,
+  AdminUsersTab,
+  AdminAgentsTab,
+  AdminProjectTypesTab,
+} from './admin';
 
 export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, onAgentUpdated }) => {
-  const [activeTab, setActiveTab] = useState<'projectTypes' | 'agents' | 'users'>('agents');
+  const [activeTab, setActiveTab] = useState<TabType>('agents');
 
   // Project Types state
   const [projectTypes, setProjectTypes] = useState<ApiProjectType[]>([]);
@@ -107,11 +35,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [loadingAgentsForType, setLoadingAgentsForType] = useState<Set<string>>(new Set());
   const [reorderingTypeId, setReorderingTypeId] = useState<string | null>(null);
   const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
-  );
 
   // Agents state
   const [agents, setAgents] = useState<ApiProjectTypeAgent[]>([]);
@@ -572,56 +495,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     } finally {
       setIsLoadingUsers(false);
     }
-  };
-
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-      const options: Intl.DateTimeFormatOptions = {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      };
-
-      if (diffDays === 0) {
-        return `Сегодня, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-      } else if (diffDays === 1) {
-        return `Вчера, ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
-      } else {
-        return date.toLocaleString('ru-RU', options);
-      }
-    } catch {
-      return '';
-    }
-  };
-
-  // Функция для выбора разнообразной иконки робота на основе ID агента
-  const getAgentIcon = (agentId: string, size: number = 16, className: string = '') => {
-    // Создаем хеш из ID для детерминированного выбора
-    const hash = Array.from(agentId).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const iconIndex = hash % 8;
-
-    const iconProps = { size, className: `text-indigo-400 shrink-0 ${className}` };
-
-    const icons = [
-      <Bot key="bot" {...iconProps} />,
-      <Brain key="brain" {...iconProps} />,
-      <Cpu key="cpu" {...iconProps} />,
-      <Zap key="zap" {...iconProps} />,
-      <Rocket key="rocket" {...iconProps} />,
-      <Sparkles key="sparkles" {...iconProps} />,
-      <CircuitBoard key="circuit" {...iconProps} />,
-      <Wand2 key="wand" {...iconProps} />,
-    ];
-
-    return icons[iconIndex];
   };
 
   const handleCreate = async () => {
@@ -1119,13 +992,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     );
   };
 
-  const resolveModel = (value: string): LLMModel => {
-    if (value === LLMModel.GPT51) return LLMModel.GPT51;
-    if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
-    if (value === LLMModel.GPT4O_MINI) return LLMModel.GPT4O_MINI;
-    return LLMModel.GPT51;
-  };
-
   const renderModelIcon = (modelId: LLMModel) => {
     if (modelId === LLMModel.GPT4O_MINI) {
       return <Zap size={14} className="text-amber-400" />;
@@ -1202,80 +1068,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     const newOrder = arrayMove(agents, oldIndex, newIndex);
     handleReorderAgents(projectTypeId, newOrder);
   };
-
-  // Filter and sort agents
-  const filteredAndSortedAgents = useMemo(() => {
-    let filtered = [...agents];
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(agent =>
-        agent.name.toLowerCase().includes(query) ||
-        (agent.description && agent.description.toLowerCase().includes(query))
-      );
-    }
-
-    // Filter by project types
-    if (selectedProjectTypeFilters.length > 0) {
-      filtered = filtered.filter(agent => {
-        const agentProjectTypeIds = agent.projectTypes?.map(pt => pt.id) || [];
-        return selectedProjectTypeFilters.some(filterId =>
-          agentProjectTypeIds.includes(filterId)
-        );
-      });
-    }
-
-    // Filter by roles
-    if (selectedRoleFilters.length > 0) {
-      filtered = filtered.filter(agent => {
-        if (selectedRoleFilters.includes('none') && !agent.role) return true;
-        return agent.role && selectedRoleFilters.includes(agent.role);
-      });
-    }
-
-    // Filter by models
-    if (selectedModelFilters.length > 0) {
-      filtered = filtered.filter(agent =>
-        selectedModelFilters.includes(agent.model)
-      );
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortBy) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' });
-          break;
-        case 'createdAt':
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          comparison = dateA - dateB;
-          break;
-        case 'projectTypesCount':
-          const countA = a.projectTypes?.length || 0;
-          const countB = b.projectTypes?.length || 0;
-          comparison = countA - countB;
-          break;
-      }
-
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-    return filtered;
-  }, [agents, searchQuery, selectedProjectTypeFilters, selectedRoleFilters, selectedModelFilters, sortBy, sortOrder]);
-
-  // Count active filters
-  const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    if (searchQuery.trim()) count++;
-    if (selectedProjectTypeFilters.length > 0) count++;
-    if (selectedRoleFilters.length > 0) count++;
-    if (selectedModelFilters.length > 0) count++;
-    return count;
-  }, [searchQuery, selectedProjectTypeFilters, selectedRoleFilters, selectedModelFilters]);
 
   // Reset filters
   const resetFilters = () => {
@@ -1373,583 +1165,58 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         {/* Content */}
         <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           {activeTab === 'projectTypes' ? (
-            <>
-              {/* Create Form */}
-              <div className="flex gap-1.5 sm:gap-2">
-                <input
-                  type="text"
-                  value={newTypeName}
-                  onChange={(e) => setNewTypeName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleCreate()}
-                  placeholder="Название типа проекта"
-                  className="flex-1 px-2.5 sm:px-4 py-2 sm:py-2.5 text-sm bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-transparent"
-                />
-                <button
-                  onClick={handleCreate}
-                  disabled={isCreating || !newTypeName.trim()}
-                  className="px-2.5 sm:px-4 py-2 sm:py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2"
-                >
-                  {isCreating ? <Loader2 size={14} className="sm:w-4 sm:h-4 animate-spin" /> : <Plus size={14} className="sm:w-4 sm:h-4" />}
-                  <span className="hidden sm:inline">Создать</span>
-                </button>
-              </div>
-
-              {/* List */}
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-indigo-400" />
-                </div>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {projectTypes.map((type) => {
-                    const agentsRaw = projectTypeAgents.get(type.id) || [];
-                    // Сортируем агентов по полю order для правильного отображения
-                    const agents = [...agentsRaw].sort((a, b) => {
-                      if (a.order === b.order) {
-                        return a.name.localeCompare(b.name);
-                      }
-                      return (a.order ?? 0) - (b.order ?? 0);
-                    });
-                    const isLoadingAgents = loadingAgentsForType.has(type.id);
-
-                    return (
-                      <div
-                        key={type.id}
-                        className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
-                      >
-                        {/* Project Type Header */}
-                        <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-4 hover:bg-white/10 transition-colors">
-                          {editingId === type.id ? (
-                            <>
-                              <input
-                                type="text"
-                                value={editingName}
-                                onChange={(e) => setEditingName(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(type.id)}
-                                className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-sm bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/70"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => handleSaveEdit(type.id)}
-                                className="px-2 sm:px-3 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors"
-                              >
-                                Сохранить
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingId(null);
-                                  setEditingName('');
-                                }}
-                                className="px-2 sm:px-3 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs sm:text-sm transition-colors"
-                              >
-                                Отмена
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => toggleCollapse(type.id)}
-                                className="p-1 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/10 transition-all"
-                                title={collapsedTypes.has(type.id) ? 'Развернуть' : 'Свернуть'}
-                              >
-                                <ChevronDown
-                                  size={16}
-                                  className={`sm:w-5 sm:h-5 transition-transform duration-200 ${collapsedTypes.has(type.id) ? '-rotate-90' : ''
-                                    }`}
-                                />
-                              </button>
-                              <span className="flex-1 text-white text-sm sm:text-base font-medium">
-                                {type.name}
-                                {agents.length > 0 && (
-                                  <span className="ml-2 text-xs text-white/50">
-                                    ({agents.length} {agents.length === 1 ? 'агент' : agents.length < 5 ? 'агента' : 'агентов'})
-                                  </span>
-                                )}
-                              </span>
-                              <button
-                                onClick={() => handleStartEdit(type)}
-                                className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
-                                title="Редактировать"
-                              >
-                                <Edit2 size={14} className="sm:w-4 sm:h-4" />
-                              </button>
-                              {type.id !== 'default' && (
-                                <button
-                                  onClick={() => handleDelete(type.id, type.name)}
-                                  className="p-1.5 sm:p-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                  title="Удалить"
-                                >
-                                  <Trash2 size={14} className="sm:w-4 sm:h-4" />
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-
-                        {/* Agents List */}
-                        {!editingId && !collapsedTypes.has(type.id) && (
-                          <div className="px-2.5 sm:px-4 pb-2.5 sm:pb-4">
-                            {isLoadingAgents ? (
-                              <div className="flex items-center justify-center py-4">
-                                <Loader2 size={16} className="animate-spin text-indigo-400" />
-                              </div>
-                            ) : agents.length === 0 ? (
-                              <div className="text-xs sm:text-sm text-white/40 py-2 px-2">
-                                Нет прикрепленных агентов
-                              </div>
-                            ) : (
-                              <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCorners}
-                                onDragEnd={(e) => handleDragEnd(e, type.id)}
-                              >
-                                <SortableContext
-                                  items={agents.map(a => a.id)}
-                                  strategy={verticalListSortingStrategy}
-                                >
-                                  <div className="space-y-1.5 sm:space-y-2 mt-2">
-                                    {agents.map((agent, index) => (
-                                      <SortableAgentItem
-                                        key={agent.id}
-                                        agent={agent}
-                                        index={index}
-                                      />
-                                    ))}
-                                  </div>
-                                </SortableContext>
-                              </DndContext>
-                            )}
-                            {reorderingTypeId === type.id && (
-                              <div className="flex items-center justify-center py-2 mt-2">
-                                <Loader2 size={14} className="animate-spin text-indigo-400 mr-2" />
-                                <span className="text-xs text-white/60">Сохранение порядка...</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
+            <AdminProjectTypesTab
+              projectTypes={projectTypes}
+              projectTypeAgents={projectTypeAgents}
+              loadingAgentsForType={loadingAgentsForType}
+              isLoading={isLoading}
+              isCreating={isCreating}
+              newTypeName={newTypeName}
+              setNewTypeName={setNewTypeName}
+              editingId={editingId}
+              editingName={editingName}
+              setEditingId={setEditingId}
+              setEditingName={setEditingName}
+              reorderingTypeId={reorderingTypeId}
+              collapsedTypes={collapsedTypes}
+              onCreate={handleCreate}
+              onStartEdit={handleStartEdit}
+              onSaveEdit={handleSaveEdit}
+              onDelete={handleDelete}
+              onDragEnd={handleDragEnd}
+              onToggleCollapse={toggleCollapse}
+            />
           ) : activeTab === 'agents' ? (
-            <>
-              {/* Agents Tab */}
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2 sm:gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white">Агенты-шаблоны</h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Compact Sort Controls */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] sm:text-xs text-white/60 font-medium">Сортировка:</span>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {/* Name Sort */}
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          onClick={() => {
-                            setSortBy('name');
-                            setSortOrder('asc');
-                            setIsFiltersOpen(false);
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${sortBy === 'name' && sortOrder === 'asc'
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
-                              : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
-                            }`}
-                          title="По имени A-Z"
-                        >
-                          <span className="hidden sm:inline">Имя</span>
-                          <span className="sm:hidden">И</span>
-                          <ArrowUp size={10} className="inline ml-0.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSortBy('name');
-                            setSortOrder('desc');
-                            setIsFiltersOpen(false);
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${sortBy === 'name' && sortOrder === 'desc'
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
-                              : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
-                            }`}
-                          title="По имени Z-A"
-                        >
-                          <ArrowDown size={10} className="inline" />
-                        </button>
-                      </div>
-
-                      {/* Date Sort */}
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          onClick={() => {
-                            setSortBy('createdAt');
-                            setSortOrder('desc');
-                            setIsFiltersOpen(false);
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${sortBy === 'createdAt' && sortOrder === 'desc'
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
-                              : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
-                            }`}
-                          title="Новые сначала"
-                        >
-                          <span className="hidden sm:inline">Дата</span>
-                          <span className="sm:hidden">Д</span>
-                          <ArrowDown size={10} className="inline ml-0.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSortBy('createdAt');
-                            setSortOrder('asc');
-                            setIsFiltersOpen(false);
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${sortBy === 'createdAt' && sortOrder === 'asc'
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
-                              : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
-                            }`}
-                          title="Старые сначала"
-                        >
-                          <ArrowUp size={10} className="inline" />
-                        </button>
-                      </div>
-
-                      {/* Project Types Count Sort */}
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          onClick={() => {
-                            setSortBy('projectTypesCount');
-                            setSortOrder('desc');
-                            setIsFiltersOpen(false);
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${sortBy === 'projectTypesCount' && sortOrder === 'desc'
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
-                              : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
-                            }`}
-                          title="Больше типов"
-                        >
-                          <span className="hidden sm:inline">Типы</span>
-                          <span className="sm:hidden">Т</span>
-                          <ArrowDown size={10} className="inline ml-0.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSortBy('projectTypesCount');
-                            setSortOrder('asc');
-                            setIsFiltersOpen(false);
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium transition-all ${sortBy === 'projectTypesCount' && sortOrder === 'asc'
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50'
-                              : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
-                            }`}
-                          title="Меньше типов"
-                        >
-                          <ArrowUp size={10} className="inline" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenAgentDialog()}
-                    className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1 sm:gap-2"
-                  >
-                    <Plus size={14} className="sm:w-4 sm:h-4" />
-                    <span className="hidden sm:inline">Создать агента</span>
-                    <span className="sm:hidden">Создать</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Filters Panel */}
-              <div className="mb-3 sm:mb-4">
-                <button
-                  onClick={() => {
-                    setIsFiltersOpen(!isFiltersOpen);
-                    setIsSortDropdownOpen(false);
-                  }}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white transition-colors flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <Filter size={16} className="sm:w-5 sm:h-5" />
-                    <span className="text-xs sm:text-sm font-medium">Фильтры</span>
-                    {activeFiltersCount > 0 && (
-                      <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] sm:text-xs rounded-full border border-indigo-500/30 font-semibold">
-                        {activeFiltersCount}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    size={16}
-                    className={`sm:w-5 sm:h-5 transition-transform duration-200 ${isFiltersOpen ? 'rotate-180' : ''
-                      }`}
-                  />
-                </button>
-
-                {/* Filters Content */}
-                {isFiltersOpen && (
-                  <div className="mt-2 p-2.5 sm:p-3 bg-white/5 border border-white/10 rounded-lg space-y-3">
-                    {/* Search */}
-                    <div>
-                      <div className="relative">
-                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
-                        <input
-                          type="text"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Поиск по имени или описанию..."
-                          className="w-full pl-9 pr-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs sm:text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Project Types Filter */}
-                    <div>
-                      <label className="block text-[10px] sm:text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
-                        Типы проектов
-                      </label>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                        {projectTypes.length === 0 ? (
-                          <p className="text-[10px] text-white/40">Нет типов</p>
-                        ) : (
-                          projectTypes.map((type) => {
-                            const isSelected = selectedProjectTypeFilters.includes(type.id);
-                            return (
-                              <button
-                                key={type.id}
-                                onClick={() => toggleProjectTypeFilter(type.id)}
-                                className={`px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${isSelected
-                                    ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
-                                    : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:border-white/20'
-                                  }`}
-                              >
-                                {type.name}
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Roles Filter */}
-                    <div>
-                      <label className="block text-[10px] sm:text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
-                        Роли
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { value: 'copywriter', label: 'Копирайтер' },
-                          { value: 'layout', label: 'Верстальщик' },
-                          { value: 'dsl', label: 'DSL' },
-                          { value: 'none', label: 'Без роли' },
-                        ].map((role) => {
-                          const isSelected = selectedRoleFilters.includes(role.value);
-                          return (
-                            <button
-                              key={role.value}
-                              onClick={() => toggleRoleFilter(role.value)}
-                              className={`px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${isSelected
-                                  ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
-                                  : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:border-white/20'
-                                }`}
-                            >
-                              {role.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Models Filter */}
-                    <div>
-                      <label className="block text-[10px] sm:text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
-                        Модели
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {MODELS.map((model) => {
-                          const isSelected = selectedModelFilters.includes(model.id);
-                          return (
-                            <button
-                              key={model.id}
-                              onClick={() => toggleModelFilter(model.id)}
-                              className={`px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${isSelected
-                                  ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/20'
-                                  : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:border-white/20'
-                                }`}
-                            >
-                              {model.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Reset Button */}
-                    {activeFiltersCount > 0 && (
-                      <button
-                        onClick={resetFilters}
-                        className="w-full px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] sm:text-xs text-white/80 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <X size={12} />
-                        Сбросить фильтры ({activeFiltersCount})
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Results Counter */}
-              {!isLoadingAgents && agents.length > 0 && (
-                <div className="mb-2 text-xs sm:text-sm text-white/60">
-                  Показано {filteredAndSortedAgents.length} из {agents.length} агентов
-                </div>
-              )}
-
-              {isLoadingAgents ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-indigo-400" />
-                </div>
-              ) : (
-                <div className="space-y-2 sm:space-y-2">
-                  {agents.length === 0 ? (
-                    <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-white/60">
-                      Нет агентов. Создайте первого агента.
-                    </div>
-                  ) : filteredAndSortedAgents.length === 0 ? (
-                    <div className="text-center py-6 sm:py-8 text-sm sm:text-base text-white/60">
-                      Нет агентов, соответствующих фильтрам.
-                    </div>
-                  ) : (
-                    filteredAndSortedAgents.map((agent) => (
-                      <div
-                        key={agent.id}
-                        onClick={() => handleOpenAgentDialog(agent)}
-                        className="group relative p-3 sm:p-3.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-indigo-500/10 transition-all duration-200 cursor-pointer"
-                      >
-                        {/* Верхний правый угол: дата и кнопка удаления */}
-                        <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
-                          {/* Дата создания */}
-                          {agent.createdAt && (
-                            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-white/50">
-                              <Calendar size={9} className="text-white/30 shrink-0" />
-                              <span>{formatDate(agent.createdAt)}</span>
-                            </div>
-                          )}
-                          {/* Кнопка удаления */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteAgent(agent.id, agent.name);
-                            }}
-                            className="p-1 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                            title="Удалить"
-                          >
-                            <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
-                          </button>
-                        </div>
-
-                        <div className="flex-1 min-w-0 pr-16">
-                          {/* Заголовок с иконкой */}
-                          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-                            {getAgentIcon(agent.id, 14, 'sm:w-4 sm:h-4')}
-                            <h3 className="text-xs sm:text-sm text-white font-semibold truncate">{agent.name}</h3>
-                          </div>
-
-                          {/* Описание */}
-                          {agent.description && (
-                            <p className="text-[10px] sm:text-xs text-white/60 mb-2.5 line-clamp-2 leading-tight">
-                              {agent.description}
-                            </p>
-                          )}
-
-                          {/* Теги проектов */}
-                          {agent.projectTypes && agent.projectTypes.length > 0 && (
-                            <div className="flex items-center flex-wrap gap-1.5 mt-2">
-                              {agent.projectTypes.map((pt) => (
-                                <span
-                                  key={pt.id}
-                                  className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-[9px] sm:text-[10px] rounded-full border border-indigo-500/30 font-medium"
-                                >
-                                  {pt.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </>
+            <AdminAgentsTab
+              agents={agents}
+              isLoadingAgents={isLoadingAgents}
+              projectTypes={projectTypes}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              selectedProjectTypeFilters={selectedProjectTypeFilters}
+              selectedRoleFilters={selectedRoleFilters}
+              selectedModelFilters={selectedModelFilters}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              setSortBy={setSortBy}
+              setSortOrder={setSortOrder}
+              isFiltersOpen={isFiltersOpen}
+              setIsFiltersOpen={setIsFiltersOpen}
+              onCreateAgent={handleOpenAgentDialog}
+              onEditAgent={handleOpenAgentDialog}
+              onDeleteAgent={handleDeleteAgent}
+              onToggleProjectTypeFilter={toggleProjectTypeFilter}
+              onToggleRoleFilter={toggleRoleFilter}
+              onToggleModelFilter={toggleModelFilter}
+              onResetFilters={resetFilters}
+            />
           ) : (
-            <>
-              {/* Users Tab */}
-              <div className="flex flex-col gap-3 sm:gap-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-base sm:text-lg font-bold text-white">Пользователи</h2>
-                  {(totalUsers > 0 || totalProjects > 0) && (
-                    <span className="text-xs sm:text-sm text-white/60">
-                      ({totalUsers} {totalUsers === 1 ? 'пользователь' : totalUsers < 5 ? 'пользователя' : 'пользователей'}, {totalProjects} {totalProjects === 1 ? 'проект' : totalProjects < 5 ? 'проекта' : 'проектов'})
-                    </span>
-                  )}
-                </div>
-
-                {isLoadingUsers ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 size={24} className="animate-spin text-indigo-400" />
-                  </div>
-                ) : users.length === 0 ? (
-                  <div className="text-center py-8 text-white/60 text-sm">
-                    <p>Пользователи не найдены</p>
-                    <p className="text-xs text-white/40 mt-2">
-                      В базе данных пока нет зарегистрированных пользователей
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {users.map((user) => (
-                      <div
-                        key={user.id}
-                        className="bg-white/5 rounded-lg border border-white/10 p-3 sm:p-4"
-                      >
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
-                          <div>
-                            <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
-                              Логин
-                            </div>
-                            <div className="text-sm sm:text-base text-white font-medium">
-                              {user.username}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
-                              Пароль
-                            </div>
-                            <div className="text-sm sm:text-base text-white/80">
-                              ••••••
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
-                              Дата регистрации
-                            </div>
-                            <div className="text-sm sm:text-base text-white/80">
-                              {formatDate(user.createdAt)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
-                              Проектов
-                            </div>
-                            <div className="text-sm sm:text-base text-white font-medium">
-                              {user.projectsCount}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
+            <AdminUsersTab
+              users={users}
+              isLoadingUsers={isLoadingUsers}
+              totalUsers={totalUsers}
+              totalProjects={totalProjects}
+            />
           )}
         </div>
       </div>
