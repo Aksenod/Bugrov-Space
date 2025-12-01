@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
     const isDev = mode === 'development';
 
     // Support dynamic base path for PR previews
-    const basePath = env.VITE_BASE_PATH || '/';
+    const basePath = env.VITE_BASE_PATH ? './' : '/';
 
     // Generate build timestamp for cache busting
     const buildTimestamp = Date.now();
