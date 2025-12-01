@@ -435,7 +435,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (!fileToUse) return;
 
     // Открываем прототип в новой вкладке через хэш-роутинг
-    const url = `${window.location.origin} /#/prototype / ${fileToUse.id} `;
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
     window.open(url, '_blank');
   };
 
@@ -443,7 +443,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     const fileToUse = localSelectedFile || selectedFile;
     if (!fileToUse) return;
 
-    const url = `${window.location.origin} /#/prototype / ${fileToUse.id} `;
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
     try {
       await navigator.clipboard.writeText(url);
       // Можно добавить уведомление об успехе, если есть такая возможность
