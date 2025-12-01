@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
@@ -32,7 +32,7 @@ interface ProjectDocumentsModalProps {
   onOpenAgentSettings?: (agentId: string) => void;
   onDocumentUpdate?: (file: UploadedFile) => void;
   onUpdateAgent?: (updatedAgent: Agent) => void;
-  onFileUpload?: (files: FileList) => void;
+  onFileUpload?: () => void;
   onRemoveAgentFile?: (fileId: string) => void;
   onAgentFilesUpdate?: (agentId: string, files: UploadedFile[]) => void;
   onShowConfirm?: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'warning' | 'info') => void;
@@ -605,6 +605,16 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 <X size={20} />
               </button>
             </div>
+            {/* Upload Button */}
+            {onFileUpload && (
+              <button
+                onClick={onFileUpload}
+                className="w-full mt-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+              >
+                <Upload size={16} />
+                Загрузить файлы
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2 md:no-scrollbar">

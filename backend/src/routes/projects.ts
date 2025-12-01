@@ -402,6 +402,115 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   }
 }));
 
+// GET /:projectId/files - получить все файлы проекта
+router.get('/:projectId/files', asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
+  const { projectId } = req.params;
+
+  // Проверяем, что проект принадлежит пользователю
+  const project = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id: projectId, userId },
+      select: { id: true },
+    }),
+    3,
+    `GET /projects/${projectId}/files - find project`
+  );
+
+  if (!project) {
+    return res.status(404).json({ error: 'Проект не найден' });
+  }
+
+  // Получаем всех агентов проекта
+  const agents = await withRetry(
+    () => prisma.agent.findMany({
+      where: { projectId, userId },
+      select: { id: true },
+    }),
+    3,
+    `GET /projects/${projectId}/files - find agents`
+  );
+
+  const agentIds = agents.map(agent => agent.id);
+
+  // Получаем все файлы проекта (не из базы знаний)
+  const files = await withRetry(
+    () => prisma.file.findMany({
+      where: {
+        agentId: { in: agentIds },
+        isKnowledgeBase: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    3,
+    `GET /projects/${projectId}/files - find files`
+  );
+
+  logger.debug({ userId, projectId, filesCount: files.length }, 'Project files fetched');
+  res.json({ files });
+}));
+
+// POST /:projectId/files - загрузить файл в проект
+router.post('/:projectId/files', asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
+  const { projectId } = req.params;
+  const { name, mimeType, content } = req.body;
+
+  // Валидация входных данных
+  if (!name || !mimeType || !content) {
+    return res.status(400).json({ error: 'Необходимо указать name, mimeType и content' });
+  }
+
+  // Проверяем, что проект принадлежит пользователю
+  const project = await withRetry(
+    () => prisma.project.findFirst({
+      where: { id: projectId, userId },
+      select: { id: true },
+    }),
+    3,
+    `POST /projects/${projectId}/files - find project`
+  );
+
+  if (!project) {
+    return res.status(404).json({ error: 'Проект не найден' });
+  }
+
+  // Находим первого агента проекта для связи с файлом
+  const agent = await withRetry(
+    () => prisma.agent.findFirst({
+      where: { projectId, userId },
+      select: { id: true },
+      orderBy: { order: 'asc' },
+    }),
+    3,
+    `POST /projects/${projectId}/files - find first agent`
+  );
+
+  if (!agent) {
+    return res.status(400).json({ error: 'В проекте нет агентов. Создайте хотя бы одного агента.' });
+  }
+
+  // Создаем файл
+  const file = await withRetry(
+    () => prisma.file.create({
+      data: {
+        agentId: agent.id,
+        name,
+        mimeType,
+        content,
+        isKnowledgeBase: false,
+      },
+    }),
+    3,
+    `POST /projects/${projectId}/files - create file`
+  );
+
+  logger.info({ userId, projectId, fileId: file.id, fileName: file.name }, 'Project file uploaded');
+  res.status(201).json({ file });
+}));
+
 // DELETE /:projectId/files/:fileId - удалить файл проекта
 router.delete('/:projectId/files/:fileId', asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
