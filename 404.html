@@ -11,14 +11,23 @@
         var path = window.location.pathname;
         var search = window.location.search;
         var hash = window.location.hash;
-        
+
         // Если путь уже index.html, не редиректим
         if (path.includes('index.html')) {
           return;
         }
-        
-        // Редиректим на index.html с сохранением query параметров и hash
-        var newPath = '/index.html' + search + hash;
+
+        // Определяем base path (например, /pr-20/ или просто /)
+        var basePath = '/';
+
+        // Проверяем паттерн /pr-XX/ или /pr-XX (с или без слеша в конце)
+        var prMatch = path.match(/^(\/pr-\d+)/);
+        if (prMatch) {
+          basePath = prMatch[1] + '/';
+        }
+
+        // Редиректим на index.html в правильной директории с сохранением параметров
+        var newPath = basePath + 'index.html' + search + hash;
         window.location.replace(newPath);
       })();
     </script>
