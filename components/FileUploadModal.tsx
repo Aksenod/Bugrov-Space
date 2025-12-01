@@ -3,34 +3,12 @@ import { X, Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024; // 2MB
 
-// Supported file types (no images)
+// Supported file types (only text documents)
 const ACCEPTED_FILE_TYPES = {
-  // Documents
   'text/plain': ['.txt'],
   'text/markdown': ['.md'],
-  'application/pdf': ['.pdf'],
   'application/msword': ['.doc'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-
-  // Code files
-  'text/html': ['.html'],
-  'text/css': ['.css'],
-  'text/javascript': ['.js'],
-  'application/json': ['.json'],
-  'text/xml': ['.xml'],
-  'application/typescript': ['.ts', '.tsx'],
-  'text/x-python': ['.py'],
-  'text/x-java': ['.java'],
-  'text/x-c': ['.c', '.h'],
-  'text/x-c++': ['.cpp', '.hpp'],
-  'text/x-csharp': ['.cs'],
-  'text/x-go': ['.go'],
-  'text/x-rust': ['.rs'],
-  'text/x-php': ['.php'],
-  'text/x-ruby': ['.rb'],
-  'text/x-swift': ['.swift'],
-  'text/x-kotlin': ['.kt'],
-  'application/x-yaml': ['.yaml', '.yml'],
 };
 
 const getAllowedExtensions = () => {
@@ -79,7 +57,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
       const allowedExtensions = Object.values(ACCEPTED_FILE_TYPES).flat();
 
       if (!allowedExtensions.includes(extension)) {
-        setError(`Файл "${file.name}" имеет неподдерживаемый формат. Изображения не поддерживаются.`);
+        setError(`Файл "${file.name}" имеет неподдерживаемый формат. Поддерживаются только: TXT, MD, DOC, DOCX.`);
         return false;
       }
     }
@@ -140,7 +118,7 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
               <Upload size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Загрузить документы</h2>
+              <h2 className="text-xl font-bold text-white">Загрузить файлы</h2>
               <p className="text-sm text-white/50 mt-0.5">Добавьте файлы в проект</p>
             </div>
           </div>
@@ -226,10 +204,8 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
           <div className="mt-6 p-4 bg-white/5 border border-white/10 rounded-xl">
             <h3 className="text-sm font-semibold text-white mb-2">Поддерживаемые форматы:</h3>
             <ul className="text-xs text-white/60 space-y-1">
-              <li>📄 Документы: TXT, MD, PDF, DOC, DOCX</li>
-              <li>💻 Код: HTML, CSS, JS, TS, JSON, Python, Java, C++, и другие</li>
+              <li>📄 Файлы: TXT, MD, DOC, DOCX</li>
               <li>⚠️ Максимальный размер файла: 2MB</li>
-              <li>🚫 Изображения не поддерживаются</li>
             </ul>
           </div>
         </div>

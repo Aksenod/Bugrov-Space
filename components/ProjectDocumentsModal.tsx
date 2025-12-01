@@ -240,6 +240,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   };
 
   const getDocumentDisplayName = (doc: UploadedFile) => {
+    // Проверяем, является ли это summary документом (начинается с "Summary" или "Документ")
+    const isSummaryDocument = doc.name.match(/^(Summary|Документ)\s*[-–—]/);
+
+    // Для загруженных пользователем файлов показываем оригинальное название
+    if (!isSummaryDocument) {
+      return doc.name;
+    }
+
+    // Для summary документов показываем имя агента и дату
     return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
   };
 
@@ -612,7 +621,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 className="w-full mt-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium"
               >
                 <Upload size={16} />
-                Загрузить файлы
+                Загрузить
               </button>
             )}
           </div>
