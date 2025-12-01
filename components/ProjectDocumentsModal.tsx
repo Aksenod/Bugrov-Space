@@ -240,6 +240,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   };
 
   const getDocumentDisplayName = (doc: UploadedFile) => {
+    // Проверяем, является ли это summary документом (начинается с "Summary" или "Документ")
+    const isSummaryDocument = doc.name.match(/^(Summary|Документ)\s*[-–—]/);
+
+    // Для загруженных пользователем файлов показываем оригинальное название
+    if (!isSummaryDocument) {
+      return doc.name;
+    }
+
+    // Для summary документов показываем имя агента и дату
     return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
   };
 
