@@ -428,15 +428,32 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
-  const handleOpenInNewTab = () => {
-    const content = getDisplayContent();
-    if (!content) return;
+  const handleOpenInNewTab = async () => {
+    if (!selectedFile) return;
 
-    // Создаем новое окно с HTML контентом
-    const newWindow = window.open('', '_blank');
-    if (newWindow) {
-      newWindow.document.write(content);
-      newWindow.document.close();
+    try {
+      // Создаем публичную ссылку на прототип
+      const response = await api.createPublicPrototype(selectedFile.id);
+
+      // Открываем в новом окне
+      const fullUrl = `${window.location.origin}${window.location.pathname}#/prototype/${response.hash}`;
+      window.open(fullUrl, '_blank');
+
+      if (onShowAlert) {
+        onShowAlert('Прототип открыт в новом окне. Ссылка скопирована в буфер обмена.', 'Успех', 'success');
+      }
+
+      // Копируем ссылку в буфер обмена
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+      } catch (err) {
+        console.warn('Failed to copy to clipboard:', err);
+      }
+    } catch (error: any) {
+      console.error('Failed to create public prototype link:', error);
+      if (onShowAlert) {
+        onShowAlert(`Не удалось создать публичную ссылку: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+      }
     }
   };
 
@@ -816,34 +833,48 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
 
                     {/* Sub-tabs for Prototype - only for admins on copywriter documents */}
-                    {activeTab === 'prototype' && showDSLButtons && isAdmin && (
-                      <div className="flex items-center gap-1 mr-2">
+                    {activeTab === 'prototype' && (
+                      <div className="flex items-center gap-2 mr-2">
+                        {showDSLButtons && isAdmin && (
+                          <>
+                            <button
+                              onClick={() => setPrototypeSubTab('preview')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'preview'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              Preview
+                            </button>
+                            <button
+                              onClick={() => setPrototypeSubTab('dsl')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'dsl'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              DSL
+                            </button>
+                            <button
+                              onClick={() => setPrototypeSubTab('html')}
+                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'html'
+                                ? 'bg-white/10 text-white'
+                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                }`}
+                            >
+                              HTML
+                            </button>
+                          </>
+                        )}
+
+                        {/* Open in new window button - available for all users */}
                         <button
-                          onClick={() => setPrototypeSubTab('preview')}
-                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'preview'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            }`}
+                          onClick={handleOpenInNewTab}
+                          className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5"
+                          title="Открыть в новом окне"
                         >
-                          Preview
-                        </button>
-                        <button
-                          onClick={() => setPrototypeSubTab('dsl')}
-                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'dsl'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            }`}
-                        >
-                          DSL
-                        </button>
-                        <button
-                          onClick={() => setPrototypeSubTab('html')}
-                          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'html'
-                            ? 'bg-white/10 text-white'
-                            : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                            }`}
-                        >
-                          HTML
+                          <ExternalLink size={14} />
+                          <span>Открыть</span>
                         </button>
                       </div>
                     )}

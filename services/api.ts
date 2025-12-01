@@ -655,6 +655,18 @@ export const api = {
   async getUsers() {
     return request<{ users: ApiAdminUser[]; totalUsers: number; totalProjects: number }>('/admin/users');
   },
+
+  // Public Prototype API
+  async createPublicPrototype(fileId: string) {
+    return request<{ hash: string; url: string }>(`/public/prototypes`, {
+      method: 'POST',
+      body: JSON.stringify({ fileId }),
+    });
+  },
+
+  async getPublicPrototype(hash: string) {
+    return request<{ htmlContent: string }>(`/public/prototypes/${hash}`);
+  },
 };
 
 

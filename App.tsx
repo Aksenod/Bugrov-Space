@@ -14,6 +14,7 @@ import { AdminPage } from './components/AdminPage';
 import { OfferPage } from './components/OfferPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { RequisitesPage } from './components/RequisitesPage';
+import { PublicPrototypePage } from './components/PublicPrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -267,6 +268,7 @@ export default function App() {
   const [isOfferOpen, setIsOfferOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isRequisitesOpen, setIsRequisitesOpen] = useState(false);
+  const [prototypeHash, setPrototypeHash] = useState<string | null>(null);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -608,12 +610,16 @@ export default function App() {
         setIsPrivacyOpen(true);
       } else if (hash === '#/requisites') {
         setIsRequisitesOpen(true);
+      } else if (hash.startsWith('#/prototype/')) {
+        const hashValue = hash.replace('#/prototype/', '');
+        setPrototypeHash(hashValue);
       } else if (hash === '') {
         // Закрываем все открытые страницы
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
         setIsRequisitesOpen(false);
+        setPrototypeHash(null);
         setAdminInitialAgentId(undefined);
       }
     };
@@ -630,6 +636,9 @@ export default function App() {
       setIsPrivacyOpen(true);
     } else if (hash === '#/requisites') {
       setIsRequisitesOpen(true);
+    } else if (hash.startsWith('#/prototype/')) {
+      const hashValue = hash.replace('#/prototype/', '');
+      setPrototypeHash(hashValue);
     }
 
     return () => {
@@ -1561,6 +1570,18 @@ export default function App() {
     return <RequisitesPage
       onClose={() => {
         setIsRequisitesOpen(false);
+        window.location.hash = '';
+        window.history.replaceState(null, '', window.location.pathname);
+      }}
+    />;
+  }
+
+  if (prototypeHash || window.location.hash.startsWith('#/prototype/')) {
+    const hash = prototypeHash || window.location.hash.replace('#/prototype/', '');
+    return <PublicPrototypePage
+      prototypeHash={hash}
+      onClose={() => {
+        setPrototypeHash(null);
         window.location.hash = '';
         window.history.replaceState(null, '', window.location.pathname);
       }}
