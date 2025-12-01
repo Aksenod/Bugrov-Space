@@ -33,7 +33,6 @@ jobs:
 
       - name: Setup GitHub Pages files
         run: |
-          cp 404.html dist/404.html
           echo '' > dist/.nojekyll
 
       - name: Deploy to gh-pages
@@ -44,12 +43,26 @@ jobs:
           destination_dir: pr-${{ github.event.pull_request.number }}
           keep_files: true
 
+      - name: Update root 404.html in gh-pages
+        run: |
+          mkdir -p temp-404
+          cp 404.html temp-404/404.html
+
+      - name: Deploy root 404.html to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./temp-404
+          destination_dir: .
+          keep_files: true
+          allow_empty_commit: false
+
       - name: Comment PR with preview link
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = `https://bugrov.space/pr-${prNumber}/`;
+            const previewUrl = 'https://bugrov.space/pr-' + prNumber + '/';
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({

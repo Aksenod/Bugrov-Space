@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain, Briefcase, FileText, MessageSquare } from 'lucide-react';
+import { Bot, Settings, Trash2, Menu, AlertCircle, Zap, Cpu, Brain, Briefcase, FileText } from 'lucide-react';
 
 import { Message, Role, LLMModel, MODELS, UploadedFile, Agent, User, Project, ProjectType } from './types';
 import { MessageBubble } from './components/MessageBubble';
@@ -7,8 +7,12 @@ import { MessageSkeleton } from './components/MessageSkeleton';
 import { ChatInput } from './components/ChatInput';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
+import { Footer } from './components/Footer';
 import { AuthPage } from './components/AuthPage';
 import { AdminPage } from './components/AdminPage';
+import { OfferPage } from './components/OfferPage';
+import { PrivacyPage } from './components/PrivacyPage';
+import { RequisitesPage } from './components/RequisitesPage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -257,6 +261,9 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isOfferOpen, setIsOfferOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isRequisitesOpen, setIsRequisitesOpen] = useState(false);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -584,28 +591,48 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentUser, activeAgent, isDocsOpen, isSidebarOpen]);
 
-  // Проверяем, находимся ли мы на странице админ-панели
+  // Проверяем, находимся ли мы на странице админ-панели или документов
   // ВАЖНО: Этот хук должен быть вызван ДО условного возврата, чтобы соблюдать правила хуков
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash === '#/admin') {
+      const hash = window.location.hash;
+
+      if (hash === '#/admin') {
         setIsAdminOpen(true);
-      } else if (window.location.hash === '' && isAdminOpen) {
+      } else if (hash === '#/offer') {
+        setIsOfferOpen(true);
+      } else if (hash === '#/privacy') {
+        setIsPrivacyOpen(true);
+      } else if (hash === '#/requisites') {
+        setIsRequisitesOpen(true);
+      } else if (hash === '') {
+        // Закрываем все открытые страницы
         setIsAdminOpen(false);
+        setIsOfferOpen(false);
+        setIsPrivacyOpen(false);
+        setIsRequisitesOpen(false);
         setAdminInitialAgentId(undefined);
       }
     };
 
     window.addEventListener('hashchange', handleHashChange);
+
     // Проверяем при монтировании
-    if (window.location.hash === '#/admin') {
+    const hash = window.location.hash;
+    if (hash === '#/admin') {
       setIsAdminOpen(true);
+    } else if (hash === '#/offer') {
+      setIsOfferOpen(true);
+    } else if (hash === '#/privacy') {
+      setIsPrivacyOpen(true);
+    } else if (hash === '#/requisites') {
+      setIsRequisitesOpen(true);
     }
 
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [isAdminOpen]);
+  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
@@ -1452,6 +1479,36 @@ export default function App() {
     />;
   }
 
+  if (isOfferOpen || window.location.hash === '#/offer') {
+    return <OfferPage
+      onClose={() => {
+        setIsOfferOpen(false);
+        window.location.hash = '';
+        window.history.replaceState(null, '', window.location.pathname);
+      }}
+    />;
+  }
+
+  if (isPrivacyOpen || window.location.hash === '#/privacy') {
+    return <PrivacyPage
+      onClose={() => {
+        setIsPrivacyOpen(false);
+        window.location.hash = '';
+        window.history.replaceState(null, '', window.location.pathname);
+      }}
+    />;
+  }
+
+  if (isRequisitesOpen || window.location.hash === '#/requisites') {
+    return <RequisitesPage
+      onClose={() => {
+        setIsRequisitesOpen(false);
+        window.location.hash = '';
+        window.history.replaceState(null, '', window.location.pathname);
+      }}
+    />;
+  }
+
   return (
     <div className="flex h-full bg-gradient-to-br from-black via-black to-indigo-950/20 text-white font-sans overflow-hidden">
       <AgentSidebar
@@ -1634,6 +1691,8 @@ export default function App() {
             <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
               <ChatInput onSend={handleSendMessage} disabled={isLoading || !activeAgent} />
             </div>
+
+            <Footer telegramUsername="BugrovExperience" />
           </>
         )}
       </main>
