@@ -176,7 +176,7 @@ router.delete('/:id', authMiddleware, adminMiddleware, asyncHandler(async (req: 
 
   // Проверяем, что нет проектов с этим типом
   if (existing._count.projects > 0) {
-    return res.status(409).json({ 
+    return res.status(409).json({
       error: 'Нельзя удалить тип проекта, так как существуют проекты с этим типом',
       message: `Существует ${existing._count.projects} проект(ов) с этим типом`
     });
@@ -194,8 +194,8 @@ router.delete('/:id', authMiddleware, adminMiddleware, asyncHandler(async (req: 
   res.status(204).send();
 }));
 
-// GET /:id/agents - получить агентов типа проекта
-router.get('/:id/agents', asyncHandler(async (req: Request, res: Response) => {
+// GET /:id/agents - получить агентов типа проекта (требует аутентификации)
+router.get('/:id/agents', authMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Проверяем, что тип проекта существует
@@ -290,8 +290,8 @@ router.post('/:id/agents/reorder', authMiddleware, adminMiddleware, asyncHandler
   ) as any[];
 
   if (agentConnections.length !== agentIds.length) {
-    return res.status(400).json({ 
-      error: 'Один или несколько агентов не привязаны к этому типу проекта' 
+    return res.status(400).json({
+      error: 'Один или несколько агентов не привязаны к этому типу проекта'
     });
   }
 
