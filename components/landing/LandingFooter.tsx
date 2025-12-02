@@ -56,16 +56,16 @@ export const LandingFooter: React.FC = () => {
             <h4 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-6">Контакты</h4>
             <div className="space-y-4">
               <a
-                href="mailto:support@bugrov.space"
+                href="mailto:Dan.bugrov@yandex.ru"
                 className="flex items-center gap-3 text-white/60 hover:text-white transition-colors group"
               >
                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
                   <Mail className="w-5 h-5" />
                 </div>
-                <span>support@bugrov.space</span>
+                <span>Dan.bugrov@yandex.ru</span>
               </a>
               <a
-                href="https://t.me/bugrovspace"
+                href="https://t.me/BugrovExperience"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 text-white/60 hover:text-white transition-colors group"
@@ -73,7 +73,7 @@ export const LandingFooter: React.FC = () => {
                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
                   <Send className="w-5 h-5" />
                 </div>
-                <span>@bugrovspace</span>
+                <span>@BugrovExperience</span>
               </a>
             </div>
 
@@ -81,7 +81,7 @@ export const LandingFooter: React.FC = () => {
             <div className="mt-6 pt-6 border-t border-white/10">
               <p className="text-sm text-white/40 mb-2">Сообщество:</p>
               <a
-                href="https://t.me/bugrovspace_community"
+                href="https://t.me/BUGROVDEN"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"

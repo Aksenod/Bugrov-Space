@@ -53,49 +53,51 @@ export const PainPointsSection: React.FC = () => {
                 className="relative group"
               >
                 {/* Card */}
-                <div className="relative h-full bg-gradient-to-b from-white/5 to-white/[0.02] backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-indigo-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10">
+                <div className="relative h-full bg-[#0A0A0A] backdrop-blur-xl rounded-2xl p-8 border border-white/10 hover:border-indigo-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 overflow-hidden">
+                  {/* Glow effect */}
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/10 transition-colors duration-500"></div>
+
                   {/* Icon */}
-                  <div className="mb-6 inline-flex p-3 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                  <div className="relative mb-8 inline-flex p-4 bg-white/5 rounded-2xl border border-white/10 group-hover:border-indigo-500/30 transition-colors">
                     <Icon className="w-8 h-8 text-indigo-400" />
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-xl font-bold text-white mb-6">
+                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight">
                     {point.title}
                   </h3>
 
-                  {/* Before */}
-                  <div className="mb-4">
-                    <div className="inline-block px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full mb-2">
-                      <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Было</span>
+                  <div className="relative space-y-6">
+                    {/* Before */}
+                    <div>
+                      <div className="inline-flex items-center px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full mb-3">
+                        <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Было</span>
+                      </div>
+                      <p className="text-white/60 text-sm leading-relaxed">
+                        {point.before}
+                      </p>
                     </div>
-                    <p className="text-white/60 text-sm leading-relaxed">
-                      {point.before}
-                    </p>
-                  </div>
 
-                  {/* Solution */}
-                  <div className="mb-4">
-                    <div className="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full mb-2">
-                      <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Что даём</span>
+                    {/* Solution */}
+                    <div>
+                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full mb-3">
+                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Что даём</span>
+                      </div>
+                      <p className="text-white/60 text-sm leading-relaxed">
+                        {point.solution}
+                      </p>
                     </div>
-                    <p className="text-white/60 text-sm leading-relaxed">
-                      {point.solution}
-                    </p>
-                  </div>
 
-                  {/* Result */}
-                  <div>
-                    <div className="inline-block px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-2">
-                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Результат</span>
+                    {/* Result */}
+                    <div className="pt-4 border-t border-white/5">
+                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-3">
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Результат</span>
+                      </div>
+                      <p className="text-white text-sm leading-relaxed font-medium">
+                        {point.result}
+                      </p>
                     </div>
-                    <p className="text-white/80 text-sm leading-relaxed font-medium">
-                      {point.result}
-                    </p>
                   </div>
-
-                  {/* Decorative gradient */}
-                  <div className="absolute -top-px left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </div>
               </div>
             );
