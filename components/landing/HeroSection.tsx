@@ -20,7 +20,7 @@ export const HeroSection: React.FC = () => {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
                 15 минут
               </span>{' '}
-              вместо 2–3 недель
+              вместо недели
             </h1>
 
             {/* Subtitle */}
@@ -33,7 +33,7 @@ export const HeroSection: React.FC = () => {
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <CheckCircle className="w-6 h-6 text-indigo-400 flex-shrink-0 mt-0.5" />
-                <p className="text-white/90">Экономия 2–3 недель на ресёрч, структуру и тексты</p>
+                <p className="text-white/90">Экономия недели на ресёрч, структуру и тексты</p>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle className="w-6 h-6 text-indigo-400 flex-shrink-0 mt-0.5" />

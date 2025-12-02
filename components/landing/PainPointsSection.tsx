@@ -34,7 +34,7 @@ export const PainPointsSection: React.FC = () => {
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
             Если вы делаете{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-              5–30 проектов
+              от 1 проекта
             </span>{' '}
             в месяц — это про вас
           </h2>
