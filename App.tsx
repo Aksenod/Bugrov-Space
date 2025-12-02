@@ -1548,10 +1548,7 @@ export default function App() {
     return <LandingPage />;
   }
 
-  const authView = renderAuthOrLoader();
-  if (authView) {
-    return authView;
-  }
+  // Auth check moved down to allow public access to legal pages
 
   if (isAdminOpen || window.location.hash === '#/admin') {
     return <AdminPage
@@ -1608,6 +1605,11 @@ export default function App() {
         window.history.replaceState(null, '', window.location.pathname);
       }}
     />;
+  }
+
+  const authView = renderAuthOrLoader();
+  if (authView) {
+    return authView;
   }
 
   return (
