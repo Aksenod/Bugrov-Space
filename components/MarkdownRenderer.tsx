@@ -19,13 +19,13 @@ const loadSyntaxHighlighter = async () => {
 };
 
 // Компонент-обертка для SyntaxHighlighter с динамической загрузкой
-const SyntaxHighlighterWrapper: React.FC<{ language: string; children: string; [key: string]: any }> = ({ language, children, ...props }) => {
+const SyntaxHighlighterWrapper: React.FC<{ language: string; children: string;[key: string]: any }> = ({ language, children, ...props }) => {
   const [isReady, setIsReady] = React.useState(false);
   const [highlighter, setHighlighter] = React.useState<any>(null);
 
   React.useEffect(() => {
     let mounted = true;
-    
+
     loadSyntaxHighlighter().then(({ SyntaxHighlighter: SH, vscDarkPlus: style }) => {
       if (mounted) {
         setHighlighter({ Component: SH, style });
@@ -129,7 +129,7 @@ ${html}
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isCompact = false }) => {
   const lineHeightClass = isCompact ? 'leading-[1.5]' : 'leading-relaxed';
   const [htmlPreviews, setHtmlPreviews] = React.useState<{ [key: string]: boolean }>({});
-  
+
   // Простая функция для создания хеша строки
   const hashString = (str: string): string => {
     let hash = 0;
@@ -149,12 +149,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           code({ node, inline, className, children, ...props }: any) {
             const match = /language-(\w+)/.exec(className || '');
             const codeContent = String(children).replace(/\n$/, '');
-            
+
             // Для HTML блоков показываем превью вместо кода
             if (!inline && match && match[1] === 'html') {
               const blockId = `html-${hashString(codeContent)}`;
               const showPreview = htmlPreviews[blockId] !== false; // По умолчанию показываем превью
-              
+
               return (
                 <div className="my-0 relative" style={{ marginTop: 0, marginBottom: 0 }}>
                   {showPreview ? (
@@ -203,7 +203,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
                 </div>
               );
             }
-            
+
             return !inline && match ? (
               <SyntaxHighlighterWrapper language={match[1]} {...props}>
                 {codeContent}
@@ -218,7 +218,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             return <ul className={`list-disc ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`}>{children}</ul>;
           },
           ol({ children }) {
-            return <ol className={`list-decimal ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`}>{children}</ol>;
+            return <ol className={`list-decimal ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`} style={{ counterReset: 'list-counter' }}>{children}</ol>;
+          },
+          li({ children }) {
+            return <li className="[counter-increment:list-counter]" style={{ display: 'list-item' }}>{children}</li>;
           },
           a({ href, children }) {
             return (
