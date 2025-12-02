@@ -86,49 +86,51 @@ export const AgentChainsSection: React.FC = () => {
                 className="relative group"
               >
                 {/* Card */}
-                <div className={`relative h-full bg-gradient-to-b from-white/5 to-white/[0.02] backdrop-blur-sm rounded-2xl p-8 border border-white/10 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow}`}>
+                <div className={`relative h-full bg-[#0A0A0A] backdrop-blur-xl rounded-2xl p-8 border border-white/10 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden`}>
+                  {/* Glow effect */}
+                  <div className={`absolute top-0 right-0 w-64 h-64 ${colors.iconBg.replace('/10', '/5')} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-500`}></div>
+
                   {/* Icon */}
-                  <div className={`mb-6 inline-flex p-3 ${colors.iconBg} rounded-xl border ${colors.iconBorder}`}>
+                  <div className={`relative mb-8 inline-flex p-4 bg-white/5 rounded-2xl border border-white/10 ${colors.cardBorder} transition-colors`}>
                     <Icon className={`w-8 h-8 ${colors.iconColor}`} />
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-xl font-bold text-white mb-4">
+                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight">
                     {scenario.title}
                   </h3>
 
-                  {/* Agents flow */}
-                  <div className="mb-6">
-                    <div className="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full mb-3">
-                      <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Агенты</span>
+                  <div className="relative space-y-6">
+                    {/* Agents flow */}
+                    <div>
+                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full mb-3">
+                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Агенты</span>
+                      </div>
+                      <p className="text-white/60 text-sm leading-relaxed">
+                        {scenario.agents}
+                      </p>
                     </div>
-                    <p className="text-white/60 text-sm leading-relaxed">
-                      {scenario.agents}
-                    </p>
-                  </div>
 
-                  {/* Result */}
-                  <div className="mb-6">
-                    <div className="inline-block px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-3">
-                      <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Результат</span>
+                    {/* Result */}
+                    <div>
+                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-3">
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Результат</span>
+                      </div>
+                      <p className="text-white text-sm leading-relaxed font-medium">
+                        {scenario.result}
+                      </p>
                     </div>
-                    <p className="text-white/80 text-sm leading-relaxed font-medium">
-                      {scenario.result}
-                    </p>
-                  </div>
 
-                  {/* Use cases */}
-                  <div>
-                    <div className="inline-block px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full mb-3">
-                      <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Для чего</span>
+                    {/* Use cases */}
+                    <div className="pt-4 border-t border-white/5">
+                      <div className={`inline-flex items-center px-3 py-1 ${colors.iconBg} border ${colors.iconBorder} rounded-full mb-3`}>
+                        <span className={`text-[10px] font-bold ${colors.iconColor} uppercase tracking-widest`}>Для чего</span>
+                      </div>
+                      <p className="text-white/60 text-sm leading-relaxed">
+                        {scenario.useCases}
+                      </p>
                     </div>
-                    <p className="text-white/60 text-sm leading-relaxed">
-                      {scenario.useCases}
-                    </p>
                   </div>
-
-                  {/* Decorative gradient */}
-                  <div className={`absolute -top-px left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent ${colors.gradientTop} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
                 </div>
               </div>
             );
