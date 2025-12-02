@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu } from 'lucide-react';
+import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu, Sparkles } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { DragEndEvent } from '@dnd-kit/core';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile, ApiAdminUser } from '../services/api';
