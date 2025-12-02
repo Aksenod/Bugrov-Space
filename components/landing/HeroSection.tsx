@@ -14,6 +14,24 @@ export const HeroSection: React.FC = () => {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left column - Text content */}
           <div className="text-white space-y-8">
+            {/* Media placeholder - mobile only, before heading */}
+            <div className="relative lg:hidden mb-8">
+              <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
+                {/* Placeholder for future image/video */}
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl backdrop-blur-sm border border-white/10 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto bg-white/10 rounded-full flex items-center justify-center">
+                      <Zap className="w-8 h-8 text-indigo-400" />
+                    </div>
+                    <p className="text-white/60 text-sm">Место для медиа</p>
+                  </div>
+                </div>
+                {/* Decorative elements */}
+                <div className="absolute -top-2 -right-2 w-16 h-16 bg-indigo-500/30 rounded-full blur-xl"></div>
+                <div className="absolute -bottom-2 -left-2 w-20 h-20 bg-purple-500/30 rounded-full blur-xl"></div>
+              </div>
+            </div>
+
             {/* H1 */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
               Прототип проекта за{' '}
@@ -76,7 +94,7 @@ export const HeroSection: React.FC = () => {
             </div>
           </div>
 
-          {/* Right column - Media placeholder */}
+          {/* Right column - Media placeholder (desktop only) */}
           <div className="relative hidden lg:block">
             <div className="relative aspect-square max-w-lg mx-auto">
               {/* Placeholder for future image/video */}
