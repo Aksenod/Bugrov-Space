@@ -1,12 +1,69 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { UploadedFile, Agent, Project, User } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
 import { InlineHint } from './InlineHint';
 import { useOnboarding } from './OnboardingContext';
+
+// Динамический импорт для оптимизации и совместимости с React 19
+let SyntaxHighlighter: any = null;
+let vscDarkPlus: any = null;
+
+const loadSyntaxHighlighter = async () => {
+  if (!SyntaxHighlighter) {
+    const module = await import('react-syntax-highlighter');
+    SyntaxHighlighter = module.Prism;
+  }
+  if (!vscDarkPlus) {
+    const styleModule = await import('react-syntax-highlighter/dist/esm/styles/prism');
+    vscDarkPlus = styleModule.vscDarkPlus;
+  }
+  return { SyntaxHighlighter, vscDarkPlus };
+};
+
+// Компонент-обертка для SyntaxHighlighter
+const SyntaxHighlighterWrapper: React.FC<{ language: string; children: string; isFullscreenView?: boolean }> = ({ language, children, isFullscreenView }) => {
+  const [isReady, setIsReady] = useState(false);
+  const [highlighter, setHighlighter] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    loadSyntaxHighlighter().then(({ SyntaxHighlighter: SH, vscDarkPlus: style }) => {
+      if (mounted) {
+        setHighlighter({ Component: SH, style });
+        setIsReady(true);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  if (!isReady || !highlighter) {
+    return (
+      <div className="bg-black/50 p-4 rounded-xl border border-white/10 font-mono text-sm text-white/70">
+        {children}
+      </div>
+    );
+  }
+
+  const { Component, style } = highlighter;
+  return (
+    <Component
+      style={style}
+      language={language}
+      PreTag="div"
+      customStyle={{
+        margin: 0,
+        borderRadius: isFullscreenView ? '1.5rem' : '1rem',
+        padding: isFullscreenView ? '1.5rem' : '1.5rem',
+        minHeight: 0,
+        maxHeight: '100%',
+      }}
+    >
+      {children}
+    </Component>
+  );
+};
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
 
@@ -532,20 +589,12 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       if (content) {
         return (
           <div className="overflow-auto w-full flex-1 flex flex-col" style={{ minHeight: 0, maxHeight: '100%' }}>
-            <SyntaxHighlighter
-              style={vscDarkPlus}
+            <SyntaxHighlighterWrapper
               language={prototypeSubTab === 'dsl' ? 'markdown' : 'html'}
-              PreTag="div"
-              customStyle={{
-                margin: 0,
-                borderRadius: isFullscreenView ? '1.5rem' : '1rem',
-                padding: isFullscreenView ? '1.5rem' : '1.5rem',
-                minHeight: 0,
-                maxHeight: '100%',
-              }}
+              isFullscreenView={isFullscreenView}
             >
               {content}
-            </SyntaxHighlighter>
+            </SyntaxHighlighterWrapper>
           </div>
         );
       }
