@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown } from 'lucide-react';
+import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { DragEndEvent } from '@dnd-kit/core';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile, ApiAdminUser } from '../services/api';
@@ -1139,8 +1139,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
             <button
               onClick={() => setActiveTab('agents')}
               className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${activeTab === 'agents'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
                 }`}
             >
               Агенты
@@ -1148,8 +1148,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
             <button
               onClick={() => setActiveTab('projectTypes')}
               className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${activeTab === 'projectTypes'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
                 }`}
             >
               Типы проектов
@@ -1157,8 +1157,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
             <button
               onClick={() => setActiveTab('users')}
               className={`flex-1 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${activeTab === 'users'
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
                 }`}
             >
               Пользователи
@@ -1342,8 +1342,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                       value={agentName}
                       onChange={(e) => setAgentName(e.target.value)}
                       className={`w-full bg-black/40 border rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 pl-8 sm:pl-10 pr-14 sm:pr-20 text-xs sm:text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${!agentName.trim()
-                          ? 'border-red-500/30 focus:border-red-500/50'
-                          : 'border-white/10'
+                        ? 'border-red-500/30 focus:border-red-500/50'
+                        : 'border-white/10'
                         }`}
                       placeholder="Например: Ассистент по маркетингу"
                       maxLength={100}
@@ -1408,8 +1408,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                     value={agentSystemInstruction}
                     onChange={(e) => setAgentSystemInstruction(e.target.value)}
                     className={`w-full h-32 sm:h-40 bg-black/40 border rounded-lg sm:rounded-xl p-2 sm:p-3 text-xs text-white/90 focus:ring-2 focus:ring-amber-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed font-mono ${!agentSystemInstruction.trim()
-                        ? 'border-red-500/30 focus:border-red-500/50'
-                        : 'border-white/10'
+                      ? 'border-red-500/30 focus:border-red-500/50'
+                      : 'border-white/10'
                       }`}
                     placeholder="Ты - полезный AI-ассистент. Твоя задача - помогать пользователям..."
                     maxLength={5000}
@@ -1543,8 +1543,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                                     setIsModelDropdownOpen(false);
                                   }}
                                   className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${isSelected
-                                      ? 'bg-purple-500/10 hover:bg-purple-500/15'
-                                      : 'hover:bg-white/5'
+                                    ? 'bg-purple-500/10 hover:bg-purple-500/15'
+                                    : 'hover:bg-white/5'
                                     }`}
                                 >
                                   <div className={`p-2 rounded-lg shrink-0 ${isSelected ? 'bg-purple-500/30' : 'bg-white/5'
@@ -1715,8 +1715,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                                   <label
                                     key={type.id}
                                     className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${isSelected
-                                        ? 'bg-cyan-500/10 hover:bg-cyan-500/15'
-                                        : 'hover:bg-white/5'
+                                      ? 'bg-cyan-500/10 hover:bg-cyan-500/15'
+                                      : 'hover:bg-white/5'
                                       }`}
                                     onClick={(e) => e.stopPropagation()}
                                   >
@@ -1825,8 +1825,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                                     setIsRoleDropdownOpen(false);
                                   }}
                                   className={`w-full flex items-center gap-3 px-4 py-3 transition-colors ${isSelected
-                                      ? 'bg-cyan-500/10 hover:bg-cyan-500/15'
-                                      : 'hover:bg-white/5'
+                                    ? 'bg-cyan-500/10 hover:bg-cyan-500/15'
+                                    : 'hover:bg-white/5'
                                     }`}
                                 >
                                   {Icon ? (
@@ -1882,8 +1882,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       className={`border-2 border-dashed rounded-lg sm:rounded-xl p-4 sm:p-6 text-center transition-all group mb-2 sm:mb-3 ${isUploadingFiles
-                          ? 'border-emerald-500/20 bg-emerald-500/5 cursor-wait opacity-60'
-                          : 'border-emerald-500/30 hover:border-emerald-400/60 hover:bg-emerald-500/10 bg-emerald-500/5 cursor-pointer'
+                        ? 'border-emerald-500/20 bg-emerald-500/5 cursor-wait opacity-60'
+                        : 'border-emerald-500/30 hover:border-emerald-400/60 hover:bg-emerald-500/10 bg-emerald-500/5 cursor-pointer'
                         }`}
                     >
                       {isUploadingFiles ? (
