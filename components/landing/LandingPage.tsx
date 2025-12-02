@@ -5,11 +5,14 @@ import { AgentChainsSection } from './AgentChainsSection';
 import { PricingSection } from './PricingSection';
 import { FAQSection } from './FAQSection';
 import { LandingFooter } from './LandingFooter';
+import { LandingHeader } from './LandingHeader';
 
 export const LandingPage: React.FC = () => {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-black">
       <div className="relative min-h-screen text-white">
+        {/* Header */}
+        <LandingHeader />
         {/* Hero Section */}
         <HeroSection />
 
