@@ -311,9 +311,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   };
 
 
-  if (!isOpen) return null;
-
-
   const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
 
   // Timer for prototype generation - calculates duration based on content size
@@ -334,6 +331,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
     return () => clearInterval(interval);
   }, [isGeneratingPrototype, selectedFile]);
+
+  if (!isOpen) return null;
 
 
   // Находим агента-создателя документа
