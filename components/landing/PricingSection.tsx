@@ -34,14 +34,14 @@ export const PricingSection: React.FC = () => {
             {/* Card */}
             <div className="relative bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden">
               {/* Badge */}
-              <div className="absolute top-0 right-0 m-6">
-                <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full border border-white/20">
+              <div className="relative sm:absolute sm:top-0 sm:right-0 p-6 sm:p-0 sm:m-6 pb-0 sm:pb-0">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full border border-white/20">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
                   <span className="text-sm font-semibold text-white">Для фрилансеров и мини‑студий</span>
                 </div>
               </div>
 
-              <div className="p-8 sm:p-12">
+              <div className="p-8 sm:p-12 pt-6 sm:pt-12">
                 {/* Plan name and price */}
                 <div className="mb-8">
                   <h3 className="text-2xl font-bold text-white mb-4">Тариф «Pro»</h3>
