@@ -68,6 +68,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -257,6 +258,25 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
 
   const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
+
+  // Timer for prototype generation - calculates duration based on content size
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isGeneratingPrototype && selectedFile) {
+      // Calculate estimated time based on content size
+      const contentSize = decodeContent(selectedFile.data).length;
+      // Formula: 30s base + 1s per 100 characters, min 30s, max 180s
+      const estimatedSeconds = Math.min(180, Math.max(30, 30 + Math.floor(contentSize / 100)));
+
+      setTimeLeft(estimatedSeconds);
+      interval = setInterval(() => {
+        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      setTimeLeft(null);
+    }
+    return () => clearInterval(interval);
+  }, [isGeneratingPrototype, selectedFile]);
 
 
   // Находим агента-создателя документа
@@ -739,8 +759,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                             disabled={isGeneratingPrototype}
                             className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                           >
-                            {isGeneratingPrototype && <Loader2 size={14} className="animate-spin" />}
-                            Сгенерировать прототип
+                            {isGeneratingPrototype ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                Генерация... ({timeLeft}s)
+                              </>
+                            ) : (
+                              "Сгенерировать прототип"
+                            )}
                           </button>
                         )}
                       </div>
