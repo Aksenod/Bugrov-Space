@@ -86,35 +86,35 @@ export const AgentChainsSection: React.FC = () => {
                 className="relative group"
               >
                 {/* Card */}
-                <div className={`relative h-full bg-[#0A0A0A] backdrop-blur-xl rounded-2xl p-8 border border-white/10 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden`}>
+                <div className={`relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-8 border border-white/20 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden group-hover:-translate-y-1`}>
                   {/* Glow effect */}
-                  <div className={`absolute top-0 right-0 w-64 h-64 ${colors.iconBg.replace('/10', '/5')} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-500`}></div>
+                  <div className={`absolute top-0 right-0 w-64 h-64 ${colors.iconBg.replace('/10', '/20')} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-500`}></div>
 
                   {/* Icon */}
-                  <div className={`relative mb-8 inline-flex p-4 bg-white/5 rounded-2xl border border-white/10 ${colors.cardBorder} transition-colors`}>
+                  <div className={`relative mb-8 inline-flex p-4 bg-gradient-to-br from-white/10 to-transparent rounded-2xl border border-white/20 ${colors.cardBorder} group-hover:scale-110 transition-all duration-300 shadow-lg shadow-black/20`}>
                     <Icon className={`w-8 h-8 ${colors.iconColor}`} />
                   </div>
 
                   {/* Title */}
-                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight">
+                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight group-hover:text-white transition-colors">
                     {scenario.title}
                   </h3>
 
                   <div className="relative space-y-6">
                     {/* Agents flow */}
                     <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full mb-3">
-                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Агенты</span>
+                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full mb-3 shadow-sm shadow-blue-900/20">
+                        <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Агенты</span>
                       </div>
-                      <p className="text-white/60 text-sm leading-relaxed">
+                      <p className="text-white/70 text-sm leading-relaxed">
                         {scenario.agents}
                       </p>
                     </div>
 
                     {/* Result */}
                     <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-3">
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Результат</span>
+                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full mb-3 shadow-sm shadow-emerald-900/20">
+                        <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Результат</span>
                       </div>
                       <p className="text-white text-sm leading-relaxed font-medium">
                         {scenario.result}
@@ -122,11 +122,11 @@ export const AgentChainsSection: React.FC = () => {
                     </div>
 
                     {/* Use cases */}
-                    <div className="pt-4 border-t border-white/5">
-                      <div className={`inline-flex items-center px-3 py-1 ${colors.iconBg} border ${colors.iconBorder} rounded-full mb-3`}>
-                        <span className={`text-[10px] font-bold ${colors.iconColor} uppercase tracking-widest`}>Для чего</span>
+                    <div className="pt-4 border-t border-white/10">
+                      <div className={`inline-flex items-center px-3 py-1 ${colors.iconBg.replace('/10', '/20')} border ${colors.iconBorder.replace('/20', '/30')} rounded-full mb-3 shadow-sm`}>
+                        <span className={`text-[10px] font-bold ${colors.iconColor.replace('400', '300')} uppercase tracking-widest`}>Для чего</span>
                       </div>
-                      <p className="text-white/60 text-sm leading-relaxed">
+                      <p className="text-white/70 text-sm leading-relaxed">
                         {scenario.useCases}
                       </p>
                     </div>

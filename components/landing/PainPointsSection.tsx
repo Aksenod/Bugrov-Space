@@ -53,45 +53,45 @@ export const PainPointsSection: React.FC = () => {
                 className="relative group"
               >
                 {/* Card */}
-                <div className="relative h-full bg-[#0A0A0A] backdrop-blur-xl rounded-2xl p-8 border border-white/10 hover:border-indigo-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 overflow-hidden">
+                <div className="relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-8 border border-white/20 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/20 overflow-hidden group-hover:-translate-y-1">
                   {/* Glow effect */}
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/10 transition-colors duration-500"></div>
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/20 transition-colors duration-500"></div>
 
                   {/* Icon */}
-                  <div className="relative mb-8 inline-flex p-4 bg-white/5 rounded-2xl border border-white/10 group-hover:border-indigo-500/30 transition-colors">
-                    <Icon className="w-8 h-8 text-indigo-400" />
+                  <div className="relative mb-8 inline-flex p-4 bg-gradient-to-br from-white/10 to-transparent rounded-2xl border border-white/20 group-hover:border-indigo-500/50 group-hover:scale-110 transition-all duration-300 shadow-lg shadow-black/20">
+                    <Icon className="w-8 h-8 text-indigo-300 group-hover:text-indigo-200 transition-colors" />
                   </div>
 
                   {/* Title */}
-                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight">
+                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight group-hover:text-indigo-100 transition-colors">
                     {point.title}
                   </h3>
 
                   <div className="relative space-y-6">
                     {/* Before */}
                     <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full mb-3">
-                        <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Было</span>
+                      <div className="inline-flex items-center px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full mb-3 shadow-sm shadow-red-900/20">
+                        <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">Было</span>
                       </div>
-                      <p className="text-white/60 text-sm leading-relaxed">
+                      <p className="text-white/70 text-sm leading-relaxed">
                         {point.before}
                       </p>
                     </div>
 
                     {/* Solution */}
                     <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full mb-3">
-                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Что даём</span>
+                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full mb-3 shadow-sm shadow-blue-900/20">
+                        <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Что даём</span>
                       </div>
-                      <p className="text-white/60 text-sm leading-relaxed">
+                      <p className="text-white/70 text-sm leading-relaxed">
                         {point.solution}
                       </p>
                     </div>
 
                     {/* Result */}
-                    <div className="pt-4 border-t border-white/5">
-                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-3">
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Результат</span>
+                    <div className="pt-4 border-t border-white/10">
+                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full mb-3 shadow-sm shadow-emerald-900/20">
+                        <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Результат</span>
                       </div>
                       <p className="text-white text-sm leading-relaxed font-medium">
                         {point.result}
