@@ -17,19 +17,13 @@ export const LandingHeader: React.FC = () => {
                         </span>
                     </div>
 
-                    {/* Auth Buttons */}
-                    <div className="flex items-center gap-3">
+                    {/* Auth Button */}
+                    <div className="flex items-center">
                         <button
                             onClick={() => window.location.hash = '#/auth'}
-                            className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-white/80 hover:text-white transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 bg-white/10 text-white rounded-full font-medium text-sm hover:bg-white/20 transition-all border border-white/20 hover:border-white/30"
                         >
                             Вход
-                        </button>
-                        <button
-                            onClick={() => window.location.hash = '#/auth'}
-                            className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-                        >
-                            Регистрация
                         </button>
                     </div>
                 </div>
