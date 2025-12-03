@@ -135,16 +135,6 @@ export const AgentChainsSection: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* CTA */}
-        <div className="text-center mt-12">
-          <button
-            onClick={() => window.location.hash = '#/auth'}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
-          >
-            Выбрать сценарий
-          </button>
-        </div>
       </div>
     </section>
   );
