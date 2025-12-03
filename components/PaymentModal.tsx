@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Check, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -24,24 +25,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
         setError(null);
 
         try {
-            const response = await fetch('http://localhost:3000/api/payment/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    amount: 1000.00,
-                    description: 'Подписка на Bugrov Space',
-                    returnUrl: window.location.href,
-                }),
+            const data = await api.createPayment({
+                amount: '1000.00',
+                description: 'Подписка на Bugrov Space',
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to initiate payment');
-            }
-
-            const data = await response.json();
             if (data.confirmationUrl) {
                 window.location.href = data.confirmationUrl;
             } else {
