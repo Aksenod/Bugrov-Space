@@ -1,5 +1,5 @@
 import React from 'react';
-import { UltraHeroSection } from './ultra/UltraHeroSection';
+import { UltraHeroSectionV2 } from './ultra/UltraHeroSectionV2';
 import { UltraProblemSection } from './ultra/UltraProblemSection';
 import { UltraSolutionSection } from './ultra/UltraSolutionSection';
 import { UltraPricingSection } from './ultra/UltraPricingSection';
@@ -7,14 +7,14 @@ import { UltraFAQSection } from './ultra/UltraFAQSection';
 import { UltraFooter } from './ultra/UltraFooter';
 import { LandingHeader } from './LandingHeader';
 
-interface UltraCreativeLandingPageProps {
+interface UltraCreativeLandingPageCompareProps {
     isAuthenticated?: boolean;
     username?: string;
     onOpenPayment?: () => void;
     onOpenCabinet?: () => void;
 }
 
-export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> = ({
+export const UltraCreativeLandingPageCompare: React.FC<UltraCreativeLandingPageCompareProps> = ({
     isAuthenticated = false,
     username,
     onOpenPayment = () => {},
@@ -23,9 +23,8 @@ export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> =
     return (
         <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-[#000000] text-white selection:bg-purple-500/30">
             <div className="relative min-h-screen">
-                {/* Enhanced Ambient Background Effects - упрощено */}
+                {/* Enhanced Ambient Background Effects */}
                 <div className="fixed inset-0 pointer-events-none z-0">
-                    {/* Animated Gradient Orbs - уменьшено количество */}
                     <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-purple-600/12 rounded-full blur-[120px] animate-blob will-change-transform" />
                     <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600/12 rounded-full blur-[120px] animate-blob will-change-transform" style={{ animationDelay: '2s' }} />
                 </div>
@@ -39,8 +38,17 @@ export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> =
                     />
                 </div>
 
-                {/* Hero Section */}
-                <UltraHeroSection isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
+                {/* Hero Section V2 */}
+                <UltraHeroSectionV2 isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
+
+                {/* Разделитель между секциями */}
+                <div className="relative z-10 py-8">
+                    <div className="container mx-auto px-4">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Problem Section */}
                 <UltraProblemSection />

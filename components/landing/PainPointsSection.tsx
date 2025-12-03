@@ -5,24 +5,24 @@ export const PainPointsSection: React.FC = () => {
   const painPoints = [
     {
       icon: Clock,
-      title: 'Рутинные структуры и тексты',
-      before: 'Каждый раз заново придумывать блоки и тексты',
-      solution: 'Готовые связки агентов под вашу задачу и ЦА',
-      result: 'Первый прототип через 15 минут, а не через неделю',
+      problem: 'Неделя на&nbsp;ресёрч и&nbsp;тексты, которые никто не&nbsp;оценит',
+      result: 'Готовый прототип с текстами за 15 минут',
+      metric: '40+ часов',
+      metricLabel: 'экономии',
     },
     {
       icon: Layers,
-      title: 'Клиенты хотят «вчера» и несколько вариантов',
-      before: '2–3 варианта проекта = ещё неделя работы',
-      solution: 'Несколько прототипов из одного брифа',
-      result: 'Все варианты на одном созвоне → быстрее согласование',
+      problem: 'Клиент просит 3&nbsp;варианта, а&nbsp;у&nbsp;вас есть время только на&nbsp;один',
+      result: 'Все варианты готовы за&nbsp;час — клиент выбирает на&nbsp;одном созвоне',
+      metric: 'неделя → 1 час',
+      metricLabel: 'вместо',
     },
     {
       icon: TrendingUp,
-      title: 'Давление по цене и просадка маржи',
-      before: 'Много ручной работы, которую клиент не хочет оплачивать',
-      solution: 'Автоматизированные сценарии для разных типов проектов',
-      result: 'Больше проектов в месяц без найма людей и падения маржи',
+      problem: 'Клиенты торгуются, а ручная работа съедает маржу',
+      result: 'Делаете на&nbsp;2–3&nbsp;проекта больше в&nbsp;месяц с&nbsp;той&nbsp;же командой',
+      metric: '+2–3 проекта',
+      metricLabel: 'в месяц',
     },
   ];
 
@@ -32,14 +32,14 @@ export const PainPointsSection: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
-            Если вы делаете{' '}
+            Экономьте{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-              от 1 проекта
+              40+ часов
             </span>{' '}
-            в месяц — это про вас
+            на&nbsp;каждом проекте — если делаете от&nbsp;1&nbsp;проекта в&nbsp;месяц, это уже окупается
           </h2>
           <p className="text-lg sm:text-xl text-white/70 max-w-3xl mx-auto">
-            Bugrov.Space экономит вам часы рутины на каждом проекте и помогает держать дедлайны без падения маржи.
+            Bugrov.Space экономит вам часы рутины на&nbsp;каждом проекте и&nbsp;помогает держать дедлайны без&nbsp;падения маржи.
           </p>
         </div>
 
@@ -53,49 +53,36 @@ export const PainPointsSection: React.FC = () => {
                 className="relative group"
               >
                 {/* Card */}
-                <div className="relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-8 border border-white/20 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/20 overflow-hidden group-hover:-translate-y-1">
+                <div className="relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-6 sm:p-8 border border-white/20 hover:border-indigo-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/20 overflow-hidden group-hover:-translate-y-1">
                   {/* Glow effect */}
                   <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/20 transition-colors duration-500"></div>
 
                   {/* Icon */}
-                  <div className="relative mb-8 inline-flex p-4 bg-gradient-to-br from-white/10 to-transparent rounded-2xl border border-white/20 group-hover:border-indigo-500/50 group-hover:scale-110 transition-all duration-300 shadow-lg shadow-black/20">
-                    <Icon className="w-8 h-8 text-indigo-300 group-hover:text-indigo-200 transition-colors" />
+                  <div className="relative mb-6 inline-flex p-3 bg-gradient-to-br from-white/10 to-transparent rounded-xl border border-white/20 group-hover:border-indigo-500/50 group-hover:scale-110 transition-all duration-300">
+                    <Icon className="w-6 h-6 text-indigo-300 group-hover:text-indigo-200 transition-colors" />
                   </div>
 
-                  {/* Title */}
-                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight group-hover:text-indigo-100 transition-colors">
-                    {point.title}
+                  {/* Problem */}
+                  <h3 className="relative text-lg sm:text-xl font-bold text-white/90 mb-4 leading-tight group-hover:text-white transition-colors">
+                    {point.problem}
                   </h3>
 
-                  <div className="relative space-y-6">
-                    {/* Before */}
-                    <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full mb-3 shadow-sm shadow-red-900/20">
-                        <span className="text-[10px] font-bold text-red-300 uppercase tracking-widest">Было</span>
-                      </div>
-                      <p className="text-white/70 text-sm leading-relaxed">
-                        {point.before}
-                      </p>
-                    </div>
-
-                    {/* Solution */}
-                    <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full mb-3 shadow-sm shadow-blue-900/20">
-                        <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Что даём</span>
-                      </div>
-                      <p className="text-white/70 text-sm leading-relaxed">
-                        {point.solution}
-                      </p>
-                    </div>
-
-                    {/* Result */}
-                    <div className="pt-4 border-t border-white/10">
-                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full mb-3 shadow-sm shadow-emerald-900/20">
-                        <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Результат</span>
-                      </div>
-                      <p className="text-white text-sm leading-relaxed font-medium">
+                  {/* Result - главный акцент */}
+                  <div className="relative pt-4 border-t border-emerald-500/30">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <p className="text-white text-base sm:text-lg leading-relaxed font-semibold flex-1">
                         {point.result}
                       </p>
+                    </div>
+                    
+                    {/* Metric */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
+                      <span className="text-sm font-bold text-emerald-300">
+                        {point.metric}
+                      </span>
+                      <span className="text-xs text-emerald-400/70">
+                        {point.metricLabel}
+                      </span>
                     </div>
                   </div>
                 </div>

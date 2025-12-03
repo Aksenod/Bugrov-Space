@@ -6,25 +6,22 @@ export const AgentChainsSection: React.FC = () => {
     {
       icon: Layout,
       title: 'Лендинги и сайты',
-      agents: 'Сегментация аудитории → Buyer Persona → UX‑архитектор → Копирайтер',
-      result: 'Готовый прототип с продающими текстами и структурой',
-      useCases: 'Лендинги, многостраничные сайты, портфолио',
+      result: 'Прототип с продающими текстами и структурой',
+      agentCount: '4 агента',
       color: 'indigo',
     },
     {
       icon: Share2,
       title: 'Продвижение в соцсетях',
-      agents: '7 специализированных агентов для создания контент-плана и материалов',
-      result: 'Стратегия продвижения, готовые посты, сценарии для рилсов',
-      useCases: 'Запуск проекта в соцсетях, контент-маркетинг',
+      result: 'Стратегия, готовые посты и сценарии для рилсов',
+      agentCount: '7 агентов',
       color: 'purple',
     },
     {
       icon: Smartphone,
-      title: 'Приложения и сервисы (скоро)',
-      agents: 'Связка агентов для проектирования интерфейсов и структуры',
-      result: 'UX-документация + прототип интерфейса',
-      useCases: 'Мобильные и веб-приложения, SaaS-сервисы',
+      title: 'Приложения и сервисы',
+      result: 'UX-документация и прототип интерфейса',
+      agentCount: 'Скоро',
       color: 'emerald',
     },
   ];
@@ -66,11 +63,10 @@ export const AgentChainsSection: React.FC = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
               AI‑агентов
             </span>{' '}
-            под разные типы проектов
+            под&nbsp;разные задачи
           </h2>
           <p className="text-lg sm:text-xl text-white/70 max-w-3xl mx-auto">
-            Вы выбираете нужный сценарий и заполняете бриф. Связка агентов автоматически проходит все этапы
-            и выдаёт готовый прототип, которым можно поделиться с заказчиком.
+            Выбираете сценарий → заполняете бриф → получаете готовый прототип
           </p>
         </div>
 
@@ -86,49 +82,31 @@ export const AgentChainsSection: React.FC = () => {
                 className="relative group"
               >
                 {/* Card */}
-                <div className={`relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-8 border border-white/20 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden group-hover:-translate-y-1`}>
+                <div className={`relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-6 sm:p-8 border border-white/20 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden group-hover:-translate-y-1`}>
                   {/* Glow effect */}
                   <div className={`absolute top-0 right-0 w-64 h-64 ${colors.iconBg.replace('/10', '/20')} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-500`}></div>
 
                   {/* Icon */}
-                  <div className={`relative mb-8 inline-flex p-4 bg-gradient-to-br from-white/10 to-transparent rounded-2xl border border-white/20 ${colors.cardBorder} group-hover:scale-110 transition-all duration-300 shadow-lg shadow-black/20`}>
-                    <Icon className={`w-8 h-8 ${colors.iconColor}`} />
+                  <div className={`relative mb-6 inline-flex p-3 bg-gradient-to-br from-white/10 to-transparent rounded-xl border border-white/20 ${colors.cardBorder} group-hover:scale-110 transition-all duration-300`}>
+                    <Icon className={`w-6 h-6 ${colors.iconColor}`} />
                   </div>
 
                   {/* Title */}
-                  <h3 className="relative text-xl font-bold text-white mb-8 leading-tight group-hover:text-white transition-colors">
+                  <h3 className="relative text-lg sm:text-xl font-bold text-white mb-4 leading-tight group-hover:text-white transition-colors">
                     {scenario.title}
                   </h3>
 
-                  <div className="relative space-y-6">
-                    {/* Agents flow */}
-                    <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full mb-3 shadow-sm shadow-blue-900/20">
-                        <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Агенты</span>
-                      </div>
-                      <p className="text-white/70 text-sm leading-relaxed">
-                        {scenario.agents}
-                      </p>
-                    </div>
-
-                    {/* Result */}
-                    <div>
-                      <div className="inline-flex items-center px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full mb-3 shadow-sm shadow-emerald-900/20">
-                        <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">Результат</span>
-                      </div>
-                      <p className="text-white text-sm leading-relaxed font-medium">
-                        {scenario.result}
-                      </p>
-                    </div>
-
-                    {/* Use cases */}
-                    <div className="pt-4 border-t border-white/10">
-                      <div className={`inline-flex items-center px-3 py-1 ${colors.iconBg.replace('/10', '/20')} border ${colors.iconBorder.replace('/20', '/30')} rounded-full mb-3 shadow-sm`}>
-                        <span className={`text-[10px] font-bold ${colors.iconColor.replace('400', '300')} uppercase tracking-widest`}>Для чего</span>
-                      </div>
-                      <p className="text-white/70 text-sm leading-relaxed">
-                        {scenario.useCases}
-                      </p>
+                  {/* Result - главный акцент */}
+                  <div className="relative pt-4 border-t border-emerald-500/30">
+                    <p className="text-white text-base sm:text-lg leading-relaxed font-semibold mb-3">
+                      {scenario.result}
+                    </p>
+                    
+                    {/* Agent count */}
+                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 ${colors.iconBg} border ${colors.iconBorder} rounded-lg`}>
+                      <span className={`text-sm font-bold ${colors.iconColor}`}>
+                        {scenario.agentCount}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -166,9 +144,6 @@ export const AgentChainsSection: React.FC = () => {
           >
             Выбрать сценарий
           </button>
-          <p className="mt-4 text-sm text-white/50">
-            Первый прототип — обычно за 15 минут после брифа
-          </p>
         </div>
       </div>
     </section>
