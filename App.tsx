@@ -235,6 +235,24 @@ const getDefaultAgentExamples = (agentName: string): string[] => [
   `Уточни у ${agentName}, какие данные ему нужны, чтобы начать работу`,
 ];
 
+const normalizeRoles = (rolesString?: string): string[] =>
+  (rolesString || '')
+    .split(',')
+    .map(role => role.trim().toLowerCase())
+    .filter(Boolean);
+
+const agentHasRole = (agent: Pick<Agent, 'role'>, role: string) =>
+  normalizeRoles(agent.role).includes(role.toLowerCase());
+
+const selectDefaultAgentId = (agentList: Agent[]): string | null => {
+  if (!agentList || agentList.length === 0) {
+    return null;
+  }
+  // Приоритет: выбираем копирайтера, если он есть
+  const copywriter = agentList.find(agent => agentHasRole(agent, 'copywriter'));
+  return copywriter?.id ?? agentList[0]?.id ?? null;
+};
+
 const buildAgentHint = (agent?: Agent): AgentHint | null => {
   if (!agent) return null;
   const descriptionSource = agent.description?.trim() || agent.systemInstruction?.trim() || '';
@@ -1178,7 +1196,7 @@ export default function App() {
       const { agents: apiAgents } = await api.getAgents(projectId);
       const mappedAgents = sortAgents(apiAgents.map(mapAgent));
       setAgents(mappedAgents);
-      setActiveAgentId(mappedAgents[0]?.id ?? null);
+      setActiveAgentId(selectDefaultAgentId(mappedAgents));
 
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
@@ -1208,7 +1226,7 @@ export default function App() {
         const { agents: apiAgents } = await api.getAgents(mappedProject.id);
         const mappedAgents = sortAgents(apiAgents.map(mapAgent));
         setAgents(mappedAgents);
-        setActiveAgentId(mappedAgents[0]?.id ?? null);
+        setActiveAgentId(selectDefaultAgentId(mappedAgents));
       } catch (error) {
         if (import.meta.env.DEV) {
           console.log('No agents in new project, this is expected');

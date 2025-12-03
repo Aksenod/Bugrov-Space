@@ -70,36 +70,116 @@ export const createPayment = async (userId: string, amount: number | string, des
 };
 
 export const handleWebhook = async (event: any) => {
-    const { object } = event;
-    const paymentId = object.id;
-    const status = object.status;
-    const userId = object.metadata.userId;
+    try {
+        const { object } = event;
+        
+        if (!object || !object.id) {
+            logger.error({ event }, 'Invalid webhook event: missing object or object.id');
+            throw new Error('Invalid webhook event structure');
+        }
 
-    logger.info({ paymentId, status, userId }, 'Processing payment webhook');
+        const paymentId = object.id;
+        const status = object.status;
+        const userId = object.metadata?.userId;
 
-    // Update payment status in DB
-    await prisma.payment.update({
-        where: { yookassaId: paymentId },
-        data: { status },
-    });
+        logger.info({ paymentId, status, userId, eventType: event.event }, 'Processing payment webhook');
 
-    if (status === 'succeeded') {
-        // Grant subscription
-        // For simplicity, let's say subscription is for 30 days
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
+        // Проверка наличия userId в metadata
+        if (!userId) {
+            logger.error({ paymentId, status, metadata: object.metadata }, 'Webhook missing userId in metadata');
+            throw new Error('UserId not found in payment metadata');
+        }
 
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                isPaid: true,
-                subscriptionExpiresAt: expiresAt,
-            },
+        // Находим платеж в базе данных (может не существовать, если webhook пришел раньше создания платежа)
+        const existingPayment = await prisma.payment.findFirst({
+            where: { yookassaId: paymentId },
         });
 
-        logger.info({ userId }, 'Subscription activated');
-    } else if (status === 'canceled') {
-        // Handle cancellation if needed
-        logger.info({ paymentId }, 'Payment canceled');
+        if (existingPayment) {
+            // Обновляем статус существующего платежа
+            await prisma.payment.update({
+                where: { yookassaId: paymentId },
+                data: { status },
+            });
+            logger.info({ paymentId, status, userId }, 'Payment status updated in DB');
+        } else {
+            // Платеж не найден - возможно webhook пришел раньше создания платежа
+            // Создаем запись о платеже, если есть необходимая информация
+            if (object.amount && object.amount.value) {
+                try {
+                    await prisma.payment.create({
+                        data: {
+                            userId,
+                            amount: parseFloat(object.amount.value),
+                            currency: object.amount.currency || 'RUB',
+                            status: status,
+                            yookassaId: paymentId,
+                            description: object.description || 'Payment from webhook',
+                        },
+                    });
+                    logger.info({ paymentId, status, userId }, 'Payment created from webhook');
+                } catch (createError: any) {
+                    // Если платеж уже существует (race condition), просто логируем
+                    if (createError.code === 'P2002') {
+                        logger.warn({ paymentId }, 'Payment already exists, skipping creation');
+                    } else {
+                        logger.error({ paymentId, error: createError }, 'Failed to create payment from webhook');
+                        throw createError;
+                    }
+                }
+            } else {
+                logger.warn({ paymentId, userId }, 'Payment not found in DB and cannot create from webhook (missing amount)');
+            }
+        }
+
+        // Обрабатываем успешный платеж
+        if (status === 'succeeded') {
+            // Проверяем существование пользователя
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+            });
+
+            if (!user) {
+                logger.error({ userId, paymentId }, 'User not found when trying to activate subscription');
+                throw new Error(`User with id ${userId} not found`);
+            }
+
+            // Проверяем, не активирована ли уже подписка (идемпотентность)
+            // Если подписка уже активна и не истекла, не обновляем
+            const now = new Date();
+            const isSubscriptionActive = user.isPaid && 
+                user.subscriptionExpiresAt && 
+                new Date(user.subscriptionExpiresAt) > now;
+
+            if (isSubscriptionActive) {
+                logger.info({ userId, paymentId, expiresAt: user.subscriptionExpiresAt }, 'Subscription already active, skipping activation');
+                return;
+            }
+
+            // Активируем подписку на 30 дней
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 30);
+
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    isPaid: true,
+                    subscriptionExpiresAt: expiresAt,
+                },
+            });
+
+            logger.info({ userId, paymentId, expiresAt }, 'Subscription activated successfully');
+        } else if (status === 'canceled') {
+            logger.info({ paymentId, userId }, 'Payment canceled');
+        } else {
+            logger.info({ paymentId, userId, status }, 'Payment status updated (not succeeded)');
+        }
+    } catch (error: any) {
+        logger.error({ 
+            error: error.message, 
+            stack: error.stack, 
+            event: JSON.stringify(event, null, 2) 
+        }, 'Error processing payment webhook');
+        throw error;
     }
 };
