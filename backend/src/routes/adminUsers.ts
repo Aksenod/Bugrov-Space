@@ -76,7 +76,19 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     }));
 
     logger.info({ usersCount: usersWithCount.length }, 'Admin users fetched');
+    
+    // Логируем информацию о подписках для диагностики
+    const paidUsers = usersWithCount.filter(u => u.isPaid);
     console.log(`[GET /admin/users] Returning ${usersWithCount.length} users`);
+    console.log(`[GET /admin/users] Paid users count: ${paidUsers.length}`);
+    if (paidUsers.length > 0) {
+      console.log('[GET /admin/users] Paid users details:', paidUsers.map(u => ({
+        username: u.username,
+        isPaid: u.isPaid,
+        subscriptionExpiresAt: u.subscriptionExpiresAt,
+      })));
+    }
+    
     res.json({
       users: usersWithCount,
       totalUsers: totalUsersCount,

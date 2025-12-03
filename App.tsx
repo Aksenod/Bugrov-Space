@@ -1196,7 +1196,7 @@ export default function App() {
       const { agents: apiAgents } = await api.getAgents(projectId);
       const mappedAgents = sortAgents(apiAgents.map(mapAgent));
       setAgents(mappedAgents);
-      setActiveAgentId(selectDefaultAgentId(mappedAgents));
+      setActiveAgentId(mappedAgents[0]?.id ?? null);
 
       loadedAgentsRef.current.clear();
       loadedSummaryRef.current.clear();
@@ -1226,7 +1226,7 @@ export default function App() {
         const { agents: apiAgents } = await api.getAgents(mappedProject.id);
         const mappedAgents = sortAgents(apiAgents.map(mapAgent));
         setAgents(mappedAgents);
-        setActiveAgentId(selectDefaultAgentId(mappedAgents));
+        setActiveAgentId(mappedAgents[0]?.id ?? null);
       } catch (error) {
         if (import.meta.env.DEV) {
           console.log('No agents in new project, this is expected');

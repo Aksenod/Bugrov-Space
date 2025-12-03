@@ -464,7 +464,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           id: u.id,
           username: u.username,
           createdAt: u.createdAt,
-          projectsCount: u.projectsCount
+          projectsCount: u.projectsCount,
+          isPaid: u.isPaid,
+          subscriptionExpiresAt: u.subscriptionExpiresAt
         })));
       }
 

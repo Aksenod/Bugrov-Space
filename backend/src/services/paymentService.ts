@@ -160,15 +160,28 @@ export const handleWebhook = async (event: any) => {
             const expiresAt = new Date();
             expiresAt.setDate(expiresAt.getDate() + 30);
 
-            await prisma.user.update({
+            const updatedUser = await prisma.user.update({
                 where: { id: userId },
                 data: {
                     isPaid: true,
                     subscriptionExpiresAt: expiresAt,
                 },
+                select: {
+                    id: true,
+                    username: true,
+                    isPaid: true,
+                    subscriptionExpiresAt: true,
+                },
             });
 
-            logger.info({ userId, paymentId, expiresAt }, 'Subscription activated successfully');
+            logger.info({ 
+                userId, 
+                username: updatedUser.username,
+                paymentId, 
+                expiresAt,
+                isPaid: updatedUser.isPaid,
+                subscriptionExpiresAt: updatedUser.subscriptionExpiresAt 
+            }, 'Subscription activated successfully');
         } else if (status === 'canceled') {
             logger.info({ paymentId, userId }, 'Payment canceled');
         } else {
