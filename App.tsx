@@ -95,6 +95,8 @@ const mapUser = (user: ApiUser): User => ({
   id: user.id,
   username: user.username,
   role: user.role,
+  isPaid: (user as any).isPaid,
+  subscriptionExpiresAt: (user as any).subscriptionExpiresAt ? new Date((user as any).subscriptionExpiresAt) : null,
 });
 
 const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => ({
@@ -1469,6 +1471,46 @@ export default function App() {
           onResetPassword={handleResetPassword}
           error={authError}
         />
+      );
+    }
+
+    // Проверка подписки для НЕ-админов (сразу после аутентификации)
+    if (!isAdmin && currentUser.isPaid === false) {
+      return (
+        <div className="flex items-center justify-center h-full bg-black text-white p-4">
+          <div className="max-w-md w-full bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-6">
+            <div className="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold">Требуется подписка</h2>
+              <p className="text-gray-400">
+                Для доступа к платформе необходимо оплатить подписку.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-all"
+            >
+              Оплатить подписку — 1000 ₽
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-500 hover:text-white transition-colors"
+            >
+              Выйти из аккаунта
+            </button>
+
+            <PaymentModal
+              isOpen={isPaymentModalOpen}
+              onClose={() => setIsPaymentModalOpen(false)}
+              token={authToken || ''}
+            />
+          </div>
+        </div>
       );
     }
 

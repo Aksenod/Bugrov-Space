@@ -55,6 +55,8 @@ export interface User {
   id: string;
   username: string;
   role?: string;
+  isPaid?: boolean;
+  subscriptionExpiresAt?: Date | null;
 }
 
 export interface ProjectType {
