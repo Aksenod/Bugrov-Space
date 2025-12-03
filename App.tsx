@@ -739,11 +739,6 @@ export default function App() {
     };
   }, [currentUser]);
 
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen, isLandingOpen, isCreativeLandingOpen]);
-
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
       if (!agentId || loadedAgentsRef.current.has(agentId)) {
