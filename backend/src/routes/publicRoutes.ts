@@ -72,4 +72,66 @@ router.get('/prototype/:documentId', asyncHandler(async (req: Request, res: Resp
     });
 }));
 
+// GET /api/public/agents - получить все уникальные агенты для витрины (без авторизации)
+router.get('/agents', asyncHandler(async (req: Request, res: Response) => {
+    logger.info('Public agents request');
+
+    try {
+        // Загружаем все агенты-шаблоны
+        const allAgents = await withRetry(
+            () => prisma.projectTypeAgent.findMany({
+                where: {
+                    isHiddenFromSidebar: false, // Показываем только видимые агенты
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    role: true,
+                    createdAt: true,
+                },
+                orderBy: {
+                    createdAt: 'asc',
+                },
+            }),
+            3,
+            'GET /public/agents - find agents'
+        );
+
+        logger.debug({ totalAgents: allAgents.length }, 'Loaded agents from database');
+
+        // Убираем дубликаты по имени, оставляя первый (самый старый) агент с таким именем
+        const uniqueAgentsMap = new Map<string, typeof allAgents[0]>();
+        for (const agent of allAgents) {
+            if (agent.name && !uniqueAgentsMap.has(agent.name)) {
+                uniqueAgentsMap.set(agent.name, agent);
+            }
+        }
+
+        const agents = Array.from(uniqueAgentsMap.values())
+            .filter(agent => agent.name && agent.description) // Фильтруем агентов с пустыми данными
+            .sort((a, b) => a.name.localeCompare(b.name)); // Сортируем по алфавиту
+
+        logger.debug({ agentsCount: agents.length, totalAgents: allAgents.length }, 'Public agents loaded successfully');
+
+        // Возвращаем только публичную информацию
+        res.json({
+            agents: agents.map(agent => ({
+                id: agent.id,
+                name: agent.name,
+                description: agent.description || '',
+                role: agent.role || '',
+            })),
+        });
+    } catch (error: any) {
+        logger.error({ error: error.message, code: error.code, stack: error.stack }, 'Error loading public agents');
+        // Если таблица не существует (миграция не применена), возвращаем пустой массив
+        if (error.code === 'P2001' || error.code === 'P2021' || error.message?.includes('does not exist') || error.message?.includes('Unknown model')) {
+            logger.warn('ProjectTypeAgent table may not exist, returning empty array');
+            return res.json({ agents: [] });
+        }
+        throw error;
+    }
+}));
+
 export default router;
