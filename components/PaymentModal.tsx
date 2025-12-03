@@ -86,10 +86,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
 
                         <ul className="space-y-3">
                             {[
-                                'Неограниченное создание агентов',
-                                'Доступ к GPT-4 и Claude 3.5',
-                                'Приоритетная поддержка',
-                                'Ранний доступ к новым функциям'
+                                'Неограниченное создание агентов и запуск сценариев (fair‑use).',
+                                'Платформа работает на моделях GPT‑5.1 — оплата за модели уже включена в подписку, свои ключи не нужны.',
+                                'Поддержка напрямую от автора сервиса.',
+                                'Ранний доступ к новым сценариям и функциям платформы.'
                             ].map((feature, i) => (
                                 <li key={i} className="flex items-center gap-3 text-sm text-gray-300">
                                     <Check className="w-4 h-4 text-green-400 shrink-0" />
