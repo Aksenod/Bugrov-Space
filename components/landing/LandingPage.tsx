@@ -11,14 +11,15 @@ interface LandingPageProps {
   isAuthenticated?: boolean;
   username?: string;
   onOpenPayment?: () => void;
+  onOpenCabinet?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ isAuthenticated = false, username, onOpenPayment = () => { } }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ isAuthenticated = false, username, onOpenPayment = () => { }, onOpenCabinet = () => { } }) => {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-black">
       <div className="relative min-h-screen text-white">
         {/* Header */}
-        <LandingHeader isAuthenticated={isAuthenticated} username={username} />
+        <LandingHeader isAuthenticated={isAuthenticated} username={username} onOpenCabinet={onOpenCabinet} />
         {/* Hero Section */}
         <HeroSection isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
 

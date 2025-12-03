@@ -1595,6 +1595,10 @@ export default function App() {
           isAuthenticated={!!currentUser}
           username={currentUser?.username}
           onOpenPayment={() => setIsPaymentModalOpen(true)}
+          onOpenCabinet={() => {
+            setIsLandingOpen(false);
+            window.location.hash = '#/projects';
+          }}
         />
         <PaymentModal
           isOpen={isPaymentModalOpen}

@@ -4,9 +4,10 @@ import { Sparkles } from 'lucide-react';
 interface LandingHeaderProps {
     isAuthenticated?: boolean;
     username?: string;
+    onOpenCabinet?: () => void;
 }
 
-export const LandingHeader: React.FC<LandingHeaderProps> = ({ isAuthenticated, username }) => {
+export const LandingHeader: React.FC<LandingHeaderProps> = ({ isAuthenticated, username, onOpenCabinet }) => {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/80 backdrop-blur-xl">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -30,7 +31,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({ isAuthenticated, u
                                     {username}
                                 </span>
                                 <button
-                                    onClick={() => window.location.hash = '#/projects'}
+                                    onClick={onOpenCabinet}
                                     className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white rounded-full font-medium text-sm hover:bg-white/20 transition-all border border-white/20 hover:border-white/30"
                                 >
                                     В кабинет
