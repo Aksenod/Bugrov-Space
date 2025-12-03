@@ -45,7 +45,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
               key={user.id}
               className="bg-white/5 rounded-lg border border-white/10 p-3 sm:p-4"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 sm:gap-4">
                 <div>
                   <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
                     Логин
@@ -76,6 +76,30 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </div>
                   <div className="text-sm sm:text-base text-white font-medium">
                     {user.projectsCount}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
+                    Подписка
+                  </div>
+                  <div>
+                    {user.isPaid ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-300 text-xs rounded-full border border-emerald-500/30 font-medium">
+                        ✓ Оплачена
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded-full border border-red-500/30 font-medium">
+                        ✗ Не оплачена
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
+                    Действует до
+                  </div>
+                  <div className="text-sm sm:text-base text-white/80">
+                    {user.subscriptionExpiresAt ? formatDate(user.subscriptionExpiresAt) : '—'}
                   </div>
                 </div>
               </div>

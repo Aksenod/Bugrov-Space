@@ -262,6 +262,8 @@ export interface ApiAdminUser {
   username: string;
   createdAt: string;
   projectsCount: number;
+  isPaid?: boolean;
+  subscriptionExpiresAt?: string | null;
 }
 
 export interface ApiFile {
