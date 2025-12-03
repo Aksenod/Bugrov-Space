@@ -12,10 +12,8 @@ router.post('/create', authenticate, async (req: any, res) => {
         const { amount = 1.00, description = 'Subscription Payment' } = req.body; // Default 1 RUB for testing
 
         // Return URL should be the frontend page where user lands after payment
-        // Assuming frontend is running on same domain or configured URL
-        // For now, let's assume localhost or the production URL
-        // We can pass returnUrl from frontend or hardcode it
-        const returnUrl = req.body.returnUrl || 'http://localhost:5173/payment/success';
+        // Using production URL or fallback to localhost for development
+        const returnUrl = req.body.returnUrl || 'https://bugrov.space';
 
         const payment = await createPayment(userId, amount, description, returnUrl);
 
