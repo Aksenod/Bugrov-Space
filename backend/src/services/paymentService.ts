@@ -21,13 +21,14 @@ const yookassaClient = axios.create({
     },
 });
 
-export const createPayment = async (userId: string, amount: number, description: string, returnUrl: string) => {
+export const createPayment = async (userId: string, amount: number | string, description: string, returnUrl: string) => {
     try {
         const idempotenceKey = uuidv4();
+        const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
 
         const response = await yookassaClient.post('/payments', {
             amount: {
-                value: amount.toFixed(2),
+                value: numericAmount.toFixed(2),
                 currency: 'RUB',
             },
             capture: true,
@@ -51,7 +52,7 @@ export const createPayment = async (userId: string, amount: number, description:
         await prisma.payment.create({
             data: {
                 userId,
-                amount: amount,
+                amount: numericAmount,
                 currency: 'RUB',
                 status: paymentData.status,
                 yookassaId: paymentData.id,
