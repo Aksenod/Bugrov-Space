@@ -16,6 +16,7 @@ import { PrivacyPage } from './components/PrivacyPage';
 import { RequisitesPage } from './components/RequisitesPage';
 import { LandingPage } from './components/landing/LandingPage';
 import { CreativeLandingPage } from './components/landing/CreativeLandingPage';
+import { UltraCreativeLandingPage } from './components/landing/UltraCreativeLandingPage';
 import { PublicPrototypePage } from './components/PublicPrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
@@ -293,6 +294,7 @@ export default function App() {
   const [isRequisitesOpen, setIsRequisitesOpen] = useState(false);
   const [isLandingOpen, setIsLandingOpen] = useState(false);
   const [isCreativeLandingOpen, setIsCreativeLandingOpen] = useState(false);
+  const [isUltraLandingOpen, setIsUltraLandingOpen] = useState(false);
   const [prototypeHash, setPrototypeHash] = useState<string | null>(null);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -683,24 +685,59 @@ export default function App() {
 
     window.addEventListener('hashchange', handleHashChange);
 
-    // Проверяем при монтировании
+    // Проверяем при монтировании - используем ту же логику, что и в handleHashChange
     const hash = window.location.hash;
-    if (hash === '#/landing' || hash === '#/' || hash === '') {
+    if (hash === '#/landing' || hash === '#/') {
       setIsLandingOpen(true);
+      setIsCreativeLandingOpen(false);
+      setIsAdminOpen(false);
+      setIsOfferOpen(false);
+      setIsPrivacyOpen(false);
+      setIsRequisitesOpen(false);
+    } else if (hash === '') {
+      // Если hash пустой и пользователь авторизован, не показываем лендинг
+      setIsAdminOpen(false);
+      setIsOfferOpen(false);
+      setIsPrivacyOpen(false);
+      setIsRequisitesOpen(false);
+      setPrototypeHash(null);
+      setAdminInitialAgentId(undefined);
+      // Показываем лендинг только если пользователь не авторизован
+      if (!currentUser) {
+        setIsLandingOpen(true);
+        setIsCreativeLandingOpen(false);
+      } else {
+        setIsLandingOpen(false);
+        setIsCreativeLandingOpen(false);
+      }
     } else if (hash === '#/promo') {
       setIsCreativeLandingOpen(true);
+      setIsLandingOpen(false);
+      setIsAdminOpen(false);
+      setIsOfferOpen(false);
+      setIsPrivacyOpen(false);
+      setIsRequisitesOpen(false);
     } else if (hash === '#/admin') {
       setIsAdminOpen(true);
+      setIsLandingOpen(false);
     } else if (hash === '#/offer') {
       setIsOfferOpen(true);
+      setIsLandingOpen(false);
     } else if (hash === '#/privacy') {
       setIsPrivacyOpen(true);
+      setIsLandingOpen(false);
     } else if (hash === '#/requisites') {
       setIsRequisitesOpen(true);
+      setIsLandingOpen(false);
     } else if (hash.startsWith('#/prototype/')) {
       const hashValue = hash.replace('#/prototype/', '');
       setPrototypeHash(hashValue);
     }
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [currentUser]);
 
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
@@ -1659,6 +1696,28 @@ export default function App() {
           onOpenPayment={() => setIsPaymentModalOpen(true)}
           onOpenCabinet={() => {
             setIsCreativeLandingOpen(false);
+            window.location.hash = '#/projects';
+          }}
+        />
+        <PaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          token={authToken || ''}
+        />
+      </>
+    );
+  }
+
+  // Ultra creative landing page check
+  if (isUltraLandingOpen || window.location.hash === '#/ultra') {
+    return (
+      <>
+        <UltraCreativeLandingPage
+          isAuthenticated={!!currentUser}
+          username={currentUser?.username}
+          onOpenPayment={() => setIsPaymentModalOpen(true)}
+          onOpenCabinet={() => {
+            setIsUltraLandingOpen(false);
             window.location.hash = '#/projects';
           }}
         />

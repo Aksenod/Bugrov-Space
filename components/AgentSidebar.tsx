@@ -55,6 +55,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   const documentsButtonRef = useRef<HTMLButtonElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const [tooltipState, setTooltipState] = useState<{ agentId: string; description: string; x: number; y: number } | null>(null);
+  const tooltipStateRef = useRef<{ agentId: string; description: string; x: number; y: number } | null>(null);
   
   // Проверка, является ли пользователь администратором
   const isAdmin =
@@ -89,16 +90,19 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       y = window.innerHeight - padding - tooltipHeight / 2;
     }
     
-    setTooltipState({
+    const newState = {
       agentId: agent.id,
       description: agent.description,
       x,
       y,
-    });
+    };
+    setTooltipState(newState);
+    tooltipStateRef.current = newState;
   }, []);
   
   const handleAgentMouseLeave = useCallback(() => {
     setTooltipState(null);
+    tooltipStateRef.current = null;
   }, []);
   
   // Обновляем позицию тултипа при скролле
@@ -106,14 +110,19 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
     if (!tooltipState) return;
     
     const updateTooltipPosition = () => {
-      const agentElement = document.querySelector(`[data-agent-id="${tooltipState.agentId}"]`) as HTMLElement;
+      const currentState = tooltipStateRef.current;
+      if (!currentState) return;
+      
+      const agentElement = document.querySelector(`[data-agent-id="${currentState.agentId}"]`) as HTMLElement;
       if (agentElement) {
         const rect = agentElement.getBoundingClientRect();
-        setTooltipState({
-          ...tooltipState,
+        const newState = {
+          ...currentState,
           x: rect.right + 8,
           y: rect.top + rect.height / 2,
-        });
+        };
+        setTooltipState(newState);
+        tooltipStateRef.current = newState;
       }
     };
     
@@ -282,11 +291,12 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                 <div className="flex-1 min-w-0 flex items-center gap-1.5">
                   <div className="font-semibold text-xs truncate">{agent.name}</div>
                   {agent.description && (
-                    <Info 
-                      size={12} 
-                      className="text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0" 
-                      title="Наведите для просмотра описания"
-                    />
+                    <div title="Наведите для просмотра описания">
+                      <Info 
+                        size={12} 
+                        className="text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0" 
+                      />
+                    </div>
                   )}
                 </div>
                 {/* Mobile tooltip (bottom) */}
