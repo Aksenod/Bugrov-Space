@@ -1,5 +1,5 @@
 import React from 'react';
-import { UltraHeroSection } from './ultra/UltraHeroSection';
+import { UltraHeroSectionV2 } from './ultra/UltraHeroSectionV2';
 import { UltraProblemSection } from './ultra/UltraProblemSection';
 import { UltraSolutionSection } from './ultra/UltraSolutionSection';
 import { UltraPricingSection } from './ultra/UltraPricingSection';
@@ -7,14 +7,14 @@ import { UltraFAQSection } from './ultra/UltraFAQSection';
 import { UltraFooter } from './ultra/UltraFooter';
 import { LandingHeader } from './LandingHeader';
 
-interface UltraCreativeLandingPageProps {
+interface UltraCreativeLandingPageV2Props {
     isAuthenticated?: boolean;
     username?: string;
     onOpenPayment?: () => void;
     onOpenCabinet?: () => void;
 }
 
-export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> = ({
+export const UltraCreativeLandingPageV2: React.FC<UltraCreativeLandingPageV2Props> = ({
     isAuthenticated = false,
     username,
     onOpenPayment = () => {},
@@ -39,8 +39,8 @@ export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> =
                     />
                 </div>
 
-                {/* Hero Section */}
-                <UltraHeroSection isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
+                {/* Hero Section V2 */}
+                <UltraHeroSectionV2 isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
 
                 {/* Problem Section */}
                 <UltraProblemSection />

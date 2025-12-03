@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, CheckCircle, Users } from 'lucide-react';
+import { Zap, Users } from 'lucide-react';
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
@@ -41,39 +41,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
               </div>
             </div>
 
-            {/* H1 */}
+            {/* H1 - главное сообщение */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
-              Прототип проекта за{' '}
+              Прототип с{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-                15 минут
+                продающими текстами
               </span>{' '}
-              вместо недели
+              за&nbsp;15&nbsp;минут
             </h1>
 
-            {/* Subtitle */}
+            {/* Subtitle - только суть, без деталей */}
             <p className="text-lg sm:text-xl text-white/80 leading-relaxed">
-              Bugrov.Space — AI‑платформа для UX/UI дизайнеров и мини‑студий. Готовые связки агентов под разные задачи:
-              лендинги, сайты, портфолио, приложения, сервисы, продвижение в соцсетях. Выбираете сценарий → проходите по связке агентов → получаете готовый прототип.
+              Вместо недели на&nbsp;ресёрч и&nbsp;тексты — готовый прототип. AI‑платформа для&nbsp;дизайнеров и&nbsp;мини‑студий.
             </p>
 
-            {/* Bullets */}
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-6 h-6 text-indigo-400 flex-shrink-0 mt-0.5" />
-                <p className="text-white/90">Экономия недели на ресёрч, структуру и тексты</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-6 h-6 text-indigo-400 flex-shrink-0 mt-0.5" />
-                <p className="text-white/90">Готовые сценарии под разные типы проектов</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-6 h-6 text-indigo-400 flex-shrink-0 mt-0.5" />
-                <p className="text-white/90">Прототип, которым можно сразу поделиться с заказчиком</p>
-              </div>
-            </div>
-
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 pt-2">
               {/* Primary CTA */}
               <div className="flex flex-col gap-2">
                 <button
@@ -86,19 +69,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
               </div>
             </div>
 
-            {/* Trust elements */}
-            <div className="pt-8 border-t border-white/10">
-              <div className="flex items-center gap-3 mb-3">
-                <Users className="w-5 h-5 text-indigo-400" />
-                <p className="text-white/70 text-sm">
-                  Для UX/UI дизайнеров, no‑code веб‑мастеров и мини‑студий 1–5 человек
-                </p>
+            {/* Trust elements - компактные, выше */}
+            <div className="pt-6 flex flex-wrap items-center gap-4 text-sm text-white/60">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-400" />
+                <span>Для дизайнеров и мини‑студий</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Zap className="w-5 h-5 text-indigo-400" />
-                <p className="text-white/70 text-sm">
-                  Уже сгенерировано 100+ прототипов по разным сценариям
-                </p>
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-indigo-400" />
+                <span>100+ прототипов уже создано</span>
               </div>
             </div>
           </div>

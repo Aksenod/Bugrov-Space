@@ -13,12 +13,12 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
 
   const features = [
     'Доступ ко всем связкам агентов платформы',
-    'Сценарии для лендингов, сайтов, приложений, сервисов, соцсетей',
+    'Сценарии для&nbsp;лендингов, сайтов, приложений, сервисов, соцсетей',
     'Генерация прототипов без ограничений',
     'Сохранение и публикация прототипов',
-    'Библиотека шаблонов под ключевые ниши',
+    'Библиотека шаблонов под&nbsp;ключевые ниши',
     'Новые сценарии добавляются автоматически',
-    'Поддержка и помощь в онбординге',
+    'Поддержка и&nbsp;помощь в&nbsp;онбординге',
   ];
 
   return (
@@ -27,10 +27,10 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
-            Один честный тариф{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-              без скрытых ограничений
-            </span>
+              Безлимитные прототипы
+            </span>{' '}
+            и все сценарии без скрытых платежей
           </h2>
         </div>
 
@@ -83,7 +83,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
                   <ul className="space-y-2 text-white/60 text-sm">
                     <li className="flex items-start gap-2">
                       <span className="text-indigo-400">•</span>
-                      <span>Ежемесячная подписка, отмена в любой момент</span>
+                      <span>Ежемесячная подписка, отмена в&nbsp;любой момент</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-indigo-400">•</span>
@@ -103,7 +103,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
 
                   {/* Hint */}
                   <p className="text-center text-sm text-white/50">
-                    Один дополнительный проект в месяц уже окупает подписку
+                    Один дополнительный проект в&nbsp;месяц уже окупает подписку
                   </p>
                 </div>
               </div>
