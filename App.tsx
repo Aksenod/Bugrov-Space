@@ -15,6 +15,7 @@ import { OfferPage } from './components/OfferPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { RequisitesPage } from './components/RequisitesPage';
 import { LandingPage } from './components/landing/LandingPage';
+import { CreativeLandingPage } from './components/landing/CreativeLandingPage';
 import { PublicPrototypePage } from './components/PublicPrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
@@ -273,6 +274,7 @@ export default function App() {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isRequisitesOpen, setIsRequisitesOpen] = useState(false);
   const [isLandingOpen, setIsLandingOpen] = useState(false);
+  const [isCreativeLandingOpen, setIsCreativeLandingOpen] = useState(false);
   const [prototypeHash, setPrototypeHash] = useState<string | null>(null);
   const [adminInitialAgentId, setAdminInitialAgentId] = useState<string | undefined>(undefined);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
@@ -610,6 +612,14 @@ export default function App() {
 
       if (hash === '#/landing' || hash === '#/' || hash === '') {
         setIsLandingOpen(true);
+        setIsCreativeLandingOpen(false);
+        setIsAdminOpen(false);
+        setIsOfferOpen(false);
+        setIsPrivacyOpen(false);
+        setIsRequisitesOpen(false);
+      } else if (hash === '#/promo') {
+        setIsCreativeLandingOpen(true);
+        setIsLandingOpen(false);
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
@@ -649,6 +659,8 @@ export default function App() {
     const hash = window.location.hash;
     if (hash === '#/landing' || hash === '#/' || hash === '') {
       setIsLandingOpen(true);
+    } else if (hash === '#/promo') {
+      setIsCreativeLandingOpen(true);
     } else if (hash === '#/admin') {
       setIsAdminOpen(true);
     } else if (hash === '#/offer') {
@@ -665,7 +677,7 @@ export default function App() {
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen, isLandingOpen]);
+  }, [isAdminOpen, isOfferOpen, isPrivacyOpen, isRequisitesOpen, isLandingOpen, isCreativeLandingOpen]);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
@@ -1597,6 +1609,28 @@ export default function App() {
           onOpenPayment={() => setIsPaymentModalOpen(true)}
           onOpenCabinet={() => {
             setIsLandingOpen(false);
+            window.location.hash = '#/projects';
+          }}
+        />
+        <PaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          token={authToken || ''}
+        />
+      </>
+    );
+  }
+
+  // Creative landing page check
+  if (isCreativeLandingOpen || window.location.hash === '#/promo') {
+    return (
+      <>
+        <CreativeLandingPage
+          isAuthenticated={!!currentUser}
+          username={currentUser?.username}
+          onOpenPayment={() => setIsPaymentModalOpen(true)}
+          onOpenCabinet={() => {
+            setIsCreativeLandingOpen(false);
             window.location.hash = '#/projects';
           }}
         />
