@@ -7,7 +7,9 @@ const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
 if (!SHOP_ID || !SECRET_KEY) {
-    logger.error('Yookassa credentials missing in .env');
+    logger.error('Yookassa credentials missing in env vars');
+} else {
+    logger.info(`Yookassa initialized with Shop ID: ${SHOP_ID}`);
 }
 
 const yookassaClient = axios.create({
