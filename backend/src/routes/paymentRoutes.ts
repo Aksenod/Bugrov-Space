@@ -1,7 +1,7 @@
 import express from 'express';
 import { createPayment, handleWebhook } from '../services/paymentService';
 import { logger } from '../utils/logger';
-import { authenticate } from '../middleware/authMiddleware';
+import { authMiddleware as authenticate } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
@@ -23,7 +23,7 @@ router.post('/create', authenticate, async (req: any, res) => {
             confirmationUrl: payment.confirmation.confirmation_url,
         });
     } catch (error: any) {
-        logger.error('Error creating payment endpoint', error);
+        logger.error({ err: error }, 'Error creating payment endpoint');
         res.status(500).json({ error: 'Failed to create payment' });
     }
 });
@@ -40,7 +40,7 @@ router.post('/webhook', async (req, res) => {
 
         res.status(200).send('OK');
     } catch (error) {
-        logger.error('Webhook error', error);
+        logger.error({ err: error }, 'Webhook error');
         res.status(500).send('Webhook processing failed');
     }
 });
