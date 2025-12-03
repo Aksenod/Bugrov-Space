@@ -63,7 +63,7 @@ export const AgentChainsSection: React.FC = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
               AI‑агентов
             </span>{' '}
-            под&nbsp;разные задачи
+            под разные задачи
           </h2>
           <p className="text-lg sm:text-xl text-white/70 max-w-3xl mx-auto">
             Выбираете сценарий → заполняете бриф → получаете готовый прототип

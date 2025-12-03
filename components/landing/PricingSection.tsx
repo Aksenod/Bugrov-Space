@@ -13,12 +13,12 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
 
   const features = [
     'Доступ ко всем связкам агентов платформы',
-    'Сценарии для&nbsp;лендингов, сайтов, приложений, сервисов, соцсетей',
+    'Сценарии для лендингов, сайтов, приложений, сервисов, соцсетей',
     'Генерация прототипов без ограничений',
     'Сохранение и публикация прототипов',
-    'Библиотека шаблонов под&nbsp;ключевые ниши',
+    'Библиотека шаблонов под ключевые ниши',
     'Новые сценарии добавляются автоматически',
-    'Поддержка и&nbsp;помощь в&nbsp;онбординге',
+    'Поддержка и помощь в онбординге',
   ];
 
   return (
@@ -83,7 +83,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
                   <ul className="space-y-2 text-white/60 text-sm">
                     <li className="flex items-start gap-2">
                       <span className="text-indigo-400">•</span>
-                      <span>Ежемесячная подписка, отмена в&nbsp;любой момент</span>
+                      <span>Ежемесячная подписка, отмена в любой момент</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-indigo-400">•</span>
@@ -103,7 +103,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
 
                   {/* Hint */}
                   <p className="text-center text-sm text-white/50">
-                    Один дополнительный проект в&nbsp;месяц уже окупает подписку
+                    Один дополнительный проект в месяц уже окупает подписку
                   </p>
                 </div>
               </div>

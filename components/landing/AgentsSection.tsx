@@ -184,7 +184,7 @@ export const AgentsSection: React.FC = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
               AI‑агенты
             </span>{' '}
-            для&nbsp;каждой задачи
+            для каждой задачи
           </h2>
           <p className="text-lg sm:text-xl text-white/70 max-w-3xl mx-auto">
             Каждый агент — эксперт в своей области. Они работают вместе, создавая комплексное решение для вашего проекта.

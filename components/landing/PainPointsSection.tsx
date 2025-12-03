@@ -5,22 +5,22 @@ export const PainPointsSection: React.FC = () => {
   const painPoints = [
     {
       icon: Clock,
-      problem: 'Неделя на&nbsp;ресёрч и&nbsp;тексты, которые никто не&nbsp;оценит',
+      problem: 'Неделя на ресёрч и тексты, которые никто не оценит',
       result: 'Готовый прототип с текстами за 15 минут',
       metric: '40+ часов',
       metricLabel: 'экономии',
     },
     {
       icon: Layers,
-      problem: 'Клиент просит 3&nbsp;варианта, а&nbsp;у&nbsp;вас есть время только на&nbsp;один',
-      result: 'Все варианты готовы за&nbsp;час — клиент выбирает на&nbsp;одном созвоне',
+      problem: 'Клиент просит 3 варианта, а у вас есть время только на один',
+      result: 'Все варианты готовы за час — клиент выбирает на одном созвоне',
       metric: 'неделя → 1 час',
       metricLabel: 'вместо',
     },
     {
       icon: TrendingUp,
       problem: 'Клиенты торгуются, а ручная работа съедает маржу',
-      result: 'Делаете на&nbsp;2–3&nbsp;проекта больше в&nbsp;месяц с&nbsp;той&nbsp;же командой',
+      result: 'Делаете на 2–3 проекта больше в месяц с той же командой',
       metric: '+2–3 проекта',
       metricLabel: 'в месяц',
     },
@@ -36,10 +36,10 @@ export const PainPointsSection: React.FC = () => {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
               40+ часов
             </span>{' '}
-            на&nbsp;каждом проекте — если делаете от&nbsp;1&nbsp;проекта в&nbsp;месяц, это уже окупается
+            на каждом проекте — если делаете от 1 проекта в месяц, это уже окупается
           </h2>
           <p className="text-lg sm:text-xl text-white/70 max-w-3xl mx-auto">
-            Bugrov.Space экономит вам часы рутины на&nbsp;каждом проекте и&nbsp;помогает держать дедлайны без&nbsp;падения маржи.
+            Bugrov.Space экономит вам часы рутины на каждом проекте и помогает держать дедлайны без падения маржи.
           </p>
         </div>
 

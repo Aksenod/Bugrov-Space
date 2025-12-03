@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ArrowRight, Sparkles, Zap, Rocket, Code } from 'lucide-react';
+import { ArrowRight, Sparkles, Zap, Rocket, Code, Users } from 'lucide-react';
 
 interface UltraHeroSectionProps {
     isAuthenticated?: boolean;
