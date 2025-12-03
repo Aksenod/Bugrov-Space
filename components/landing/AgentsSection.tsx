@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, FileText, Layout, Target, MessageSquare, TrendingUp, Zap, Brain, Sparkles, Code, Palette, BarChart, Search, PenTool, Video, Image, Globe } from 'lucide-react';
-import { api } from '../../services/api';
+import { api, ApiPublicProjectType } from '../../services/api';
 
 interface Agent {
   id: string;
@@ -67,36 +67,35 @@ const getColorForAgent = (name: string, role?: string, index: number = 0): strin
 };
 
 export const AgentsSection: React.FC = () => {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [projectTypes, setProjectTypes] = useState<ApiPublicProjectType[]>([]);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadAgents = async () => {
+    const loadProjectTypes = async () => {
       try {
         setIsLoading(true);
-        const response = await api.getPublicAgents();
-        if (response.agents && response.agents.length > 0) {
-          // Фильтруем агентов: требуем только наличие имени (описание может быть пустым, бэкенд добавит дефолтное)
-          const filteredAgents = response.agents
-            .filter(agent => agent.name && agent.name.trim().length > 0)
-            .sort((a, b) => a.name.localeCompare(b.name));
-          setAgents(filteredAgents);
+        const response = await api.getPublicProjectTypes();
+        if (response.projectTypes && response.projectTypes.length > 0) {
+          setProjectTypes(response.projectTypes);
+          // Устанавливаем первый таб как активный по умолчанию
+          setActiveTab(response.projectTypes[0].id);
         } else {
-          setAgents([]);
+          setProjectTypes([]);
         }
       } catch (error: any) {
         // Логируем только ошибки в dev режиме
         if (import.meta.env.DEV) {
-          console.error('[AgentsSection] Failed to load agents:', error);
+          console.error('[AgentsSection] Failed to load project types:', error);
         }
         // В случае ошибки оставляем пустой массив, но компонент все равно покажется
-        setAgents([]);
+        setProjectTypes([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadAgents();
+    loadProjectTypes();
   }, []);
 
   const colorClasses = {
@@ -172,8 +171,8 @@ export const AgentsSection: React.FC = () => {
     },
   };
 
-  // Показываем секцию всегда, даже если агентов нет
-  // В продакшене можно вернуть: if (!isLoading && agents.length === 0) return null;
+  const activeProjectType = projectTypes.find(pt => pt.id === activeTab);
+  const activeAgents = activeProjectType?.agents || [];
 
   return (
     <section id="agents-section" className="relative py-20 sm:py-32 bg-gradient-to-b from-black via-indigo-950/20 to-black">
@@ -194,47 +193,83 @@ export const AgentsSection: React.FC = () => {
 
         {/* Loading State */}
         {isLoading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-40 bg-white/5 rounded-2xl border border-white/10 animate-pulse" />
-            ))}
+          <div className="space-y-8">
+            {/* Tabs skeleton */}
+            <div className="flex flex-wrap justify-center gap-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-10 w-32 bg-white/5 rounded-lg animate-pulse" />
+              ))}
+            </div>
+            {/* Agents grid skeleton */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="h-40 bg-white/5 rounded-2xl border border-white/10 animate-pulse" />
+              ))}
+            </div>
           </div>
-        ) : agents.length > 0 ? (
-          /* Agents Grid */
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {agents.map((agent, index) => {
-              const Icon = getIconForAgent(agent.name, agent.role);
-              const color = getColorForAgent(agent.name, agent.role, index);
-              const colors = colorClasses[color as keyof typeof colorClasses];
+        ) : projectTypes.length > 0 ? (
+          <div className="space-y-8">
+            {/* Tabs */}
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+              {projectTypes.map((projectType) => (
+                <button
+                  key={projectType.id}
+                  onClick={() => setActiveTab(projectType.id)}
+                  className={`px-6 py-3 rounded-xl font-medium text-sm sm:text-base transition-all duration-300 ${
+                    activeTab === projectType.id
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-500/50'
+                      : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border border-white/20'
+                  }`}
+                >
+                  {projectType.name}
+                </button>
+              ))}
+            </div>
 
-            return (
-              <div
-                key={agent.id}
-                className="relative group"
-              >
-                {/* Card */}
-                <div className={`relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-6 border border-white/20 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden group-hover:-translate-y-1`}>
-                  {/* Glow effect */}
-                  <div className={`absolute top-0 right-0 w-48 h-48 ${colors.iconBg.replace('/10', '/20')} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-500`}></div>
+            {/* Active Tab Agents Grid */}
+            {activeAgents.length > 0 ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {activeAgents.map((agent, index) => {
+                  const Icon = getIconForAgent(agent.name, agent.role);
+                  const color = getColorForAgent(agent.name, agent.role, index);
+                  const colors = colorClasses[color as keyof typeof colorClasses];
 
-                  {/* Icon */}
-                  <div className={`relative mb-4 inline-flex p-3 ${colors.iconBg} rounded-xl border ${colors.iconBorder} group-hover:scale-110 transition-all duration-300`}>
-                    <Icon className={`w-5 h-5 ${colors.iconColor}`} />
-                  </div>
+                  return (
+                    <div
+                      key={agent.id}
+                      className="relative group"
+                    >
+                      {/* Card */}
+                      <div className={`relative h-full bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-xl rounded-2xl p-6 border border-white/20 ${colors.cardBorder} transition-all duration-300 hover:shadow-2xl ${colors.cardShadow} overflow-hidden group-hover:-translate-y-1`}>
+                        {/* Glow effect */}
+                        <div className={`absolute top-0 right-0 w-48 h-48 ${colors.iconBg.replace('/10', '/20')} rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors duration-500`}></div>
 
-                  {/* Name */}
-                  <h3 className="relative text-lg font-bold text-white mb-3 leading-tight group-hover:text-white transition-colors">
-                    {agent.name}
-                  </h3>
+                        {/* Icon */}
+                        <div className={`relative mb-4 inline-flex p-3 ${colors.iconBg} rounded-xl border ${colors.iconBorder} group-hover:scale-110 transition-all duration-300`}>
+                          <Icon className={`w-5 h-5 ${colors.iconColor}`} />
+                        </div>
 
-                  {/* Description */}
-                  <p className="relative text-sm text-white/70 leading-relaxed">
-                    {agent.description}
-                  </p>
-                </div>
+                        {/* Name */}
+                        <h3 className="relative text-lg font-bold text-white mb-3 leading-tight group-hover:text-white transition-colors">
+                          {agent.name}
+                        </h3>
+
+                        {/* Description */}
+                        <p className="relative text-sm text-white/70 leading-relaxed">
+                          {agent.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-white/60 text-lg">
+                  В этом типе проекта пока нет агентов
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           /* Empty State */
@@ -251,4 +286,3 @@ export const AgentsSection: React.FC = () => {
     </section>
   );
 };
-

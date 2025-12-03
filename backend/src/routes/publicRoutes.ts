@@ -134,4 +134,96 @@ router.get('/agents', asyncHandler(async (req: Request, res: Response) => {
     }
 }));
 
+// GET /api/public/project-types - получить типы проектов с их агентами (без авторизации)
+router.get('/project-types', asyncHandler(async (req: Request, res: Response) => {
+    logger.info('Public project types request');
+
+    try {
+        // Загружаем все типы проектов
+        const projectTypes = await withRetry(
+            () => prisma.projectType.findMany({
+                orderBy: { name: 'asc' },
+                select: {
+                    id: true,
+                    name: true,
+                },
+            }),
+            3,
+            'GET /public/project-types - find project types'
+        );
+
+        // Для каждого типа проекта загружаем его агентов через промежуточную таблицу
+        const projectTypesWithAgents = await Promise.all(
+            projectTypes.map(async (projectType) => {
+                try {
+                    const agentConnections = await withRetry(
+                        () => (prisma as any).projectTypeAgentProjectType.findMany({
+                            where: { projectTypeId: projectType.id },
+                            include: {
+                                projectTypeAgent: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        description: true,
+                                        role: true,
+                                        isHiddenFromSidebar: true,
+                                    },
+                                },
+                            },
+                            orderBy: [
+                                { order: 'asc' },
+                                { createdAt: 'asc' },
+                            ],
+                        }),
+                        3,
+                        `GET /public/project-types - find agents for ${projectType.id}`
+                    ) as any[];
+
+                    // Фильтруем только видимые агенты и преобразуем в формат ответа
+                    const agents = agentConnections
+                        .map((connection: any) => connection.projectTypeAgent)
+                        .filter((agent: any) => !agent.isHiddenFromSidebar && agent.name && agent.description)
+                        .map((agent: any) => ({
+                            id: agent.id,
+                            name: agent.name,
+                            description: agent.description || '',
+                            role: agent.role || '',
+                        }));
+
+                    return {
+                        id: projectType.id,
+                        name: projectType.name,
+                        agents,
+                    };
+                } catch (error: any) {
+                    logger.warn({ projectTypeId: projectType.id, error: error.message }, 'Error loading agents for project type');
+                    return {
+                        id: projectType.id,
+                        name: projectType.name,
+                        agents: [],
+                    };
+                }
+            })
+        );
+
+        // Фильтруем типы проектов, у которых есть хотя бы один агент
+        const filteredProjectTypes = projectTypesWithAgents.filter(pt => pt.agents.length > 0);
+
+        logger.debug({ 
+            projectTypesCount: filteredProjectTypes.length, 
+            totalProjectTypes: projectTypes.length 
+        }, 'Public project types loaded successfully');
+
+        res.json({ projectTypes: filteredProjectTypes });
+    } catch (error: any) {
+        logger.error({ error: error.message, code: error.code, stack: error.stack }, 'Error loading public project types');
+        // Если таблица не существует (миграция не применена), возвращаем пустой массив
+        if (error.code === 'P2001' || error.code === 'P2021' || error.message?.includes('does not exist') || error.message?.includes('Unknown model')) {
+            logger.warn('ProjectType or ProjectTypeAgentProjectType table may not exist, returning empty array');
+            return res.json({ projectTypes: [] });
+        }
+        throw error;
+    }
+}));
+
 export default router;

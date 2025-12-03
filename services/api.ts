@@ -326,6 +326,12 @@ export interface ApiPublicAgent {
   role?: string;
 }
 
+export interface ApiPublicProjectType {
+  id: string;
+  name: string;
+  agents: ApiPublicAgent[];
+}
+
 export interface ApiProject {
   id: string;
   userId: string;
@@ -724,6 +730,10 @@ export const api = {
   // Public Agents API
   async getPublicAgents() {
     return request<{ agents: ApiPublicAgent[] }>('/public/agents');
+  },
+
+  async getPublicProjectTypes() {
+    return request<{ projectTypes: ApiPublicProjectType[] }>('/public/project-types');
   },
 
   // Payment API
