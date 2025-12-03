@@ -8,7 +8,7 @@ const router = express.Router();
 // Create payment
 router.post('/create', authenticate, async (req: any, res) => {
     try {
-        const userId = req.user.userId; // Assuming authenticate middleware adds user to req
+        const userId = req.userId; // authMiddleware sets userId directly on req
         const { amount = 1.00, description = 'Subscription Payment' } = req.body; // Default 1 RUB for testing
 
         // Return URL should be the frontend page where user lands after payment
