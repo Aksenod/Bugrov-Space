@@ -18,6 +18,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import { PublicPrototypePage } from './components/PublicPrototypePage';
 import { CreateProjectDialog } from './components/CreateProjectDialog';
 import { EditProjectDialog } from './components/EditProjectDialog';
+import PaymentModal from './components/PaymentModal';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { AlertDialog } from './components/AlertDialog';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -277,6 +278,7 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [summaryDocuments, setSummaryDocuments] = useState<Record<string, UploadedFile[]>>({});
   const [projectTypes, setProjectTypes] = useState<ProjectType[]>([]);
@@ -1545,7 +1547,19 @@ export default function App() {
 
   // Landing page check - should be first
   if (isLandingOpen || window.location.hash === '#/landing' || window.location.hash === '#/' || window.location.hash === '') {
-    return <LandingPage />;
+    return (
+      <>
+        <LandingPage
+          isAuthenticated={!!currentUser}
+          onOpenPayment={() => setIsPaymentModalOpen(true)}
+        />
+        <PaymentModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          token={authToken || ''}
+        />
+      </>
+    );
   }
 
   // Auth check moved down to allow public access to legal pages
@@ -1607,10 +1621,9 @@ export default function App() {
     />;
   }
 
-  const authView = renderAuthOrLoader();
-  if (authView) {
-    return authView;
-  }
+  // Render Auth or Loader
+  const authOrLoader = renderAuthOrLoader();
+  if (authOrLoader) return authOrLoader;
 
   return (
     <div className="flex h-full bg-gradient-to-br from-black via-black to-indigo-950/20 text-white font-sans overflow-hidden">

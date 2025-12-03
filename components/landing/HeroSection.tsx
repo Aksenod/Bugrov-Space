@@ -1,7 +1,20 @@
 import React from 'react';
 import { Zap, CheckCircle, Users } from 'lucide-react';
 
-export const HeroSection: React.FC = () => {
+interface HeroSectionProps {
+  isAuthenticated: boolean;
+  onOpenPayment: () => void;
+}
+
+export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpenPayment }) => {
+  const handleBuyClick = () => {
+    if (isAuthenticated) {
+      onOpenPayment();
+    } else {
+      window.location.hash = '#/auth';
+    }
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-indigo-950/30 to-black overflow-hidden">
       {/* Background effects */}
@@ -68,7 +81,7 @@ export const HeroSection: React.FC = () => {
               {/* Primary CTA */}
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => window.location.hash = '#/auth'}
+                  onClick={handleBuyClick}
                   className="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
                 >
                   Подключить — 1000 ₽/мес

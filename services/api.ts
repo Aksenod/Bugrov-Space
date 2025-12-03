@@ -667,6 +667,14 @@ export const api = {
   async getPublicPrototype(hash: string) {
     return request<{ prototype: { id: string; name: string; html: string; dsl: string | null } }>(`/public/prototype/${hash}`);
   },
+
+  // Payment API
+  async createPayment(payload: { amount: string; description: string }) {
+    return request<{ confirmationUrl: string }>('/payment/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 

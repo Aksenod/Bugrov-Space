@@ -1,7 +1,20 @@
 import React from 'react';
 import { Check, Sparkles } from 'lucide-react';
 
-export const PricingSection: React.FC = () => {
+interface PricingSectionProps {
+  isAuthenticated: boolean;
+  onOpenPayment: () => void;
+}
+
+export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated, onOpenPayment }) => {
+  const handleBuyClick = () => {
+    if (isAuthenticated) {
+      onOpenPayment();
+    } else {
+      window.location.hash = '#/auth';
+    }
+  };
+
   const features = [
     'Доступ ко всем связкам агентов платформы',
     'Сценарии для лендингов, сайтов, приложений, сервисов, соцсетей',
@@ -86,7 +99,7 @@ export const PricingSection: React.FC = () => {
                 {/* CTA */}
                 <div className="space-y-4">
                   <button
-                    onClick={() => window.location.hash = '#/auth'}
+                    onClick={handleBuyClick}
                     className="w-full px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black/50"
                   >
                     Подключить — 1000 ₽/мес

@@ -7,14 +7,19 @@ import { FAQSection } from './FAQSection';
 import { LandingFooter } from './LandingFooter';
 import { LandingHeader } from './LandingHeader';
 
-export const LandingPage: React.FC = () => {
+interface LandingPageProps {
+  isAuthenticated?: boolean;
+  onOpenPayment?: () => void;
+}
+
+export const LandingPage: React.FC<LandingPageProps> = ({ isAuthenticated = false, onOpenPayment = () => { } }) => {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-black">
       <div className="relative min-h-screen text-white">
         {/* Header */}
         <LandingHeader />
         {/* Hero Section */}
-        <HeroSection />
+        <HeroSection isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
 
         {/* Pain Points Section */}
         <PainPointsSection />
@@ -24,7 +29,7 @@ export const LandingPage: React.FC = () => {
 
         {/* Pricing Section */}
         <div id="pricing">
-          <PricingSection />
+          <PricingSection isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
         </div>
 
         {/* FAQ Section */}

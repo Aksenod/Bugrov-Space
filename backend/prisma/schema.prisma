@@ -22,6 +22,27 @@ model User {
   projects Project[]
   agents   Agent[]
   messages Message[]
+  payments Payment[]
+
+  isPaid                Boolean   @default(false)
+  subscriptionExpiresAt DateTime?
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  userId        String
+  amount        Decimal
+  currency      String   @default("RUB")
+  status        String   // pending, succeeded, canceled
+  yookassaId    String   @unique
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([yookassaId])
 }
 
 model ProjectType {

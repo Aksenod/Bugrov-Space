@@ -40,7 +40,7 @@ authRouter.post('/register', authRateLimiter, async (req, res, next) => {
 
     const { username, password } = parsed.data;
     console.log('[Register] Normalized username:', username);
-    
+
     const existing = await withRetry(
       () => prisma.user.findUnique({ where: { username } }),
       2,
@@ -104,7 +104,7 @@ authRouter.post('/login', authRateLimiter, async (req, res, next) => {
 
     const { username, password } = parsed.data;
     console.log('[Login] Attempting login for username:', username);
-    
+
     const user = await withRetry(
       () => prisma.user.findUnique({ where: { username } }),
       2,
@@ -129,6 +129,8 @@ authRouter.post('/login', authRateLimiter, async (req, res, next) => {
         id: user.id,
         username: user.username,
         role: user.role,
+        isPaid: user.isPaid,
+        subscriptionExpiresAt: user.subscriptionExpiresAt,
       },
     });
   } catch (error: any) {
@@ -161,7 +163,7 @@ authRouter.post('/reset', authRateLimiter, async (req, res, next) => {
 
     const { username, newPassword } = parsed.data;
     console.log('[Reset] Attempting password reset for username:', username);
-    
+
     const user = await withRetry(
       () => prisma.user.findUnique({ where: { username } }),
       2,
@@ -206,6 +208,8 @@ authRouter.get('/me', authMiddleware, async (req, res, next) => {
           id: true,
           username: true,
           role: true,
+          isPaid: true,
+          subscriptionExpiresAt: true,
         },
       }),
       2,
