@@ -106,7 +106,7 @@ export const UltraProblemSection: React.FC = () => {
                                         {problem.title}
                                     </h3>
                                     <p className="text-gray-300 leading-relaxed text-lg">
-                                        {problem.description}
+                                        {problem.before}
                                     </p>
 
                                     {/* Glow Effect */}
