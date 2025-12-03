@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Agent, User, Project } from '../types';
-import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Settings, Brain, Cpu, Zap, Rocket, Sparkles, CircuitBoard, Wand2, MessageCircle } from 'lucide-react';
+import { Bot, FileText, PenTool, Hash, FolderOpen, Save, CheckCircle, Loader2, LogOut, Settings, Brain, Cpu, Zap, Rocket, Sparkles, CircuitBoard, Wand2, MessageCircle, Info } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { OnboardingTooltip } from './OnboardingTooltip';
 import { useOnboarding } from './OnboardingContext';
@@ -53,11 +54,82 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   const [showSaveTooltip, setShowSaveTooltip] = useState(false);
   const documentsButtonRef = useRef<HTMLButtonElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const [tooltipState, setTooltipState] = useState<{ agentId: string; description: string; x: number; y: number } | null>(null);
   
   // Проверка, является ли пользователь администратором
   const isAdmin =
     !!currentUser &&
     (currentUser.role === 'admin' || (currentUser?.username && ADMIN_USERNAMES.has(currentUser.username)));
+  
+  const handleAgentMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, agent: Agent) => {
+    if (!agent.description) {
+      setTooltipState(null);
+      return;
+    }
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const tooltipWidth = 192; // w-48 = 12rem = 192px
+    const padding = 8;
+    
+    // Позиционируем тултип справа от элемента
+    let x = rect.right + padding;
+    let y = rect.top + rect.height / 2;
+    
+    // Проверяем, не выходит ли тултип за правый край экрана
+    if (x + tooltipWidth > window.innerWidth - padding) {
+      // Если выходит, показываем слева от элемента
+      x = rect.left - tooltipWidth - padding;
+    }
+    
+    // Проверяем вертикальные границы
+    const tooltipHeight = 40; // Примерная высота
+    if (y - tooltipHeight / 2 < padding) {
+      y = padding + tooltipHeight / 2;
+    } else if (y + tooltipHeight / 2 > window.innerHeight - padding) {
+      y = window.innerHeight - padding - tooltipHeight / 2;
+    }
+    
+    setTooltipState({
+      agentId: agent.id,
+      description: agent.description,
+      x,
+      y,
+    });
+  }, []);
+  
+  const handleAgentMouseLeave = useCallback(() => {
+    setTooltipState(null);
+  }, []);
+  
+  // Обновляем позицию тултипа при скролле
+  useEffect(() => {
+    if (!tooltipState) return;
+    
+    const updateTooltipPosition = () => {
+      const agentElement = document.querySelector(`[data-agent-id="${tooltipState.agentId}"]`) as HTMLElement;
+      if (agentElement) {
+        const rect = agentElement.getBoundingClientRect();
+        setTooltipState({
+          ...tooltipState,
+          x: rect.right + 8,
+          y: rect.top + rect.height / 2,
+        });
+      }
+    };
+    
+    const sidebar = document.querySelector('aside');
+    if (sidebar) {
+      sidebar.addEventListener('scroll', updateTooltipPosition);
+      window.addEventListener('scroll', updateTooltipPosition);
+      window.addEventListener('resize', updateTooltipPosition);
+      
+      return () => {
+        sidebar.removeEventListener('scroll', updateTooltipPosition);
+        window.removeEventListener('scroll', updateTooltipPosition);
+        window.removeEventListener('resize', updateTooltipPosition);
+      };
+    }
+  }, [tooltipState]);
   
   // Показываем тултипы при первом рендере, если нужно
   useEffect(() => {
@@ -184,6 +256,9 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
             {sortedAgents.map((agent, index) => (
               <div
                 key={agent.id}
+                data-agent-id={agent.id}
+                onMouseEnter={(e) => handleAgentMouseEnter(e, agent)}
+                onMouseLeave={handleAgentMouseLeave}
                 onClick={() => {
                   onSelectAgent(agent.id);
                   onCloseMobile();
@@ -204,15 +279,16 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                     {index + 1}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
                   <div className="font-semibold text-xs truncate">{agent.name}</div>
+                  {agent.description && (
+                    <Info 
+                      size={12} 
+                      className="text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0" 
+                      title="Наведите для просмотра описания"
+                    />
+                  )}
                 </div>
-                {/* Tooltip with agent description */}
-                {agent.description && (
-                  <div className="absolute left-full ml-2 px-3 py-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg text-xs text-white/90 whitespace-normal w-48 z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 shadow-xl hidden md:block">
-                    {agent.description}
-                  </div>
-                )}
                 {/* Mobile tooltip (bottom) */}
                 {agent.description && (
                   <div className="absolute top-full mt-2 left-0 right-0 px-3 py-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg text-xs text-white/90 whitespace-normal z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 shadow-xl md:hidden">
@@ -449,6 +525,28 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
         </div>
 
       </aside>
+      
+      {/* Desktop tooltip portal - rendered outside overflow container */}
+      {tooltipState && typeof document !== 'undefined' && document.body && (() => {
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+        if (!isDesktop) return null;
+        
+        return createPortal(
+          <div
+            className="fixed px-3 py-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg text-xs text-white/90 whitespace-normal w-48 z-[9999] pointer-events-none shadow-xl"
+            style={{
+              left: `${tooltipState.x}px`,
+              top: `${tooltipState.y}px`,
+              transform: 'translateY(-50%)',
+            }}
+            data-tooltip="true"
+            data-agent-id={tooltipState.agentId}
+          >
+            {tooltipState.description}
+          </div>,
+          document.body
+        );
+      })()}
     </>
   );
 };
