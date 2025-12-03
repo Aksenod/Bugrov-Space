@@ -27,10 +27,10 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
-            Один честный тариф{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-              без скрытых ограничений
-            </span>
+              Безлимитные прототипы
+            </span>{' '}
+            и все сценарии без скрытых платежей
           </h2>
         </div>
 
