@@ -9,15 +9,16 @@ import { LandingHeader } from './LandingHeader';
 
 interface LandingPageProps {
   isAuthenticated?: boolean;
+  username?: string;
   onOpenPayment?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ isAuthenticated = false, onOpenPayment = () => { } }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ isAuthenticated = false, username, onOpenPayment = () => { } }) => {
   return (
     <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-black">
       <div className="relative min-h-screen text-white">
         {/* Header */}
-        <LandingHeader />
+        <LandingHeader isAuthenticated={isAuthenticated} username={username} />
         {/* Hero Section */}
         <HeroSection isAuthenticated={isAuthenticated} onOpenPayment={onOpenPayment} />
 

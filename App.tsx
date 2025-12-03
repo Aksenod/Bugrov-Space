@@ -1593,6 +1593,7 @@ export default function App() {
       <>
         <LandingPage
           isAuthenticated={!!currentUser}
+          username={currentUser?.username}
           onOpenPayment={() => setIsPaymentModalOpen(true)}
         />
         <PaymentModal
