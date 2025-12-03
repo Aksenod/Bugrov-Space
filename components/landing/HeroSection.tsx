@@ -8,11 +8,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpenPayment }) => {
   const handleBuyClick = () => {
-    if (isAuthenticated) {
-      onOpenPayment();
-    } else {
-      window.location.hash = '#/auth';
-    }
+    onOpenPayment();
   };
 
   return (

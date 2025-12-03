@@ -14,6 +14,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
     if (!isOpen) return null;
 
     const handlePayment = async () => {
+        // Check if user is authenticated
+        if (!token) {
+            window.location.hash = '#/auth';
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
 

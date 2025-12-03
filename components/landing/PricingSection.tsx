@@ -8,11 +8,7 @@ interface PricingSectionProps {
 
 export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated, onOpenPayment }) => {
   const handleBuyClick = () => {
-    if (isAuthenticated) {
-      onOpenPayment();
-    } else {
-      window.location.hash = '#/auth';
-    }
+    onOpenPayment();
   };
 
   const features = [
