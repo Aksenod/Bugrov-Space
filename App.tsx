@@ -628,13 +628,30 @@ export default function App() {
     const handleHashChange = () => {
       const hash = window.location.hash;
 
-      if (hash === '#/landing' || hash === '#/' || hash === '') {
+      if (hash === '#/landing' || hash === '#/') {
         setIsLandingOpen(true);
         setIsCreativeLandingOpen(false);
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
         setIsRequisitesOpen(false);
+      } else if (hash === '') {
+        // Если hash пустой и пользователь авторизован, не показываем лендинг
+        // Просто закрываем все специальные страницы и возвращаемся в рабочее пространство
+        setIsAdminOpen(false);
+        setIsOfferOpen(false);
+        setIsPrivacyOpen(false);
+        setIsRequisitesOpen(false);
+        setPrototypeHash(null);
+        setAdminInitialAgentId(undefined);
+        // Показываем лендинг только если пользователь не авторизован
+        if (!currentUser) {
+          setIsLandingOpen(true);
+          setIsCreativeLandingOpen(false);
+        } else {
+          setIsLandingOpen(false);
+          setIsCreativeLandingOpen(false);
+        }
       } else if (hash === '#/promo') {
         setIsCreativeLandingOpen(true);
         setIsLandingOpen(false);
@@ -660,15 +677,8 @@ export default function App() {
       } else if (hash.startsWith('#/prototype/')) {
         const hashValue = hash.replace('#/prototype/', '');
         setPrototypeHash(hashValue);
-      } else if (hash === '') {
-        // Закрываем все открытые страницы
-        setIsAdminOpen(false);
-        setIsOfferOpen(false);
-        setIsPrivacyOpen(false);
-        setIsRequisitesOpen(false);
-        setPrototypeHash(null);
-        setAdminInitialAgentId(undefined);
       }
+      // Пустой hash обрабатывается выше в блоке if (hash === '')
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -1668,8 +1678,11 @@ export default function App() {
       onClose={() => {
         setIsAdminOpen(false);
         setAdminInitialAgentId(undefined);
-        window.location.hash = '';
-        window.history.replaceState(null, '', window.location.pathname);
+        // Удаляем hash из URL, но не вызываем событие hashchange
+        // чтобы не сработала логика показа лендинга
+        if (window.location.hash === '#/admin') {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
         // Перезагружаем агентов после закрытия AdminPage, чтобы обновить порядок
         reloadAgents();
       }}

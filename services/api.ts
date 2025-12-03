@@ -658,6 +658,50 @@ export const api = {
     return request<{ users: ApiAdminUser[]; totalUsers: number; totalProjects: number }>('/admin/users');
   },
 
+  // Admin fix subscription API
+  async checkUserPayments(username: string) {
+    return request<{
+      user: {
+        id: string;
+        username: string;
+        isPaid: boolean;
+        subscriptionExpiresAt: string | null;
+        createdAt: string;
+      };
+      payments: Array<{
+        id: string;
+        amount: string;
+        currency: string;
+        status: string;
+        yookassaId: string;
+        description: string | null;
+        createdAt: string;
+      }>;
+    }>(`/admin/fix-subscription/check-user/${username}`);
+  },
+
+  async fixUserSubscription(username: string) {
+    return request<{
+      success: boolean;
+      message: string;
+      user: {
+        id: string;
+        username: string;
+        isPaid: boolean;
+        subscriptionExpiresAt: string | null;
+      };
+      successfulPayment: {
+        id: string;
+        amount: string;
+        status: string;
+        createdAt: string;
+      };
+    }>('/admin/fix-subscription/fix-subscription', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+  },
+
   // Public Prototype API
   async createPublicPrototype(fileId: string) {
     return request<{ hash: string; url: string }>(`/public/prototype`, {

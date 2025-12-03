@@ -1222,6 +1222,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
               isLoadingUsers={isLoadingUsers}
               totalUsers={totalUsers}
               totalProjects={totalProjects}
+              onUsersReload={loadUsers}
             />
           )}
         </div>
