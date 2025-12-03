@@ -319,6 +319,13 @@ export interface ApiProjectTypeAgent {
   isHiddenFromSidebar?: boolean;
 }
 
+export interface ApiPublicAgent {
+  id: string;
+  name: string;
+  description: string;
+  role?: string;
+}
+
 export interface ApiProject {
   id: string;
   userId: string;
@@ -712,6 +719,11 @@ export const api = {
 
   async getPublicPrototype(hash: string) {
     return request<{ prototype: { id: string; name: string; html: string; dsl: string | null } }>(`/public/prototype/${hash}`);
+  },
+
+  // Public Agents API
+  async getPublicAgents() {
+    return request<{ agents: ApiPublicAgent[] }>('/public/agents');
   },
 
   // Payment API
