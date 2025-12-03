@@ -25,7 +25,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
                     'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    amount: 1.00, // For testing
+                    amount: 1000.00,
                     description: 'Подписка на Bugrov Space',
                     returnUrl: window.location.href,
                 }),
@@ -74,7 +74,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
                                 <p className="text-sm text-gray-400">Доступ ко всем функциям платформы</p>
                             </div>
                             <div className="ml-auto font-semibold text-white">
-                                1 ₽ <span className="text-xs text-gray-500 font-normal">/ мес</span>
+                                1000 ₽ <span className="text-xs text-gray-500 font-normal">/ мес</span>
                             </div>
                         </div>
 
