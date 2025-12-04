@@ -46,7 +46,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
           className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white text-xs font-medium rounded-full shadow-lg hover:shadow-indigo-500/50 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/20"
           aria-label="Перейти на Bugrov.space"
         >
-          <span className="flex items-center gap-1">
+          <span className="flex flex-col md:flex-row items-center gap-1">
             <span>Сделано на</span>
             <span className="font-bold">Bugrov.space</span>
           </span>
