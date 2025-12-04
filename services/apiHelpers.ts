@@ -27,7 +27,16 @@ export const setToken = (token: string | null) => {
   }
 };
 
-export const getToken = () => authToken;
+export const getToken = () => {
+  // Всегда читаем актуальное значение из localStorage, чтобы избежать проблем с синхронизацией
+  if (typeof window !== 'undefined') {
+    const tokenFromStorage = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (tokenFromStorage !== authToken) {
+      authToken = tokenFromStorage;
+    }
+  }
+  return authToken;
+};
 
 export const clearToken = () => setToken(null);
 
@@ -54,8 +63,9 @@ const getHeaders = (custom: Record<string, string> = {}) => {
   if (!(custom['Content-Type'])) {
     headers['Content-Type'] = 'application/json';
   }
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
   return headers;
 };
