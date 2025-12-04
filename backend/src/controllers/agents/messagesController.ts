@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../db/prisma';
 import { withRetry } from '../../utils/prismaRetry';
@@ -16,8 +16,9 @@ const messageSchema = z.object({
 /**
  * Получить сообщения агента
  */
-export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.userId!;
+export const getMessages = async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
   const { agentId } = req.params;
   const projectId = req.query.projectId as string | undefined;
 
@@ -81,8 +82,9 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Отправить сообщение агенту
  */
-export const postMessage = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.userId!;
+export const postMessage = async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
   const { agentId } = req.params;
 
   logger.info({
@@ -207,8 +209,9 @@ export const postMessage = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Удалить все сообщения агента
  */
-export const deleteMessages = async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.userId!;
+export const deleteMessages = async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
   const { agentId } = req.params;
   const projectId = req.query.projectId as string | undefined;
 
