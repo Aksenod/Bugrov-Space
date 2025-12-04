@@ -16,7 +16,6 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
     'Сценарии для лендингов, сайтов, приложений, сервисов, соцсетей',
     'Генерация прототипов без ограничений',
     'Сохранение и публикация прототипов',
-    'Библиотека шаблонов под ключевые ниши',
     'Новые сценарии добавляются автоматически',
     'Поддержка и помощь в онбординге',
   ];
@@ -53,7 +52,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
               <div className="p-8 sm:p-12 pt-6 sm:pt-12">
                 {/* Plan name and price */}
                 <div className="mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-4">Тариф «Pro»</h3>
+                  <h3 className="text-2xl font-bold text-white mb-4">Тариф «База»</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-5xl sm:text-6xl font-bold text-white">1000 ₽</span>
                     <span className="text-2xl text-white/60">/ месяц</span>
