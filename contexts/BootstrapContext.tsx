@@ -31,7 +31,14 @@ export const BootstrapProvider: React.FC<BootstrapProviderProps> = ({ children, 
   const hasBootstrappedRef = useRef(false);
 
   const bootstrap = useCallback(async (): Promise<void> => {
-    const token = getToken();
+    // Читаем токен несколько раз, чтобы убедиться, что он синхронизирован
+    let token = getToken();
+    if (!token) {
+      // Даем еще одну попытку после небольшой задержки
+      await new Promise(resolve => setTimeout(resolve, 50));
+      token = getToken();
+    }
+    
     if (!token) {
       auth.logout();
       projects.setProjects([]);

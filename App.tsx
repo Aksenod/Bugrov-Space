@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, Suspense } from 'react';
+import React, { useCallback, useEffect, useState, Suspense, useRef } from 'react';
 import { Bot, AlertCircle } from 'lucide-react';
 
 import { UploadedFile, Agent, User, Project } from './types';
@@ -151,12 +151,24 @@ export default function App() {
   }, [handleLogout, setAgents, setActiveAgentId, chat, bootstrap]);
 
   // Вызываем bootstrap при изменении токена
+  // Используем ref для отслеживания, был ли bootstrap вызван вручную (через handleLoginWithBootstrap)
+  const bootstrapCalledManuallyRef = useRef(false);
+  
   useEffect(() => {
-    if (authToken) {
-      bootstrap.bootstrap();
-    } else {
+    if (!authToken) {
       handleLogoutWithCleanup();
+      bootstrapCalledManuallyRef.current = false;
+      return;
     }
+    
+    // Если bootstrap был вызван вручную, не вызываем его снова
+    if (bootstrapCalledManuallyRef.current) {
+      bootstrapCalledManuallyRef.current = false;
+      return;
+    }
+    
+    // Вызываем bootstrap для случая, когда пользователь уже залогинен (например, при перезагрузке страницы)
+    bootstrap.bootstrap();
   }, [authToken, bootstrap, handleLogoutWithCleanup]);
 
   // Проверка, является ли пользователь администратором
@@ -208,7 +220,10 @@ export default function App() {
 
   // Обертка для handleLogin с вызовом bootstrap
   const handleLoginWithBootstrap = useCallback(async (username: string, password: string) => {
+    bootstrapCalledManuallyRef.current = true; // Помечаем, что bootstrap будет вызван вручную
     await handleLogin(username, password);
+    // Небольшая задержка, чтобы убедиться, что токен успел синхронизироваться
+    await new Promise(resolve => setTimeout(resolve, 50));
     await bootstrap.bootstrap();
   }, [handleLogin, bootstrap]);
 
