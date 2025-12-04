@@ -37,16 +37,16 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10">
-        <h1 className="text-white font-medium">
-          Просмотр прототипа{versionNumber !== undefined ? ` (Версия ${versionNumber})` : ''}
-          {username && <span className="text-white/60 ml-2">• {username}</span>}
+        <h1 className="text-white font-medium flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+          <span>Просмотр прототипа{versionNumber !== undefined ? ` (Версия ${versionNumber})` : ''}</span>
+          {username && <span className="text-white/60 md:ml-2">• {username}</span>}
         </h1>
         <button
           onClick={() => window.open('https://bugrov.space', '_blank')}
           className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white text-xs font-medium rounded-full shadow-lg hover:shadow-indigo-500/50 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/20"
           aria-label="Перейти на Bugrov.space"
         >
-          <span className="flex flex-col md:flex-row items-center gap-1">
+          <span className="flex flex-col md:flex-row items-center">
             <span>Сделано на</span>
             <span className="font-bold">Bugrov.space</span>
           </span>
