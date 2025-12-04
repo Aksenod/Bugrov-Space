@@ -77,6 +77,18 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
           </div>
         )}
       </div>
+
+      {/* Branding Button */}
+      <button
+        onClick={() => window.open('https://bugrov.space', '_blank')}
+        className="fixed bottom-6 right-6 z-[101] px-4 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white text-sm font-medium rounded-full shadow-lg hover:shadow-indigo-500/50 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/20"
+        aria-label="Перейти на Bugrov.space"
+      >
+        <span className="flex items-center gap-1.5">
+          <span>Сделано на</span>
+          <span className="font-bold">Bugrov.space</span>
+        </span>
+      </button>
     </div>
   );
 };
