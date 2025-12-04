@@ -156,11 +156,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
               });
             }
           }}
-          placeholder={disabled ? "Connecting..." : "Ask anything..."}
+          placeholder={disabled ? "Подключение..." : "Напишите мне ..."}
           disabled={disabled}
-          className="w-full bg-transparent text-white placeholder-white/30 text-base px-3 py-3.5 max-h-[150px] min-h-[48px] focus:outline-none focus:ring-0 resize-none no-scrollbar font-medium leading-relaxed"
+          className="w-full bg-transparent text-white placeholder-white/30 text-base px-3 max-h-[150px] min-h-[48px] focus:outline-none focus:ring-0 resize-none no-scrollbar font-medium"
           rows={1}
-          style={{ height: '48px', overflowY: 'hidden' }}
+          style={{ 
+            height: '48px', 
+            overflowY: 'hidden',
+            paddingTop: '12px',
+            paddingBottom: '12px',
+            lineHeight: '24px',
+            boxSizing: 'border-box'
+          }}
         />
         <div className="pr-1.5 flex-shrink-0 flex items-center">
           <button

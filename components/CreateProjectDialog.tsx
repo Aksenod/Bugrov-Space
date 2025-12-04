@@ -299,13 +299,16 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Введите название проекта"
+              placeholder="Например: Веб-сайт компании, Брендинг стартапа..."
               maxLength={50}
               disabled={isLoading}
               className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               autoFocus
             />
-            <p className="mt-1 text-xs text-white/40">{name.length}/50</p>
+            <div className="mt-1.5 flex items-center justify-between">
+              <p className="text-xs text-white/40">{name.length}/50</p>
+              <p className="text-xs text-white/50">Будет использоваться AI-агентами для контекста</p>
+            </div>
           </div>
 
           <div>
@@ -392,19 +395,23 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
           <div>
             <label htmlFor="description" className="block text-sm font-semibold text-white/90 mb-2">
-              Описание (необязательно)
+              Описание проекта
+              <span className="ml-2 text-xs font-normal text-white/50">(рекомендуется)</span>
             </label>
             <textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Введите описание проекта"
+              placeholder="Опишите цели, требования или особенности проекта. Эта информация поможет AI-агентам лучше понять контекст вашей работы..."
               maxLength={500}
-              rows={3}
+              rows={4}
               disabled={isLoading}
               className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
             />
-            <p className="mt-1 text-xs text-white/40">{description.length}/500</p>
+            <div className="mt-1.5 flex items-center justify-between">
+              <p className="text-xs text-white/40">{description.length}/500</p>
+              <p className="text-xs text-white/50">Будет использоваться AI-агентами для контекста</p>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">

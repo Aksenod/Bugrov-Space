@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UploadedFile, Agent, Project, User, PrototypeVersion } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
@@ -130,6 +130,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [selectedVersionNumber, setSelectedVersionNumber] = useState<number | null>(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isVersionDropdownOpen, setIsVersionDropdownOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -318,8 +319,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     return `${getAgentName(doc)} - ${extractTimestamp(doc)}`;
   };
 
-
-  const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
+  // Используем useMemo для стабильного вычисления selectedFile
+  const selectedFile = useMemo(() => {
+    return localSelectedFile || documents.find(doc => doc.id === selectedFileId) || null;
+  }, [localSelectedFile, documents, selectedFileId]);
 
   const decodeContent = (base64: string) => {
     try {
@@ -331,26 +334,40 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   // Timer for prototype generation - calculates duration based on content size
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isGeneratingPrototype && selectedFile) {
-      // Calculate estimated time based on content size
-      const contentSize = decodeContent(selectedFile.data).length;
-      // Formula: 30s base + 1s per 100 characters, min 30s, max 180s
-      const estimatedSeconds = Math.min(180, Math.max(30, 30 + Math.floor(contentSize / 100)));
+    let interval: NodeJS.Timeout | undefined;
+    if (isGeneratingPrototype && selectedFile && selectedFile.data) {
+      try {
+        // Calculate estimated time based on content size
+        const contentSize = decodeContent(selectedFile.data).length;
+        // Formula: 30s base + 1s per 100 characters, min 30s, max 180s
+        const estimatedSeconds = Math.min(180, Math.max(30, 30 + Math.floor(contentSize / 100)));
 
-      setTimeLeft(estimatedSeconds);
-      interval = setInterval(() => {
-        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
-      }, 1000);
+        setTimeLeft(estimatedSeconds);
+        interval = setInterval(() => {
+          setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+        }, 1000);
+      } catch (error) {
+        console.error('Error calculating timer:', error);
+        setTimeLeft(null);
+      }
     } else {
       setTimeLeft(null);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [isGeneratingPrototype, selectedFile]);
 
   // Load prototype versions when file with prototype is selected
   useEffect(() => {
-    if (!isOpen) return; // Early return if modal is closed
+    if (!isOpen) {
+      // Reset state when modal is closed
+      setPrototypeVersions([]);
+      setSelectedVersionNumber(null);
+      return;
+    }
     
     const loadVersions = async () => {
       if (!selectedFileId || activeTab !== 'prototype') {
@@ -390,7 +407,11 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    if (!isOpen) return; // Early return if modal is closed
+    if (!isOpen) {
+      // Ensure dropdown is closed when modal is closed
+      setIsVersionDropdownOpen(false);
+      return;
+    }
     
     const handleClickOutside = (event: MouseEvent) => {
       if (isVersionDropdownOpen) {
@@ -406,6 +427,21 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isVersionDropdownOpen, isOpen]);
+
+  // Загружаем состояние sidebar из localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('documents-sidebar-collapsed');
+    if (saved !== null) {
+      setIsSidebarCollapsed(saved === 'true');
+    }
+  }, []);
+
+  // Функция для переключения состояния sidebar
+  const toggleSidebar = () => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem('documents-sidebar-collapsed', String(newState));
+  };
 
   if (!isOpen) return null;
 
@@ -755,16 +791,40 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Sidebar List */}
-        <div className={`w-full md:!w-[15%] md:max-w-[220px] border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl ${selectedFile ? 'hidden md:flex' : 'flex'}`}>
-          <div className="p-4 sm:p-6 border-b border-white/10 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
+        <div 
+          className={`border-r border-white/10 flex flex-col bg-black/40 backdrop-blur-xl transition-all duration-300 ease-in-out relative overflow-hidden ${
+            isSidebarCollapsed 
+              ? 'w-[60px] md:!w-[60px]' 
+              : 'w-full md:!w-[280px] md:min-w-[280px]'
+          } ${selectedFile ? 'hidden md:flex' : 'flex'}`}
+          title={isSidebarCollapsed ? `${documents.length} ${documents.length === 1 ? 'документ' : documents.length < 5 ? 'документа' : 'документов'}` : undefined}
+          style={{ 
+            transitionProperty: 'width',
+            transitionDuration: '300ms',
+            transitionTimingFunction: 'ease-in-out',
+            willChange: 'width'
+          }}
+        >
+          <div className={`transition-all duration-300 ease-in-out border-b border-white/10 flex flex-col ${
+            isSidebarCollapsed ? 'p-3 items-center gap-3' : 'p-4 sm:p-6 gap-3'
+          }`}>
+            {/* Expanded Header - Always rendered, animated */}
+            <div 
+              className={`transition-opacity duration-300 ease-in-out flex items-center gap-2 ${
+                isSidebarCollapsed 
+                  ? 'opacity-0 pointer-events-none' 
+                  : 'opacity-100 pointer-events-auto'
+              }`}
+            >
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 bg-amber-500/20 rounded-xl text-amber-400 flex-shrink-0">
                     <FileText size={18} className="sm:w-5 sm:h-5" />
                   </div>
-                  <span className="truncate">{project?.name || 'Документы'}</span>
-                </h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-white truncate">
+                    {project?.name || 'Документы'}
+                  </h2>
+                </div>
                 {project?.projectType && (
                   <p className="text-xs sm:text-sm text-white/50 mt-1 ml-11 sm:ml-12 truncate">
                     {project.projectType.name}
@@ -779,54 +839,134 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
               >
                 <X size={20} />
               </button>
-            </div>
-            {/* Upload Button */}
-            {onFileUpload && (
+              {/* Desktop Toggle Button */}
               <button
-                onClick={onFileUpload}
-                className="w-full mt-2 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                onClick={toggleSidebar}
+                className="hidden md:flex p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200 flex-shrink-0"
+                aria-label="Свернуть панель документов"
+                title="Свернуть панель"
               >
-                <Upload size={16} />
-                Загрузить
+                <ChevronLeft size={16} />
               </button>
+            </div>
+
+            {/* Collapsed Header - Always rendered, instant hide on expand */}
+            <div 
+              className={`flex flex-col items-center gap-3 overflow-hidden ${
+                isSidebarCollapsed 
+                  ? 'opacity-100 pointer-events-auto' 
+                  : 'opacity-0 pointer-events-none'
+              }`}
+              style={{
+                maxWidth: isSidebarCollapsed ? '60px' : '0px',
+                transitionProperty: isSidebarCollapsed ? 'opacity, max-width' : 'none',
+                transitionDuration: isSidebarCollapsed ? '300ms' : '0ms',
+                transitionTimingFunction: 'ease-in-out'
+              }}
+            >
+              {/* Icon with Badge - Clickable to expand */}
+              <button
+                onClick={toggleSidebar}
+                className="relative p-2.5 bg-amber-500/20 hover:bg-amber-500/30 rounded-xl text-amber-400 transition-colors duration-200 group w-full flex items-center justify-center flex-shrink-0"
+                aria-label="Развернуть панель документов"
+                title={`${documents.length} ${documents.length === 1 ? 'документ' : documents.length < 5 ? 'документа' : 'документов'}`}
+              >
+                <FileText size={22} className="group-hover:scale-110 transition-transform duration-200" />
+                {documents.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-black/60 shadow-lg">
+                    {documents.length > 9 ? '9+' : documents.length}
+                  </span>
+                )}
+              </button>
+              
+              {/* Upload Button - Only if available */}
+              {onFileUpload && (
+                <button
+                  onClick={onFileUpload}
+                  className="w-full p-2.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors duration-200 flex items-center justify-center border border-indigo-500/20 hover:border-indigo-500/40 flex-shrink-0"
+                  aria-label="Загрузить документ"
+                  title="Загрузить документ"
+                >
+                  <Upload size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* Upload Button (Expanded State) - Always rendered, animated */}
+            {onFileUpload && (
+              <div
+                className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                  isSidebarCollapsed 
+                    ? 'opacity-0 max-h-0 mt-0 pointer-events-none' 
+                    : 'opacity-100 max-h-20 mt-0 pointer-events-auto'
+                }`}
+                style={{ 
+                  transitionProperty: 'opacity, max-height, margin-top',
+                  willChange: isSidebarCollapsed ? 'opacity, max-height' : undefined
+                }}
+              >
+                <button
+                  onClick={onFileUpload}
+                  className="w-full px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30"
+                >
+                  <Upload size={16} />
+                  Загрузить
+                </button>
+              </div>
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 md:no-scrollbar">
-            {documents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
-                <div className="relative mb-4">
-                  <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full animate-pulse"></div>
-                  <FileText size={40} className="relative opacity-60" />
-                </div>
-                <p className="text-base font-semibold text-white/70 mb-2">Нет документов</p>
-                <p className="text-xs text-white/50 max-w-[200px]">Используйте кнопку "Сохранить" в чате для создания отчетов.</p>
-              </div>
-            ) : (
-              documents.map(doc => (
-                <button
-                  key={doc.id}
-                  onClick={() => setSelectedFileId(doc.id)}
-                  className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-4 group relative overflow-hidden ${selectedFileId === doc.id
-                    ? 'bg-white/10 shadow-lg border border-white/10'
-                    : 'hover:bg-white/5 border border-transparent'
-                    }`}
-                >
-                  {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
-
-                  <div className="min-w-0 flex-1">
-                    <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
-                      {getDocumentDisplayName(doc)}
-                    </h4>
+          {/* Documents List with smooth animation */}
+          <div 
+            className={`flex-1 overflow-hidden transition-opacity duration-300 ease-in-out ${
+              isSidebarCollapsed 
+                ? 'opacity-0 pointer-events-none' 
+                : 'opacity-100 pointer-events-auto'
+            }`}
+          >
+            <div className="h-full overflow-y-auto p-4 space-y-2 md:no-scrollbar">
+              {documents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
+                  <div className="relative mb-4">
+                    <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full animate-pulse"></div>
+                    <FileText size={40} className="relative opacity-60" />
                   </div>
-                </button>
-              ))
-            )}
+                  <p className="text-base font-semibold text-white/70 mb-2">Нет документов</p>
+                  <p className="text-xs text-white/50 max-w-[200px]">Используйте кнопку "Сохранить" в чате для создания отчетов.</p>
+                </div>
+              ) : (
+                documents.map(doc => (
+                  <button
+                    key={doc.id}
+                    onClick={() => setSelectedFileId(doc.id)}
+                    className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-4 group relative overflow-hidden ${selectedFileId === doc.id
+                      ? 'bg-white/10 shadow-lg border border-white/10'
+                      : 'hover:bg-white/5 border border-transparent'
+                      }`}
+                  >
+                    {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
+                        {getDocumentDisplayName(doc)}
+                      </h4>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
         {/* Preview Area */}
-        <div className={`flex-1 md:w-[85%] flex flex-col bg-black/30 relative min-h-0 ${!selectedFile ? 'hidden md:flex' : 'flex'}`}>
+        <div 
+          className={`flex-1 md:flex flex-col bg-black/30 relative min-h-0 transition-all duration-300 ease-in-out ${!selectedFile ? 'hidden md:flex' : 'flex'}`}
+          style={{ 
+            width: isSidebarCollapsed ? 'calc(100% - 60px)' : undefined,
+            transitionProperty: 'width',
+            willChange: 'width'
+          }}
+        >
 
           {/* Mobile Header for Preview */}
           <div className="md:hidden sticky top-0 z-20 p-4 border-b border-white/10 flex items-center gap-3 bg-black/60 backdrop-blur-md flex-shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
