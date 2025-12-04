@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { api } from '../services/api';
+import { getToken } from '../services/apiHelpers';
 import { UseBootstrapReturn, UseAuthReturn, UseProjectsReturn, UseAgentsReturn, UseChatReturn } from './types';
 
 /**
@@ -26,7 +26,7 @@ export const useBootstrap = (
   const hasBootstrappedRef = useRef(false);
 
   const bootstrap = useCallback(async (): Promise<void> => {
-    const token = api.getToken();
+    const token = getToken();
     if (!token) {
       auth.logout();
       projects.setProjects([]);

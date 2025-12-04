@@ -1,16 +1,15 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'https://bugrov-space.onrender.com/api').replace(/\/$/, '');
-const TOKEN_STORAGE_KEY = 'bugrov_space_token';
+import { getToken } from './apiHelpers';
 
-let authToken: string | null =
-  typeof window !== 'undefined' ? window.localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'https://bugrov-space.onrender.com/api').replace(/\/$/, '');
 
 const getHeaders = (custom: Record<string, string> = {}) => {
   const headers: Record<string, string> = { ...custom };
   if (!(custom['Content-Type'])) {
     headers['Content-Type'] = 'application/json';
   }
-  if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
   return headers;
 };
@@ -357,20 +356,12 @@ export interface ApiGlobalPrompt {
   updatedAt?: string;
 }
 
-const setToken = (token: string | null) => {
-  authToken = token;
-  if (typeof window === 'undefined') return;
-  if (token) {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-  } else {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-  }
-};
+import { setToken as setTokenHelper, getToken as getTokenHelper, clearToken as clearTokenHelper } from './apiHelpers';
 
 export const api = {
-  getToken: () => authToken,
-  setToken,
-  clearToken: () => setToken(null),
+  getToken: getTokenHelper,
+  setToken: setTokenHelper,
+  clearToken: clearTokenHelper,
   clearRateLimitBlock: () => {
     rateLimitBlockedUntil = null;
     if (import.meta.env.DEV) {
