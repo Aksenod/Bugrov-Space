@@ -48,6 +48,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   // Agents state
   const [agents, setAgents] = useState<ApiProjectTypeAgent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+  const [isSavingAgent, setIsSavingAgent] = useState(false);
 
   // Users state
   const [users, setUsers] = useState<ApiAdminUser[]>([]);
