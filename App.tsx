@@ -68,7 +68,7 @@ const mapAgent = (agent: ApiAgent): Agent => ({
   summaryInstruction: agent.summaryInstruction,
   files: (agent.files ?? []).filter(file => !file.name.startsWith('Summary')).map(mapFile),
   avatarColor: pickColor(agent.id),
-  model: (agent.model as LLMModel) || LLMModel.GPT51,
+  model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
   role: agent.role,
   order: agent.order ?? 0,
   projectTypeAgentId: agent.projectTypeAgentId,
@@ -109,7 +109,7 @@ const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => ({
   summaryInstruction: agent.summaryInstruction,
   files: [], // Агенты типов проектов не имеют файлов
   avatarColor: pickColor(agent.id),
-  model: (agent.model as LLMModel) || LLMModel.GPT51,
+  model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
   role: agent.role,
   order: agent.order ?? 0, // Убеждаемся, что order всегда число
 });
@@ -367,7 +367,7 @@ export default function App() {
       console.log(`[Frontend] Project documents count: ${projectDocuments.length}`);
     }
   }, [activeAgent?.id, activeAgentId, realAgentIdForMessages, projectDocuments.length]);
-  const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT51;
+  const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT5_MINI;
   const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
   const isGPT5Mini = false; // GPT5_MINI больше не существует

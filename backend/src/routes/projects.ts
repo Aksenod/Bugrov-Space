@@ -212,7 +212,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
             description: template.description ?? '',
             systemInstruction: template.systemInstruction ?? '',
             summaryInstruction: template.summaryInstruction ?? '',
-            model: template.model ?? 'gpt-5.1',
+            model: template.model ?? 'gpt-5-mini',
             role: template.role ?? '',
             order: typeof connection.order === 'number' ? connection.order : index,
           },

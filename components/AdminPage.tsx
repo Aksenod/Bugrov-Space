@@ -66,7 +66,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [agentDescription, setAgentDescription] = useState('');
   const [agentSystemInstruction, setAgentSystemInstruction] = useState('');
   const [agentSummaryInstruction, setAgentSummaryInstruction] = useState('');
-  const [agentModel, setAgentModel] = useState<LLMModel>(LLMModel.GPT51);
+  const [agentModel, setAgentModel] = useState<LLMModel>(LLMModel.GPT5_MINI);
   const [agentRole, setAgentRole] = useState('');
   const [agentIsHiddenFromSidebar, setAgentIsHiddenFromSidebar] = useState(false);
   const [selectedProjectTypeIds, setSelectedProjectTypeIds] = useState<string[]>([]);
@@ -587,7 +587,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           description: '',
           systemInstruction: '',
           summaryInstruction: '',
-          model: LLMModel.GPT51,
+          model: LLMModel.GPT5_MINI,
           isHiddenFromSidebar: false,
         });
         setEditingAgent(newAgent);
@@ -665,7 +665,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         setAgentDescription(draft.description || '');
         setAgentSystemInstruction(draft.systemInstruction || '');
         setAgentSummaryInstruction(draft.summaryInstruction || '');
-        setAgentModel(draft.model || LLMModel.GPT51);
+        setAgentModel(draft.model || LLMModel.GPT5_MINI);
         setAgentRole(draft.role || '');
         setAgentIsHiddenFromSidebar(draft.isHiddenFromSidebar || false);
         setSelectedProjectTypeIds(draft.selectedProjectTypeIds || []);

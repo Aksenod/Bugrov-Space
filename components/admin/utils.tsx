@@ -52,7 +52,8 @@ export const getAgentIcon = (agentId: string, size: number = 16, className: stri
 
 export const resolveModel = (value: string): LLMModel => {
   if (value === LLMModel.GPT51) return LLMModel.GPT51;
+  if (value === LLMModel.GPT5_MINI) return LLMModel.GPT5_MINI;
   if (value === LLMModel.GPT4O) return LLMModel.GPT4O;
   if (value === LLMModel.GPT4O_MINI) return LLMModel.GPT4O_MINI;
-  return LLMModel.GPT51;
+  return LLMModel.GPT5_MINI;
 };
