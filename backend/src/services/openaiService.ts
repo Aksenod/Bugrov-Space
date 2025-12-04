@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { env } from '../env';
 import { logger } from '../utils/logger';
 import { getGlobalPromptText } from './globalPromptService';
+import { performDeepWebSearch, shouldPerformWebSearch, WebSearchResponse } from './webSearchService';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-5-mini';
@@ -26,6 +27,7 @@ type AgentWithFiles = {
   systemInstruction: string | null;
   summaryInstruction: string | null;
   model: string | null;
+  role?: string | null; // Роль агента (например, 'search', 'copywriter', 'dsl', 'layout')
   files: AgentFile[];
 };
 
@@ -286,15 +288,88 @@ function extractMessageText(payload: any) {
   return payload?.choices?.[0]?.message?.content?.trim() ?? '';
 }
 
+/**
+ * Форматирует результаты веб-поиска для включения в системный промпт
+ */
+function buildSearchContext(searchResults: WebSearchResponse): string {
+  const resultsText = searchResults.results
+    .map((result, index) => {
+      return `[Источник ${index + 1}]
+Заголовок: ${result.title}
+URL: ${result.url}
+Содержимое: ${result.content.substring(0, 1000)}${result.content.length > 1000 ? '...' : ''}
+---`;
+    })
+    .join('\n\n');
+
+  let context = `АКТУАЛЬНАЯ ИНФОРМАЦИЯ ИЗ ИНТЕРНЕТА (результаты веб-поиска по запросу "${searchResults.query}"):
+
+${resultsText}`;
+
+  if (searchResults.answer) {
+    context += `\n\nКРАТКИЙ ОТВЕТ ОТ ПОИСКОВОЙ СИСТЕМЫ:\n${searchResults.answer}`;
+  }
+
+  context += `\n\nВАЖНО: Используй эту информацию для формирования полного и актуального ответа. Указывай источники, когда это уместно (используй формат [Источник 1], [Источник 2] и т.д.). Если информация из разных источников противоречит друг другу, упомяни об этом. Структурируй ответ с помощью markdown разметки.`;
+
+  return context;
+}
+
 export async function generateAgentResponse(
   agent: AgentWithFiles,
   history: ConversationMessage[],
   newMessage: string,
   projectInfo?: ProjectInfo,
 ): Promise<string> {
-  const systemPrompt = await buildSystemPrompt(agent, projectInfo);
+  let searchResults: WebSearchResponse | null = null;
+  let enhancedSystemPrompt = await buildSystemPrompt(agent, projectInfo);
+
+  // Проверяем, нужен ли веб-поиск (передаем роль агента)
+  if (shouldPerformWebSearch(newMessage, agent.role)) {
+    try {
+      logger.info(
+        { 
+          agentId: agent.id, 
+          agentName: agent.name, 
+          agentRole: agent.role,
+          query: newMessage 
+        },
+        'Performing web search (agent has search role or search keywords detected)'
+      );
+      
+      searchResults = await performDeepWebSearch(newMessage, 5);
+      
+      if (searchResults.results.length > 0) {
+        const searchContext = buildSearchContext(searchResults);
+        enhancedSystemPrompt = `${enhancedSystemPrompt}\n\n${searchContext}`;
+        
+        logger.info(
+          { 
+            agentId: agent.id, 
+            resultsCount: searchResults.results.length,
+            hasAnswer: !!searchResults.answer 
+          },
+          'Web search results added to system prompt'
+        );
+      } else {
+        logger.warn(
+          { agentId: agent.id, query: newMessage },
+          'Web search returned no results'
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        { 
+          agentId: agent.id, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        },
+        'Web search failed, continuing without search results'
+      );
+    }
+  }
+
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: enhancedSystemPrompt },
     ...mapHistory(history),
     { role: 'user', content: newMessage },
   ];
@@ -307,6 +382,8 @@ export async function generateAgentResponse(
     modelType: typeof agent.model,
     modelToUse,
     defaultModel: DEFAULT_MODEL,
+    hasWebSearch: !!searchResults,
+    agentRole: agent.role,
   }, 'Generating agent response with model');
 
   const completion = await callOpenAi(modelToUse, messages);

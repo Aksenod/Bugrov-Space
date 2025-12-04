@@ -61,8 +61,11 @@ export const env = {
   port: Number(process.env.PORT ?? 4000),
   jwtSecret: process.env.JWT_SECRET!,
   openAiApiKey: process.env.OPENAI_API_KEY!,
+  tavilyApiKey: process.env.TAVILY_API_KEY, // Опциональный ключ для веб-поиска
   corsOrigin: getCorsOrigin(),
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  logToFile: process.env.LOG_TO_FILE === 'true',
 };
 
 

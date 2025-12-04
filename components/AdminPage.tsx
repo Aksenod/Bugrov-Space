@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu, Sparkles, Trash2 } from 'lucide-react';
+import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu, Sparkles, Trash2, Globe } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { DragEndEvent } from '@dnd-kit/core';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile, ApiAdminUser } from '../services/api';
@@ -1794,13 +1794,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                             'copywriter': { icon: PenTool, label: 'Копирайтер', color: 'text-cyan-300' },
                             'layout': { icon: Layout, label: 'Верстальщик', color: 'text-purple-300' },
                             'dsl': { icon: Code2, label: 'DSL', color: 'text-emerald-300' },
+                            'search': { icon: Globe, label: 'Исследователь', color: 'text-blue-300' },
                           };
                           const config = roleConfig[agentRole as keyof typeof roleConfig] || roleConfig[''];
                           const Icon = config.icon;
                           return (
                             <>
                               {Icon && (
-                                <div className={`p-1.5 rounded-lg bg-${agentRole === 'copywriter' ? 'cyan' : agentRole === 'layout' ? 'purple' : agentRole === 'dsl' ? 'emerald' : 'white'}-500/20`}>
+                                <div className={`p-1.5 rounded-lg bg-${agentRole === 'copywriter' ? 'cyan' : agentRole === 'layout' ? 'purple' : agentRole === 'dsl' ? 'emerald' : agentRole === 'search' ? 'blue' : 'white'}-500/20`}>
                                   <Icon size={14} className={config.color} />
                                 </div>
                               )}
@@ -1836,6 +1837,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                               { value: 'copywriter', label: 'Копирайтер', icon: PenTool, color: 'text-cyan-300', bgColor: 'bg-cyan-500/20', borderColor: 'border-cyan-500/30' },
                               { value: 'layout', label: 'Верстальщик', icon: Layout, color: 'text-purple-300', bgColor: 'bg-purple-500/20', borderColor: 'border-purple-500/30' },
                               { value: 'dsl', label: 'DSL', icon: Code2, color: 'text-emerald-300', bgColor: 'bg-emerald-500/20', borderColor: 'border-emerald-500/30' },
+                              { value: 'search', label: 'Исследователь', icon: Globe, color: 'text-blue-300', bgColor: 'bg-blue-500/20', borderColor: 'border-blue-500/30' },
                             ].map((role) => {
                               const isSelected = agentRole === role.value;
                               const Icon = role.icon;
