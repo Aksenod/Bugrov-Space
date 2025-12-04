@@ -5,6 +5,14 @@ import { ensureConnection } from './db/prisma';
 
 const port = env.port;
 
+// Логируем настройки CORS при старте
+logger.info({
+  corsOrigin: env.corsOrigin,
+  corsOriginType: typeof env.corsOrigin,
+  corsOriginIsArray: Array.isArray(env.corsOrigin),
+  nodeEnv: env.nodeEnv,
+}, 'Server starting with CORS configuration');
+
 // Проверяем подключение к БД перед запуском сервера
 async function startServer() {
   const maxRetries = 5;

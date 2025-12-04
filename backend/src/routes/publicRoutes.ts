@@ -32,6 +32,12 @@ router.get('/prototype/:documentId', asyncHandler(async (req: Request, res: Resp
                             select: {
                                 id: true,
                                 name: true,
+                                user: {
+                                    select: {
+                                        id: true,
+                                        username: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -108,6 +114,7 @@ router.get('/prototype/:documentId', asyncHandler(async (req: Request, res: Resp
                 id: file.agent.project.id,
                 name: file.agent.project.name,
             } : null,
+            username: file.agent?.project?.user?.username || null,
         },
     });
 }));

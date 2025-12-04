@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 
 interface PublicPrototypePageProps {
@@ -12,6 +12,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPrototype = async () => {
@@ -19,6 +20,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
         setIsLoading(true);
         const response = await api.getPublicPrototype(prototypeHash, versionNumber);
         setHtmlContent(response.prototype.html);
+        setUsername(response.prototype.username);
         setError(null);
       } catch (err: any) {
         console.error('Failed to load prototype:', err);
@@ -37,13 +39,17 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
       <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10">
         <h1 className="text-white font-medium">
           Просмотр прототипа{versionNumber !== undefined ? ` (Версия ${versionNumber})` : ''}
+          {username && <span className="text-white/60 ml-2">• {username}</span>}
         </h1>
         <button
-          onClick={onClose}
-          className="p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-          aria-label="Закрыть"
+          onClick={() => window.open('https://bugrov.space', '_blank')}
+          className="px-3 py-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white text-xs font-medium rounded-full shadow-lg hover:shadow-indigo-500/50 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/20"
+          aria-label="Перейти на Bugrov.space"
         >
-          <X size={24} />
+          <span className="flex items-center gap-1">
+            <span>Сделано на</span>
+            <span className="font-bold">Bugrov.space</span>
+          </span>
         </button>
       </div>
 
@@ -77,18 +83,6 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
           </div>
         )}
       </div>
-
-      {/* Branding Button */}
-      <button
-        onClick={() => window.open('https://bugrov.space', '_blank')}
-        className="fixed bottom-6 right-6 z-[101] px-4 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white text-sm font-medium rounded-full shadow-lg hover:shadow-indigo-500/50 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-sm border border-white/20"
-        aria-label="Перейти на Bugrov.space"
-      >
-        <span className="flex items-center gap-1.5">
-          <span>Сделано на</span>
-          <span className="font-bold">Bugrov.space</span>
-        </span>
-      </button>
     </div>
   );
 };

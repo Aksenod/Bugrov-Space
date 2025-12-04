@@ -39,15 +39,91 @@ app.use((req, res, next) => {
   next();
 });
 
+// Улучшенная настройка CORS с явной поддержкой всех origins и логированием
 app.use(
   cors({
-    origin: env.corsOrigin === '*'
-      ? (_origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => callback(null, true)
-      : env.corsOrigin,
+    origin: (origin, callback) => {
+      // Если CORS_ORIGIN не установлен или равен '*', разрешаем все origins
+      if (env.corsOrigin === '*' || !env.corsOrigin) {
+        if (env.nodeEnv === 'development') {
+          logger.info({ origin, corsOrigin: env.corsOrigin }, 'CORS: Allowing all origins');
+        }
+        callback(null, true);
+        return;
+      }
+
+      // Нормализуем origin (убираем trailing slash для сравнения)
+      const normalizeOrigin = (orig: string) => orig.replace(/\/$/, '');
+
+      // Если CORS_ORIGIN - массив строк, проверяем вхождение
+      if (Array.isArray(env.corsOrigin)) {
+        // Если origin не указан (например, для запросов из Postman, curl или мобильных приложений)
+        // Разрешаем такие запросы только если это не браузерный запрос
+        if (!origin) {
+          if (env.nodeEnv === 'development') {
+            logger.info('CORS: Allowing request without origin (non-browser request)');
+          }
+          callback(null, true);
+          return;
+        }
+        
+        const normalizedOrigin = normalizeOrigin(origin);
+        
+        // Проверяем, есть ли origin в списке разрешенных
+        const isAllowed = env.corsOrigin.some(allowedOrigin => {
+          const normalizedAllowed = normalizeOrigin(allowedOrigin);
+          
+          // Поддержка wildcard поддоменов (например, *.example.com)
+          if (normalizedAllowed.includes('*')) {
+            const pattern = normalizedAllowed.replace(/\*/g, '.*');
+            const regex = new RegExp(`^${pattern}$`);
+            return regex.test(normalizedOrigin);
+          }
+          
+          // Точное совпадение (без учета trailing slash)
+          return normalizedOrigin === normalizedAllowed;
+        });
+
+        if (isAllowed) {
+          if (env.nodeEnv === 'development') {
+            logger.info({ origin: normalizedOrigin, allowedOrigins: env.corsOrigin }, 'CORS: Origin allowed');
+          }
+          callback(null, true);
+        } else {
+          logger.warn({ origin: normalizedOrigin, allowedOrigins: env.corsOrigin }, 'CORS: Origin not allowed');
+          callback(new Error('Not allowed by CORS'));
+        }
+        return;
+      }
+
+      // Если CORS_ORIGIN - строка (один origin) - это не должно происходить после getCorsOrigin(),
+      // но оставляем для совместимости
+      if (typeof env.corsOrigin === 'string') {
+        const normalizedOrigin = origin ? normalizeOrigin(origin) : '';
+        const normalizedAllowed = normalizeOrigin(env.corsOrigin);
+        
+        if (!origin || normalizedOrigin === normalizedAllowed) {
+          if (env.nodeEnv === 'development') {
+            logger.info({ origin: normalizedOrigin, allowedOrigin: normalizedAllowed }, 'CORS: Origin allowed');
+          }
+          callback(null, true);
+        } else {
+          logger.warn({ origin: normalizedOrigin, allowedOrigin: normalizedAllowed }, 'CORS: Origin not allowed');
+          callback(new Error('Not allowed by CORS'));
+        }
+        return;
+      }
+
+      // Fallback: разрешаем все
+      logger.warn({ corsOrigin: env.corsOrigin }, 'CORS: Unknown corsOrigin type, allowing all');
+      callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Type'],
     optionsSuccessStatus: 200, // Для старых браузеров
+    maxAge: 86400, // Кешировать preflight запросы на 24 часа
   }),
 );
 

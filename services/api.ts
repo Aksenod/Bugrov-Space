@@ -737,7 +737,7 @@ export const api = {
     const url = versionNumber !== undefined 
       ? `/public/prototype/${hash}?v=${versionNumber}`
       : `/public/prototype/${hash}`;
-    return request<{ prototype: { id: string; name: string; html: string; dsl: string | null; versionNumber?: number } }>(url);
+    return request<{ prototype: { id: string; name: string; html: string; dsl: string | null; versionNumber?: number; username: string | null } }>(url);
   },
 
   // Public Agents API
