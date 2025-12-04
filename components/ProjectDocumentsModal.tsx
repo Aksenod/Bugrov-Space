@@ -806,15 +806,21 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           }}
         >
           <div className={`transition-all duration-300 ease-in-out border-b border-white/10 flex flex-col ${
-            isSidebarCollapsed ? 'p-3 items-center gap-3' : 'p-4 sm:p-6 gap-3'
+            isSidebarCollapsed ? 'p-0 items-center gap-0' : 'p-4 sm:p-6 gap-2'
           }`}>
             {/* Expanded Header - Always rendered, animated */}
             <div 
               className={`transition-opacity duration-300 ease-in-out flex items-center gap-2 ${
                 isSidebarCollapsed 
-                  ? 'opacity-0 pointer-events-none' 
+                  ? 'opacity-0 pointer-events-none max-h-0 overflow-hidden' 
                   : 'opacity-100 pointer-events-auto'
               }`}
+              style={{
+                maxHeight: isSidebarCollapsed ? '0px' : 'none',
+                transitionProperty: isSidebarCollapsed ? 'opacity, max-height' : 'opacity',
+                transitionDuration: '300ms',
+                transitionTimingFunction: 'ease-in-out'
+              }}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -852,14 +858,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
             {/* Collapsed Header - Always rendered, instant hide on expand */}
             <div 
-              className={`flex flex-col items-center gap-3 overflow-hidden ${
+              className={`flex flex-col items-center ${
                 isSidebarCollapsed 
-                  ? 'opacity-100 pointer-events-auto' 
-                  : 'opacity-0 pointer-events-none'
+                  ? 'opacity-100 pointer-events-auto overflow-visible pt-[30px]' 
+                  : 'opacity-0 pointer-events-none max-h-0 overflow-hidden'
               }`}
               style={{
                 maxWidth: isSidebarCollapsed ? '60px' : '0px',
-                transitionProperty: isSidebarCollapsed ? 'opacity, max-width' : 'none',
+                maxHeight: isSidebarCollapsed ? 'none' : '0px',
+                transitionProperty: isSidebarCollapsed ? 'opacity, max-width' : 'opacity, max-width, max-height',
                 transitionDuration: isSidebarCollapsed ? '300ms' : '0ms',
                 transitionTimingFunction: 'ease-in-out'
               }}
@@ -867,13 +874,13 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
               {/* Icon with Badge - Clickable to expand */}
               <button
                 onClick={toggleSidebar}
-                className="relative p-2.5 bg-amber-500/20 hover:bg-amber-500/30 rounded-xl text-amber-400 transition-colors duration-200 group w-full flex items-center justify-center flex-shrink-0"
+                className="relative p-2.5 bg-amber-500/20 hover:bg-amber-500/30 rounded-xl text-amber-400 transition-colors duration-200 group w-full flex items-center justify-center flex-shrink-0 mt-0"
                 aria-label="Развернуть панель документов"
                 title={`${documents.length} ${documents.length === 1 ? 'документ' : documents.length < 5 ? 'документа' : 'документов'}`}
               >
                 <FileText size={22} className="group-hover:scale-110 transition-transform duration-200" />
                 {documents.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-black/60 shadow-lg">
+                  <span className="absolute -top-0.5 -right-0.5 bg-indigo-500 text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 shadow-lg ring-2 ring-black/60">
                     {documents.length > 9 ? '9+' : documents.length}
                   </span>
                 )}
@@ -883,7 +890,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
               {onFileUpload && (
                 <button
                   onClick={onFileUpload}
-                  className="w-full p-2.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors duration-200 flex items-center justify-center border border-indigo-500/20 hover:border-indigo-500/40 flex-shrink-0"
+                  className="w-full p-2.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors duration-200 flex items-center justify-center border border-indigo-500/20 hover:border-indigo-500/40 flex-shrink-0 mt-3"
                   aria-label="Загрузить документ"
                   title="Загрузить документ"
                 >
@@ -898,7 +905,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 className={`transition-all duration-300 ease-in-out overflow-hidden ${
                   isSidebarCollapsed 
                     ? 'opacity-0 max-h-0 mt-0 pointer-events-none' 
-                    : 'opacity-100 max-h-20 mt-0 pointer-events-auto'
+                    : 'opacity-100 max-h-20 -mt-1 pointer-events-auto'
                 }`}
                 style={{ 
                   transitionProperty: 'opacity, max-height, margin-top',
@@ -1024,27 +1031,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                             </button>
                           </>
                         )}
-
-                        {/* Кнопка генерации прототипа */}
-                        {showDSLButtons && !isEditing && (
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleGenerateResult();
-                            }}
-                            disabled={isGeneratingPrototype}
-                            className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                          >
-                            {isGeneratingPrototype ? (
-                              <>
-                                <Loader2 size={14} className="animate-spin" />
-                                Генерация... ({timeLeft}s)
-                              </>
-                            ) : (
-                              "Сгенерировать прототип"
-                            )}
-                          </button>
-                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1113,7 +1099,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
                 {/* Tabs for copywriter documents */}
                 {(showDSLButtons || isAdmin) && (
-                  <div className="mb-6 flex items-center justify-between border-b border-white/10">
+                  <div className="mb-6 flex items-center gap-4 border-b border-white/10 flex-wrap">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setActiveTabSafe('text')}
@@ -1135,10 +1121,30 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       </button>
                     </div>
 
+                    {/* Кнопка генерации прототипа */}
+                    {showDSLButtons && !isEditing && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleGenerateResult();
+                        }}
+                        disabled={isGeneratingPrototype}
+                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
+                      >
+                        {isGeneratingPrototype ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Генерация... ({timeLeft}s)
+                          </>
+                        ) : (
+                          "Сгенерировать прототип"
+                        )}
+                      </button>
+                    )}
 
                     {/* Sub-tabs for Prototype - only for admins on copywriter documents */}
                     {activeTab === 'prototype' && (
-                      <div className="flex items-center gap-2 mr-2">
+                      <div className="flex items-center gap-2 ml-auto">
                         {showDSLButtons && isAdmin && (
                           <>
                             <button

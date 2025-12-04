@@ -12,9 +12,10 @@ interface CreativeLandingPageProps {
     username?: string;
     onOpenPayment?: () => void;
     onOpenCabinet?: () => void;
+    onLogout?: () => void;
 }
 
-export const CreativeLandingPage: React.FC<CreativeLandingPageProps> = ({ isAuthenticated = false, username, onOpenPayment = () => { }, onOpenCabinet = () => { } }) => {
+export const CreativeLandingPage: React.FC<CreativeLandingPageProps> = ({ isAuthenticated = false, username, onOpenPayment = () => { }, onOpenCabinet = () => { }, onLogout = () => { } }) => {
     return (
         <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white selection:bg-purple-500/30">
             <div className="relative min-h-screen">
@@ -26,7 +27,7 @@ export const CreativeLandingPage: React.FC<CreativeLandingPageProps> = ({ isAuth
 
                 {/* Header */}
                 <div className="relative z-50">
-                    <LandingHeader isAuthenticated={isAuthenticated} username={username} onOpenCabinet={onOpenCabinet} />
+                    <LandingHeader isAuthenticated={isAuthenticated} username={username} onOpenCabinet={onOpenCabinet} onLogout={onLogout} />
                 </div>
 
                 {/* Hero Section */}

@@ -12,6 +12,7 @@ interface UltraCreativeLandingPageProps {
     username?: string;
     onOpenPayment?: () => void;
     onOpenCabinet?: () => void;
+    onLogout?: () => void;
 }
 
 export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> = ({
@@ -19,6 +20,7 @@ export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> =
     username,
     onOpenPayment = () => {},
     onOpenCabinet = () => {},
+    onLogout = () => {},
 }) => {
     return (
         <div className="fixed inset-0 overflow-y-auto overflow-x-hidden bg-[#000000] text-white selection:bg-purple-500/30">
@@ -36,6 +38,7 @@ export const UltraCreativeLandingPage: React.FC<UltraCreativeLandingPageProps> =
                         isAuthenticated={isAuthenticated} 
                         username={username} 
                         onOpenCabinet={onOpenCabinet} 
+                        onLogout={onLogout}
                     />
                 </div>
 

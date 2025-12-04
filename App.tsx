@@ -632,6 +632,7 @@ export default function App() {
       if (hash === '#/landing' || hash === '#/') {
         setIsLandingOpen(true);
         setIsCreativeLandingOpen(false);
+        setIsUltraLandingOpen(false);
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
@@ -649,13 +650,24 @@ export default function App() {
         if (!currentUser) {
           setIsLandingOpen(true);
           setIsCreativeLandingOpen(false);
+          setIsUltraLandingOpen(false);
         } else {
           setIsLandingOpen(false);
           setIsCreativeLandingOpen(false);
+          setIsUltraLandingOpen(false);
         }
       } else if (hash === '#/promo') {
         setIsCreativeLandingOpen(true);
         setIsLandingOpen(false);
+        setIsUltraLandingOpen(false);
+        setIsAdminOpen(false);
+        setIsOfferOpen(false);
+        setIsPrivacyOpen(false);
+        setIsRequisitesOpen(false);
+      } else if (hash === '#/ultra') {
+        setIsUltraLandingOpen(true);
+        setIsLandingOpen(false);
+        setIsCreativeLandingOpen(false);
         setIsAdminOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
@@ -663,11 +675,13 @@ export default function App() {
       } else if (hash === '#/admin') {
         setIsAdminOpen(true);
         setIsLandingOpen(false);
+        setIsUltraLandingOpen(false);
       } else if (hash === '#/projects') {
         // Закрываем все специальные страницы и показываем основное приложение
         setIsAdminOpen(false);
         setIsLandingOpen(false);
         setIsCreativeLandingOpen(false);
+        setIsUltraLandingOpen(false);
         setIsOfferOpen(false);
         setIsPrivacyOpen(false);
         setIsRequisitesOpen(false);
@@ -676,15 +690,19 @@ export default function App() {
       } else if (hash === '#/offer') {
         setIsOfferOpen(true);
         setIsLandingOpen(false);
+        setIsUltraLandingOpen(false);
       } else if (hash === '#/privacy') {
         setIsPrivacyOpen(true);
         setIsLandingOpen(false);
+        setIsUltraLandingOpen(false);
       } else if (hash === '#/requisites') {
         setIsRequisitesOpen(true);
         setIsLandingOpen(false);
+        setIsUltraLandingOpen(false);
       } else if (hash === '#/auth') {
         // Закрываем все страницы для показа AuthPage
         setIsLandingOpen(false);
+        setIsUltraLandingOpen(false);
       } else if (hash.startsWith('#/prototype/')) {
         const hashValue = hash.replace('#/prototype/', '');
         setPrototypeHash(hashValue);
@@ -1648,7 +1666,11 @@ export default function App() {
   };
 
   // Landing page check - should be first
-  if (isLandingOpen || window.location.hash === '#/landing' || window.location.hash === '#/' || window.location.hash === '') {
+  // Проверяем hash первым, чтобы избежать показа landing при #/projects
+  const currentHash = window.location.hash;
+  // Не показываем landing если hash указывает на другую страницу
+  const isSpecialPage = currentHash === '#/projects' || currentHash === '#/admin' || currentHash === '#/promo' || currentHash === '#/ultra' || currentHash === '#/auth' || currentHash === '#/offer' || currentHash === '#/privacy' || currentHash === '#/requisites' || currentHash.startsWith('#/prototype/');
+  if (!isSpecialPage && (isLandingOpen || currentHash === '#/landing' || currentHash === '#/' || currentHash === '')) {
     return (
       <>
         <LandingPage
@@ -1656,9 +1678,9 @@ export default function App() {
           username={currentUser?.username}
           onOpenPayment={() => setIsPaymentModalOpen(true)}
           onOpenCabinet={() => {
-            setIsLandingOpen(false);
             window.location.hash = '#/projects';
           }}
+          onLogout={handleLogout}
         />
         <PaymentModal
           isOpen={isPaymentModalOpen}
@@ -1670,7 +1692,7 @@ export default function App() {
   }
 
   // Creative landing page check
-  if (isCreativeLandingOpen || window.location.hash === '#/promo') {
+  if (isCreativeLandingOpen || currentHash === '#/promo') {
     return (
       <>
         <CreativeLandingPage
@@ -1678,9 +1700,9 @@ export default function App() {
           username={currentUser?.username}
           onOpenPayment={() => setIsPaymentModalOpen(true)}
           onOpenCabinet={() => {
-            setIsCreativeLandingOpen(false);
             window.location.hash = '#/projects';
           }}
+          onLogout={handleLogout}
         />
         <PaymentModal
           isOpen={isPaymentModalOpen}
@@ -1692,7 +1714,7 @@ export default function App() {
   }
 
   // Ultra creative landing page check
-  if (isUltraLandingOpen || window.location.hash === '#/ultra') {
+  if (isUltraLandingOpen || currentHash === '#/ultra') {
     return (
       <>
         <UltraCreativeLandingPage
@@ -1700,9 +1722,9 @@ export default function App() {
           username={currentUser?.username}
           onOpenPayment={() => setIsPaymentModalOpen(true)}
           onOpenCabinet={() => {
-            setIsUltraLandingOpen(false);
             window.location.hash = '#/projects';
           }}
+          onLogout={handleLogout}
         />
         <PaymentModal
           isOpen={isPaymentModalOpen}
