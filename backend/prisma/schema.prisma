@@ -29,15 +29,15 @@ model User {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  userId        String
-  amount        Decimal
-  currency      String   @default("RUB")
-  status        String   // pending, succeeded, canceled
-  yookassaId    String   @unique
-  description   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Decimal
+  currency    String   @default("RUB")
+  status      String // pending, succeeded, canceled
+  yookassaId  String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -88,11 +88,11 @@ model Agent {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectTypeAgent ProjectTypeAgent? @relation(fields: [projectTypeAgentId], references: [id], onDelete: Cascade)
-  messages Message[]
-  files    File[]
+  messages         Message[]
+  files            File[]
 
   @@index([userId])
   @@index([projectId])
@@ -160,7 +160,8 @@ model File {
   isKnowledgeBase    Boolean  @default(false) // true = база знаний агента, false = документ проекта
   createdAt          DateTime @default(now())
 
-  agent Agent? @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent             Agent?             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  prototypeVersions PrototypeVersion[]
 
   @@index([agentId])
   @@index([projectTypeAgentId])
@@ -168,6 +169,21 @@ model File {
   @@index([projectTypeAgentId, isKnowledgeBase])
   @@index([agentId, createdAt]) // Оптимизация для запросов с сортировкой по createdAt
   @@index([projectTypeAgentId, createdAt])
+}
+
+model PrototypeVersion {
+  id             String   @id @default(cuid())
+  fileId         String
+  versionNumber  Int
+  dslContent     String? // Generated DSL content for this version
+  verstkaContent String? // Generated HTML content for this version
+  createdAt      DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, versionNumber])
+  @@index([fileId])
+  @@index([fileId, versionNumber])
 }
 
 model GlobalPrompt {

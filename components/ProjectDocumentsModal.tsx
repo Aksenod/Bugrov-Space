@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload } from 'lucide-react';
-import { UploadedFile, Agent, Project, User } from '../types';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown } from 'lucide-react';
+import { UploadedFile, Agent, Project, User, PrototypeVersion } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { api } from '../services/api';
 import { InlineHint } from './InlineHint';
@@ -126,6 +126,10 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   const [editedContent, setEditedContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [prototypeVersions, setPrototypeVersions] = useState<PrototypeVersion[]>([]);
+  const [selectedVersionNumber, setSelectedVersionNumber] = useState<number | null>(null);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [isVersionDropdownOpen, setIsVersionDropdownOpen] = useState(false);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -164,12 +168,16 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           setPrototypeSubTab('preview');
         }
         setIsVerstkaFullscreen(false);
+        setIsVersionDropdownOpen(false);
       }
     } else if (!isOpen) {
       // Сбрасываем таб при закрытии модального окна
       setActiveTabSafe('text');
       setPrototypeSubTab('preview');
       setIsVerstkaFullscreen(false);
+      setIsVersionDropdownOpen(false);
+      setPrototypeVersions([]);
+      setSelectedVersionNumber(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFileId, isOpen]);
@@ -500,6 +508,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       // Переключаемся на таб прототипа
       setTimeout(() => {
         setActiveTabSafe('prototype');
+        // Reload versions after generation
+        if (selectedFileId) {
+          api.getPrototypeVersions(selectedFileId).then(({ versions }) => {
+            setPrototypeVersions(versions);
+            if (versions.length > 0) {
+              setSelectedVersionNumber(versions[0].versionNumber);
+            }
+          }).catch(console.error);
+        }
       }, 100);
     } catch (error: any) {
       console.error('Failed to generate result:', error);
@@ -513,12 +530,69 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
   };
 
+  // Load prototype versions when file with prototype is selected
+  useEffect(() => {
+    const loadVersions = async () => {
+      if (!selectedFileId || activeTab !== 'prototype') {
+        setPrototypeVersions([]);
+        setSelectedVersionNumber(null);
+        return;
+      }
+
+      const file = documents.find(doc => doc.id === selectedFileId);
+      if (!file || (!file.verstkaContent && !file.dslContent)) {
+        setPrototypeVersions([]);
+        setSelectedVersionNumber(null);
+        return;
+      }
+
+      setIsLoadingVersions(true);
+      try {
+        const { versions } = await api.getPrototypeVersions(selectedFileId);
+        setPrototypeVersions(versions);
+        // Select latest version by default (highest versionNumber)
+        if (versions.length > 0) {
+          setSelectedVersionNumber(versions[0].versionNumber);
+        } else {
+          setSelectedVersionNumber(null);
+        }
+      } catch (error) {
+        console.error('Failed to load prototype versions:', error);
+        setPrototypeVersions([]);
+        setSelectedVersionNumber(null);
+      } finally {
+        setIsLoadingVersions(false);
+      }
+    };
+
+    loadVersions();
+  }, [selectedFileId, activeTab, documents]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isVersionDropdownOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.version-dropdown-container')) {
+          setIsVersionDropdownOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isVersionDropdownOpen]);
+
   const handleOpenInNewTab = () => {
     const fileToUse = localSelectedFile || selectedFile;
     if (!fileToUse) return;
 
     // Открываем прототип в новой вкладке через хэш-роутинг
-    const url = `${window.location.origin}/#/prototype/${fileToUse.id}`;
+    // Если выбрана конкретная версия, добавляем query параметр
+    const versionParam = selectedVersionNumber !== null ? `?v=${selectedVersionNumber}` : '';
+    const url = `${window.location.origin}/#/prototype/${fileToUse.id}${versionParam}`;
     window.open(url, '_blank');
   };
 
@@ -544,7 +618,18 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     if (activeTab === 'text') {
       return fileToUse.data;
     } else if (activeTab === 'prototype') {
-      // Для таба прототипа возвращаем контент в зависимости от под-таба
+      // Если выбрана конкретная версия, используем её контент
+      if (selectedVersionNumber !== null && prototypeVersions.length > 0) {
+        const selectedVersion = prototypeVersions.find(v => v.versionNumber === selectedVersionNumber);
+        if (selectedVersion) {
+          if (prototypeSubTab === 'dsl') {
+            return selectedVersion.dslContent || null;
+          }
+          return selectedVersion.verstkaContent || null;
+        }
+      }
+      
+      // Иначе используем данные из файла (для обратной совместимости или если версий нет)
       if (prototypeSubTab === 'dsl') {
         return fileToUse.dslContent || null;
       }
@@ -555,7 +640,8 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         contentLength: content?.length || 0,
         selectedFileId: fileToUse.id,
         isLocalSelected: localSelectedFile?.id === fileToUse.id,
-        subTab: prototypeSubTab
+        subTab: prototypeSubTab,
+        selectedVersionNumber
       });
       return content;
     }
@@ -943,7 +1029,97 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                           </>
                         )}
 
-                        {/* Open in new window button - available for all users */}
+                        {/* Version dropdown and Open button - available for all users */}
+                        {prototypeVersions.length > 0 && (
+                          <div className="relative version-dropdown-container">
+                            <button
+                              onClick={() => setIsVersionDropdownOpen(!isVersionDropdownOpen)}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 flex items-center gap-1.5"
+                              title="Выбрать версию"
+                            >
+                              <span>Версия {selectedVersionNumber || '?'}</span>
+                              <ChevronDown size={14} className={isVersionDropdownOpen ? 'rotate-180' : ''} />
+                            </button>
+                            {isVersionDropdownOpen && (
+                              <div className="absolute right-0 top-full mt-1 bg-black/95 backdrop-blur-md border border-white/10 rounded-lg shadow-xl z-50 min-w-[200px] max-h-[200px] overflow-y-auto version-dropdown-container">
+                                {prototypeVersions.map((version) => (
+                                  <div
+                                    key={version.id}
+                                    className={`flex items-center justify-between group ${
+                                      selectedVersionNumber === version.versionNumber
+                                        ? 'bg-cyan-500/20'
+                                        : ''
+                                    }`}
+                                  >
+                                    <button
+                                      onClick={() => {
+                                        setSelectedVersionNumber(version.versionNumber);
+                                        setIsVersionDropdownOpen(false);
+                                      }}
+                                      className={`flex-1 text-left px-3 py-2 text-xs transition-colors ${
+                                        selectedVersionNumber === version.versionNumber
+                                          ? 'text-cyan-400'
+                                          : 'text-white/70 hover:text-white hover:bg-white/5'
+                                      }`}
+                                    >
+                                      Версия {version.versionNumber}
+                                    </button>
+                                    {prototypeVersions.length > 1 && onShowConfirm && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setIsVersionDropdownOpen(false);
+                                          if (onShowConfirm) {
+                                            onShowConfirm(
+                                              'Удалить версию',
+                                              `Вы уверены, что хотите удалить версию ${version.versionNumber}? Это действие нельзя отменить.`,
+                                              async () => {
+                                                try {
+                                                  await api.deletePrototypeVersion(selectedFileId!, version.versionNumber);
+                                                  // Reload versions
+                                                  const { versions } = await api.getPrototypeVersions(selectedFileId!);
+                                                  setPrototypeVersions(versions);
+                                                  // Select latest version if deleted version was selected
+                                                  if (selectedVersionNumber === version.versionNumber) {
+                                                    if (versions.length > 0) {
+                                                      setSelectedVersionNumber(versions[0].versionNumber);
+                                                    } else {
+                                                      setSelectedVersionNumber(null);
+                                                    }
+                                                  }
+                                                  // Reload file to update dslContent/verstkaContent
+                                                  if (onDocumentUpdate && selectedFile) {
+                                                    const updatedFile = documents.find(d => d.id === selectedFileId);
+                                                    if (updatedFile) {
+                                                      onDocumentUpdate(updatedFile);
+                                                    }
+                                                  }
+                                                  if (onShowAlert) {
+                                                    onShowAlert('Версия успешно удалена', 'Успех', 'success');
+                                                  }
+                                                } catch (error: any) {
+                                                  console.error('Failed to delete version:', error);
+                                                  if (onShowAlert) {
+                                                    onShowAlert(`Не удалось удалить версию: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+                                                  }
+                                                }
+                                              },
+                                              'danger'
+                                            );
+                                          }
+                                        }}
+                                        className="px-2 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Удалить версию"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <button
                           onClick={handleOpenInNewTab}
                           className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5"

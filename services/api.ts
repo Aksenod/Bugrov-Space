@@ -473,6 +473,16 @@ export const api = {
     });
   },
 
+  async getPrototypeVersions(fileId: string) {
+    return request<{ versions: Array<{ id: string; versionNumber: number; createdAt: string; dslContent?: string; verstkaContent?: string }> }>(`/agents/files/${fileId}/prototype-versions`);
+  },
+
+  async deletePrototypeVersion(fileId: string, versionNumber: number) {
+    return request<{ success: boolean }>(`/agents/files/${fileId}/prototype-versions/${versionNumber}`, {
+      method: 'DELETE',
+    });
+  },
+
   // Projects API
   async getProjects() {
     return request<{ projects: ApiProject[] }>('/projects');
@@ -723,8 +733,11 @@ export const api = {
     });
   },
 
-  async getPublicPrototype(hash: string) {
-    return request<{ prototype: { id: string; name: string; html: string; dsl: string | null } }>(`/public/prototype/${hash}`);
+  async getPublicPrototype(hash: string, versionNumber?: number) {
+    const url = versionNumber !== undefined 
+      ? `/public/prototype/${hash}?v=${versionNumber}`
+      : `/public/prototype/${hash}`;
+    return request<{ prototype: { id: string; name: string; html: string; dsl: string | null; versionNumber?: number } }>(url);
   },
 
   // Public Agents API

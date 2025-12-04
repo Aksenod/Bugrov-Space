@@ -7,10 +7,13 @@ import { withRetry } from '../utils/prismaRetry';
 const router = Router();
 
 // GET /api/public/prototype/:documentId - получить прототип без авторизации
+// Поддерживает query параметр ?v=versionNumber для выбора конкретной версии
 router.get('/prototype/:documentId', asyncHandler(async (req: Request, res: Response) => {
     const { documentId } = req.params;
+    const versionParam = req.query.v as string | undefined;
+    const versionNumber = versionParam ? parseInt(versionParam, 10) : null;
 
-    logger.info({ documentId }, 'Public prototype request');
+    logger.info({ documentId, versionNumber }, 'Public prototype request');
 
     // Загружаем документ
     const file = await withRetry(
@@ -44,17 +47,53 @@ router.get('/prototype/:documentId', asyncHandler(async (req: Request, res: Resp
         return res.status(404).json({ error: 'Прототип не найден' });
     }
 
+    let verstkaContent: string | null = null;
+    let dslContent: string | null = null;
+
+    // Если указана версия, загружаем её из PrototypeVersion
+    if (versionNumber !== null && !isNaN(versionNumber)) {
+        const version = await withRetry(
+            () => prisma.prototypeVersion.findUnique({
+                where: {
+                    fileId_versionNumber: {
+                        fileId: documentId,
+                        versionNumber: versionNumber
+                    }
+                },
+                select: {
+                    verstkaContent: true,
+                    dslContent: true
+                }
+            }),
+            3,
+            `GET /public/prototype/${documentId} - find version ${versionNumber}`
+        );
+
+        if (!version) {
+            logger.warn({ documentId, versionNumber }, 'Prototype version not found');
+            return res.status(404).json({ error: `Версия ${versionNumber} не найдена` });
+        }
+
+        verstkaContent = version.verstkaContent;
+        dslContent = version.dslContent;
+    } else {
+        // Используем данные из File (последняя версия или старые данные для обратной совместимости)
+        verstkaContent = file.verstkaContent;
+        dslContent = file.dslContent;
+    }
+
     // Проверяем наличие контента прототипа
-    if (!file.verstkaContent) {
-        logger.warn({ documentId }, 'Document has no prototype content');
+    if (!verstkaContent) {
+        logger.warn({ documentId, versionNumber }, 'Document has no prototype content');
         return res.status(404).json({ error: 'Прототип еще не сгенерирован для этого документа' });
     }
 
     logger.debug({
         documentId,
+        versionNumber,
         fileName: file.name,
-        hasVerstkaContent: !!file.verstkaContent,
-        hasDslContent: !!file.dslContent,
+        hasVerstkaContent: !!verstkaContent,
+        hasDslContent: !!dslContent,
     }, 'Public prototype loaded successfully');
 
     // Возвращаем только публичную информацию
@@ -62,8 +101,9 @@ router.get('/prototype/:documentId', asyncHandler(async (req: Request, res: Resp
         prototype: {
             id: file.id,
             name: file.name,
-            html: file.verstkaContent,
-            dsl: file.dslContent,
+            html: verstkaContent,
+            dsl: dslContent,
+            versionNumber: versionNumber || undefined,
             project: file.agent?.project ? {
                 id: file.agent.project.id,
                 name: file.agent.project.name,
@@ -109,7 +149,7 @@ router.get('/agents', asyncHandler(async (req: Request, res: Response) => {
         }
 
         const agents = Array.from(uniqueAgentsMap.values())
-            .filter(agent => agent.name && agent.description) // Фильтруем агентов с пустыми данными
+            .filter(agent => agent.name) // Фильтруем только агентов с именем (description может быть пустым)
             .sort((a, b) => a.name.localeCompare(b.name)); // Сортируем по алфавиту
 
         logger.debug({ agentsCount: agents.length, totalAgents: allAgents.length }, 'Public agents loaded successfully');
@@ -182,7 +222,7 @@ router.get('/project-types', asyncHandler(async (req: Request, res: Response) =>
                     // Фильтруем только видимые агенты и преобразуем в формат ответа
                     const agents = agentConnections
                         .map((connection: any) => connection.projectTypeAgent)
-                        .filter((agent: any) => !agent.isHiddenFromSidebar && agent.name && agent.description)
+                        .filter((agent: any) => !agent.isHiddenFromSidebar && agent.name) // description может быть пустым
                         .map((agent: any) => ({
                             id: agent.id,
                             name: agent.name,

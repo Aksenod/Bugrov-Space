@@ -25,6 +25,14 @@ export interface ModelConfig {
   description: string;
 }
 
+export interface PrototypeVersion {
+  id: string;
+  versionNumber: number;
+  createdAt: string;
+  dslContent?: string;
+  verstkaContent?: string;
+}
+
 export interface UploadedFile {
   id: string;
   name: string;

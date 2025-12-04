@@ -1763,9 +1763,15 @@ export default function App() {
   }
 
   if (prototypeHash || window.location.hash.startsWith('#/prototype/')) {
-    const hash = prototypeHash || window.location.hash.replace('#/prototype/', '');
+    const hash = prototypeHash || window.location.hash.replace('#/prototype/', '').split('?')[0];
+    // Extract version from query parameter
+    const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const versionParam = urlParams.get('v');
+    const versionNumber = versionParam ? parseInt(versionParam, 10) : undefined;
+    
     return <PublicPrototypePage
       prototypeHash={hash}
+      versionNumber={versionNumber}
       onClose={() => {
         setPrototypeHash(null);
         window.location.hash = '';

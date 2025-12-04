@@ -1350,7 +1350,67 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
       projectInfo
     );
 
-    // 6. Save to DB
+    // 6. Find the next version number
+    const existingVersions = await withRetry(
+      () => prisma.prototypeVersion.findMany({
+        where: { fileId },
+        orderBy: { versionNumber: 'desc' },
+        take: 1,
+        select: { versionNumber: true }
+      }),
+      3,
+      `POST /agents/${agentId}/files/${fileId}/generate-prototype - find existing versions`
+    );
+
+    const nextVersionNumber = existingVersions.length > 0 
+      ? existingVersions[0].versionNumber + 1 
+      : 1;
+
+    // 7. Create new prototype version
+    const MAX_VERSIONS = 10;
+    const newVersion = await withRetry(
+      async () => {
+        // Create new version
+        const version = await prisma.prototypeVersion.create({
+          data: {
+            fileId,
+            versionNumber: nextVersionNumber,
+            dslContent,
+            verstkaContent
+          }
+        });
+
+        // Limit versions: delete old ones if exceeding MAX_VERSIONS
+        const allVersions = await prisma.prototypeVersion.findMany({
+          where: { fileId },
+          orderBy: { versionNumber: 'desc' },
+          select: { id: true, versionNumber: true }
+        });
+
+        if (allVersions.length > MAX_VERSIONS) {
+          const versionsToDelete = allVersions.slice(MAX_VERSIONS);
+          await prisma.prototypeVersion.deleteMany({
+            where: {
+              fileId,
+              versionNumber: {
+                in: versionsToDelete.map(v => v.versionNumber)
+              }
+            }
+          });
+          logger.info({ 
+            fileId, 
+            deletedVersions: versionsToDelete.length,
+            remainingVersions: MAX_VERSIONS 
+          }, 'Deleted old prototype versions');
+        }
+
+        return version;
+      },
+      3,
+      `POST /agents/${agentId}/files/${fileId}/generate-prototype - create version`
+    );
+
+    // 8. Update File with latest version for backward compatibility
     const updatedFile = await withRetry(
       () => prisma.file.update({
         where: { id: fileId },
@@ -1363,7 +1423,12 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
       `POST /agents/${agentId}/files/${fileId}/generate-prototype - update file`
     );
 
-    logger.info({ fileId, hasDsl: !!dslContent, hasVerstka: !!verstkaContent }, 'Prototype generated and saved');
+    logger.info({ 
+      fileId, 
+      versionNumber: nextVersionNumber,
+      hasDsl: !!dslContent, 
+      hasVerstka: !!verstkaContent 
+    }, 'Prototype version created and saved');
 
     res.json({ file: updatedFile });
   } catch (error) {
@@ -1375,6 +1440,185 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
       stack: error instanceof Error ? error.stack : undefined
     }, 'Prototype generation failed');
     res.status(500).json({ error: 'Failed to generate prototype' });
+  }
+});
+
+// GET /api/agents/files/:fileId/prototype-versions - получить все версии прототипа
+router.get('/files/:fileId/prototype-versions', authMiddleware, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { fileId } = req.params;
+    const userId = req.userId!;
+
+    logger.info({ fileId, userId }, 'GET /agents/files/:fileId/prototype-versions');
+
+    // Verify file exists and belongs to user's project
+    const file = await withRetry(
+      () => prisma.file.findFirst({
+        where: {
+          id: fileId,
+          agent: {
+            userId
+          }
+        },
+        select: { id: true }
+      }),
+      3,
+      `GET /agents/files/${fileId}/prototype-versions - verify file`
+    );
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Get all versions ordered by version number descending
+    const versions = await withRetry(
+      () => prisma.prototypeVersion.findMany({
+        where: { fileId },
+        orderBy: { versionNumber: 'desc' },
+        select: {
+          id: true,
+          versionNumber: true,
+          createdAt: true,
+          dslContent: true,
+          verstkaContent: true
+        }
+      }),
+      3,
+      `GET /agents/files/${fileId}/prototype-versions - find versions`
+    );
+
+    logger.info({ fileId, versionsCount: versions.length }, 'Prototype versions retrieved');
+
+    res.json({ versions });
+  } catch (error) {
+    logger.error({
+      fileId: req.params.fileId,
+      userId: req.userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 'Failed to get prototype versions');
+    res.status(500).json({ error: 'Failed to get prototype versions' });
+  }
+});
+
+// DELETE /api/agents/files/:fileId/prototype-versions/:versionNumber - удалить версию
+router.delete('/files/:fileId/prototype-versions/:versionNumber', authMiddleware, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { fileId, versionNumber } = req.params;
+    const userId = req.userId!;
+    const versionNum = parseInt(versionNumber, 10);
+
+    if (isNaN(versionNum)) {
+      return res.status(400).json({ error: 'Invalid version number' });
+    }
+
+    logger.info({ fileId, versionNumber: versionNum, userId }, 'DELETE /agents/files/:fileId/prototype-versions/:versionNumber');
+
+    // Verify file exists and belongs to user's project
+    const file = await withRetry(
+      () => prisma.file.findFirst({
+        where: {
+          id: fileId,
+          agent: {
+            userId
+          }
+        },
+        select: { id: true }
+      }),
+      3,
+      `DELETE /agents/files/${fileId}/prototype-versions/${versionNumber} - verify file`
+    );
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Verify version exists
+    const version = await withRetry(
+      () => prisma.prototypeVersion.findUnique({
+        where: {
+          fileId_versionNumber: {
+            fileId,
+            versionNumber: versionNum
+          }
+        },
+        select: { id: true }
+      }),
+      3,
+      `DELETE /agents/files/${fileId}/prototype-versions/${versionNumber} - verify version`
+    );
+
+    if (!version) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    // Delete version
+    await withRetry(
+      () => prisma.prototypeVersion.delete({
+        where: {
+          fileId_versionNumber: {
+            fileId,
+            versionNumber: versionNum
+          }
+        }
+      }),
+      3,
+      `DELETE /agents/files/${fileId}/prototype-versions/${versionNumber} - delete version`
+    );
+
+    // If deleted version was the latest, update File with the new latest version
+    const latestVersion = await withRetry(
+      () => prisma.prototypeVersion.findFirst({
+        where: { fileId },
+        orderBy: { versionNumber: 'desc' },
+        select: {
+          dslContent: true,
+          verstkaContent: true
+        }
+      }),
+      3,
+      `DELETE /agents/files/${fileId}/prototype-versions/${versionNumber} - find latest version`
+    );
+
+    if (latestVersion) {
+      await withRetry(
+        () => prisma.file.update({
+          where: { id: fileId },
+          data: {
+            dslContent: latestVersion.dslContent,
+            verstkaContent: latestVersion.verstkaContent
+          }
+        }),
+        3,
+        `DELETE /agents/files/${fileId}/prototype-versions/${versionNumber} - update file`
+      );
+    } else {
+      // No versions left, clear File fields
+      await withRetry(
+        () => prisma.file.update({
+          where: { id: fileId },
+          data: {
+            dslContent: null,
+            verstkaContent: null
+          }
+        }),
+        3,
+        `DELETE /agents/files/${fileId}/prototype-versions/${versionNumber} - clear file`
+      );
+    }
+
+    logger.info({ fileId, versionNumber: versionNum }, 'Prototype version deleted');
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({
+      fileId: req.params.fileId,
+      versionNumber: req.params.versionNumber,
+      userId: req.userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 'Failed to delete prototype version');
+    res.status(500).json({ error: 'Failed to delete prototype version' });
   }
 });
 

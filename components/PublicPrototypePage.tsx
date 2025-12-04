@@ -4,10 +4,11 @@ import { api } from '../services/api';
 
 interface PublicPrototypePageProps {
   prototypeHash: string;
+  versionNumber?: number;
   onClose: () => void;
 }
 
-export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ prototypeHash, onClose }) => {
+export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ prototypeHash, versionNumber, onClose }) => {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +17,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
     const loadPrototype = async () => {
       try {
         setIsLoading(true);
-        const response = await api.getPublicPrototype(prototypeHash);
+        const response = await api.getPublicPrototype(prototypeHash, versionNumber);
         setHtmlContent(response.prototype.html);
         setError(null);
       } catch (err: any) {
@@ -28,13 +29,15 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
     };
 
     loadPrototype();
-  }, [prototypeHash]);
+  }, [prototypeHash, versionNumber]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10">
-        <h1 className="text-white font-medium">Просмотр прототипа</h1>
+        <h1 className="text-white font-medium">
+          Просмотр прототипа{versionNumber !== undefined ? ` (Версия ${versionNumber})` : ''}
+        </h1>
         <button
           onClick={onClose}
           className="p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
