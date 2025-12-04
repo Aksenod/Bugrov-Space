@@ -8,7 +8,6 @@ import { ChatInput } from './components/ChatInput';
 import { AgentSidebar } from './components/AgentSidebar';
 import { ProjectDocumentsModal } from './components/ProjectDocumentsModal';
 import { FileUploadModal } from './components/FileUploadModal';
-import { Footer } from './components/Footer';
 import { AuthPage } from './components/AuthPage';
 import { AdminPage } from './components/AdminPage';
 import { OfferPage } from './components/OfferPage';
@@ -1961,8 +1960,6 @@ export default function App() {
             <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
               <ChatInput onSend={handleSendMessage} disabled={isLoading || !activeAgent} />
             </div>
-
-            <Footer telegramUsername="BugrovExperience" />
           </>
         )}
       </main>
