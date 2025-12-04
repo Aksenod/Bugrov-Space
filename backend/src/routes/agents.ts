@@ -170,7 +170,7 @@ const getOrCreateAgentFromTemplate = async (
       description: template.description ?? '',
       systemInstruction: template.systemInstruction ?? '',
       summaryInstruction: template.summaryInstruction ?? '',
-      model: template.model ?? 'gpt-5.1',
+      model: template.model ?? 'gpt-5-mini',
       role: template.role ?? '',
       order: nextOrder,
     };

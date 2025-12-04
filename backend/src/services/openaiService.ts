@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 import { getGlobalPromptText } from './globalPromptService';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const DEFAULT_MODEL = 'gpt-5.1';
+const DEFAULT_MODEL = 'gpt-5-mini';
 // Максимальный размер содержимого файла для включения в промпт (в символах)
 const MAX_FILE_CONTENT_SIZE = 50000; // ~50KB текста
 
