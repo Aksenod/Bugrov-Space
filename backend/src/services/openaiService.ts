@@ -30,6 +30,7 @@ type AgentWithFiles = {
 };
 
 export type ProjectInfo = {
+  name?: string | null;
   description?: string | null;
   projectTypeName?: string | null;
 };
@@ -105,6 +106,10 @@ async function buildSystemPrompt(agent: AgentWithFiles, projectInfo?: ProjectInf
   // Добавляем информацию о проекте, если она предоставлена
   if (projectInfo) {
     const projectInfoParts: string[] = [];
+    
+    if (projectInfo.name) {
+      projectInfoParts.push(`Название проекта: ${projectInfo.name}`);
+    }
     
     if (projectInfo.projectTypeName) {
       projectInfoParts.push(`Тип проекта: ${projectInfo.projectTypeName}`);

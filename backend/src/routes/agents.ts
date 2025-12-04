@@ -692,6 +692,7 @@ router.post('/:agentId/messages', async (req, res) => {
   try {
     // Подготавливаем информацию о проекте для передачи в промпт
     const projectInfo = project ? {
+      name: project.name || null,
       description: project.description || null,
       projectTypeName: project.projectType?.name || null,
     } : undefined;
@@ -1319,6 +1320,7 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
 
     // Подготавливаем информацию о проекте для передачи в промпт
     const projectInfo = project ? {
+      name: project.name || null,
       description: project.description || null,
       projectTypeName: project.projectType?.name || null,
     } : undefined;
