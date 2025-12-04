@@ -321,6 +321,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   const selectedFile = localSelectedFile || documents.find(doc => doc.id === selectedFileId);
 
+  const decodeContent = (base64: string) => {
+    try {
+      return decodeURIComponent(escape(window.atob(base64)));
+    } catch (e) {
+      return "Не удалось прочитать файл или это бинарный файл.";
+    }
+  };
+
   // Timer for prototype generation - calculates duration based on content size
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -339,6 +347,65 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
     return () => clearInterval(interval);
   }, [isGeneratingPrototype, selectedFile]);
+
+  // Load prototype versions when file with prototype is selected
+  useEffect(() => {
+    if (!isOpen) return; // Early return if modal is closed
+    
+    const loadVersions = async () => {
+      if (!selectedFileId || activeTab !== 'prototype') {
+        setPrototypeVersions([]);
+        setSelectedVersionNumber(null);
+        return;
+      }
+
+      const file = documents.find(doc => doc.id === selectedFileId);
+      if (!file || (!file.verstkaContent && !file.dslContent)) {
+        setPrototypeVersions([]);
+        setSelectedVersionNumber(null);
+        return;
+      }
+
+      setIsLoadingVersions(true);
+      try {
+        const { versions } = await api.getPrototypeVersions(selectedFileId);
+        setPrototypeVersions(versions);
+        // Select latest version by default (highest versionNumber)
+        if (versions.length > 0) {
+          setSelectedVersionNumber(versions[0].versionNumber);
+        } else {
+          setSelectedVersionNumber(null);
+        }
+      } catch (error) {
+        console.error('Failed to load prototype versions:', error);
+        setPrototypeVersions([]);
+        setSelectedVersionNumber(null);
+      } finally {
+        setIsLoadingVersions(false);
+      }
+    };
+
+    loadVersions();
+  }, [selectedFileId, activeTab, documents, isOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!isOpen) return; // Early return if modal is closed
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isVersionDropdownOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.version-dropdown-container')) {
+          setIsVersionDropdownOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isVersionDropdownOpen, isOpen]);
 
   if (!isOpen) return null;
 
@@ -374,16 +441,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     const roles = agent.role ? agent.role.split(',').map(r => r.trim()) : [];
     return roles.includes('verstka');
   });
-
-
-  const decodeContent = (base64: string) => {
-    try {
-      return decodeURIComponent(escape(window.atob(base64)));
-    } catch (e) {
-      return "Не удалось прочитать файл или это бинарный файл.";
-    }
-  };
-
 
   const handleDownload = (file: UploadedFile, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -529,61 +586,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       setIsGeneratingPrototype(false);
     }
   };
-
-  // Load prototype versions when file with prototype is selected
-  useEffect(() => {
-    const loadVersions = async () => {
-      if (!selectedFileId || activeTab !== 'prototype') {
-        setPrototypeVersions([]);
-        setSelectedVersionNumber(null);
-        return;
-      }
-
-      const file = documents.find(doc => doc.id === selectedFileId);
-      if (!file || (!file.verstkaContent && !file.dslContent)) {
-        setPrototypeVersions([]);
-        setSelectedVersionNumber(null);
-        return;
-      }
-
-      setIsLoadingVersions(true);
-      try {
-        const { versions } = await api.getPrototypeVersions(selectedFileId);
-        setPrototypeVersions(versions);
-        // Select latest version by default (highest versionNumber)
-        if (versions.length > 0) {
-          setSelectedVersionNumber(versions[0].versionNumber);
-        } else {
-          setSelectedVersionNumber(null);
-        }
-      } catch (error) {
-        console.error('Failed to load prototype versions:', error);
-        setPrototypeVersions([]);
-        setSelectedVersionNumber(null);
-      } finally {
-        setIsLoadingVersions(false);
-      }
-    };
-
-    loadVersions();
-  }, [selectedFileId, activeTab, documents]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (isVersionDropdownOpen) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('.version-dropdown-container')) {
-          setIsVersionDropdownOpen(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isVersionDropdownOpen]);
 
   const handleOpenInNewTab = () => {
     const fileToUse = localSelectedFile || selectedFile;

@@ -1,4 +1,5 @@
 import 'express-serve-static-core';
+import { Request, ParamsDictionary, Query } from 'express-serve-static-core';
 
 declare global {
   namespace Express {
@@ -9,7 +10,13 @@ declare global {
 }
 
 // Тип для аутентифицированных запросов (после authMiddleware)
-export interface AuthenticatedRequest extends Express.Request {
+// Используем intersection type для правильного расширения Request с params
+export interface AuthenticatedRequest<
+  P extends ParamsDictionary = ParamsDictionary,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery extends Query = Query
+> extends Request<P, ResBody, ReqBody, ReqQuery> {
   userId: string;
 }
 

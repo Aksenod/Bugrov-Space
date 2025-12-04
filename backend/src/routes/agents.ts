@@ -1446,10 +1446,11 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
 });
 
 // GET /api/agents/files/:fileId/prototype-versions - получить все версии прототипа
-router.get('/files/:fileId/prototype-versions', authMiddleware, async (req: AuthenticatedRequest, res, next) => {
+router.get('/files/:fileId/prototype-versions', authMiddleware, async (req, res, next) => {
   try {
-    const { fileId } = req.params;
-    const userId = req.userId!;
+    const authReq = req as AuthenticatedRequest;
+    const { fileId } = authReq.params;
+    const userId = authReq.userId;
 
     logger.info({ fileId, userId }, 'GET /agents/files/:fileId/prototype-versions');
 
@@ -1493,9 +1494,10 @@ router.get('/files/:fileId/prototype-versions', authMiddleware, async (req: Auth
 
     res.json({ versions });
   } catch (error) {
+    const authReq = req as AuthenticatedRequest;
     logger.error({
-      fileId: req.params.fileId,
-      userId: req.userId,
+      fileId: authReq.params.fileId,
+      userId: authReq.userId,
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     }, 'Failed to get prototype versions');
@@ -1504,10 +1506,11 @@ router.get('/files/:fileId/prototype-versions', authMiddleware, async (req: Auth
 });
 
 // DELETE /api/agents/files/:fileId/prototype-versions/:versionNumber - удалить версию
-router.delete('/files/:fileId/prototype-versions/:versionNumber', authMiddleware, async (req: AuthenticatedRequest, res, next) => {
+router.delete('/files/:fileId/prototype-versions/:versionNumber', authMiddleware, async (req, res, next) => {
   try {
-    const { fileId, versionNumber } = req.params;
-    const userId = req.userId!;
+    const authReq = req as AuthenticatedRequest;
+    const { fileId, versionNumber } = authReq.params;
+    const userId = authReq.userId;
     const versionNum = parseInt(versionNumber, 10);
 
     if (isNaN(versionNum)) {
@@ -1613,10 +1616,11 @@ router.delete('/files/:fileId/prototype-versions/:versionNumber', authMiddleware
 
     res.json({ success: true });
   } catch (error) {
+    const authReq = req as AuthenticatedRequest;
     logger.error({
-      fileId: req.params.fileId,
-      versionNumber: req.params.versionNumber,
-      userId: req.userId,
+      fileId: authReq.params.fileId,
+      versionNumber: authReq.params.versionNumber,
+      userId: authReq.userId,
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     }, 'Failed to delete prototype version');
