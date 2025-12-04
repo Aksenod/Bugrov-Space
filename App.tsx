@@ -442,7 +442,7 @@ export default function App() {
   }, [documents, showAlert]);
 
   const renderAuthOrLoader = () => {
-    if (authToken && isBootstrapping) {
+    if (authToken && bootstrap.isBootstrapping) {
       return (
         <div className="flex items-center justify-center h-full bg-black text-white">
           <div className="text-center space-y-6">
