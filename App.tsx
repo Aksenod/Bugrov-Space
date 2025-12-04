@@ -693,71 +693,40 @@ export default function App() {
       // Пустой hash обрабатывается выше в блоке if (hash === '')
     };
 
-    window.addEventListener('hashchange', handleHashChange);
+    // Вызываем обработчик сразу при монтировании
+    handleHashChange();
 
-    // Проверяем при монтировании - используем ту же логику, что и в handleHashChange
-    const hash = window.location.hash;
-    if (hash === '#/landing' || hash === '#/') {
-      setIsLandingOpen(true);
-      setIsCreativeLandingOpen(false);
-      setIsAdminOpen(false);
-      setIsOfferOpen(false);
-      setIsPrivacyOpen(false);
-      setIsRequisitesOpen(false);
-    } else if (hash === '') {
-      // Если hash пустой и пользователь авторизован, не показываем лендинг
-      setIsAdminOpen(false);
-      setIsOfferOpen(false);
-      setIsPrivacyOpen(false);
-      setIsRequisitesOpen(false);
-      setPrototypeHash(null);
-      setAdminInitialAgentId(undefined);
-      // Показываем лендинг только если пользователь не авторизован
-      if (!currentUser) {
-        setIsLandingOpen(true);
-        setIsCreativeLandingOpen(false);
-      } else {
-        setIsLandingOpen(false);
-        setIsCreativeLandingOpen(false);
-      }
-    } else if (hash === '#/promo') {
-      setIsCreativeLandingOpen(true);
-      setIsLandingOpen(false);
-      setIsAdminOpen(false);
-      setIsOfferOpen(false);
-      setIsPrivacyOpen(false);
-      setIsRequisitesOpen(false);
-    } else if (hash === '#/admin') {
-      setIsAdminOpen(true);
-      setIsLandingOpen(false);
-    } else if (hash === '#/projects') {
-      // Закрываем все специальные страницы и показываем основное приложение
-      setIsAdminOpen(false);
-      setIsLandingOpen(false);
-      setIsCreativeLandingOpen(false);
-      setIsOfferOpen(false);
-      setIsPrivacyOpen(false);
-      setIsRequisitesOpen(false);
-      setPrototypeHash(null);
-      setAdminInitialAgentId(undefined);
-    } else if (hash === '#/offer') {
-      setIsOfferOpen(true);
-      setIsLandingOpen(false);
-    } else if (hash === '#/privacy') {
-      setIsPrivacyOpen(true);
-      setIsLandingOpen(false);
-    } else if (hash === '#/requisites') {
-      setIsRequisitesOpen(true);
-      setIsLandingOpen(false);
-    } else if (hash.startsWith('#/prototype/')) {
-      const hashValue = hash.replace('#/prototype/', '');
-      setPrototypeHash(hashValue);
-    }
+    window.addEventListener('hashchange', handleHashChange);
+    // Также слушаем popstate для кнопок назад/вперед
+    window.addEventListener('popstate', handleHashChange);
 
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
     };
   }, [currentUser]);
+
+  // Отслеживаем изменения hash, когда событие hashchange не срабатывает
+  // (например, когда hash устанавливается программно в то же значение)
+  useEffect(() => {
+    let lastHash = window.location.hash;
+    const checkHash = () => {
+      const currentHash = window.location.hash;
+      if (currentHash !== lastHash) {
+        lastHash = currentHash;
+        // Вызываем событие hashchange вручную
+        window.dispatchEvent(new HashChangeEvent('hashchange', {
+          oldURL: window.location.href.replace(window.location.hash, lastHash),
+          newURL: window.location.href
+        }));
+      }
+    };
+    
+    // Проверяем каждые 100мс для отслеживания программных изменений hash
+    const interval = setInterval(checkHash, 100);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const ensureMessagesLoaded = useCallback(
     async (agentId: string) => {
