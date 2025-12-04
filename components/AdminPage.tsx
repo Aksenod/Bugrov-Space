@@ -80,6 +80,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoOpenedRef = useRef(false); // Флаг для отслеживания автоматического открытия
   const onAgentUpdatedRef = useRef(onAgentUpdated); // Храним актуальную версию callback
+  const initialProjectTypeIdsRef = useRef<string[]>([]); // Исходные типы проектов для сравнения
   const STORAGE_KEY = 'admin_agent_draft';
   const GLOBAL_PROMPT_LIMIT = 5000;
   const [globalPrompt, setGlobalPrompt] = useState('');
@@ -331,7 +332,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           setAgentModel(resolveModel(agent.model));
           setAgentRole(agent.role || '');
           setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
-          setSelectedProjectTypeIds(projectTypes.map(pt => pt.id));
+          const projectTypeIds = projectTypes.map(pt => pt.id);
+          setSelectedProjectTypeIds(projectTypeIds);
+          initialProjectTypeIdsRef.current = [...projectTypeIds]; // Сохраняем исходные типы проектов
           setAgentFiles(agentFilesData);
           setIsAgentDialogOpen(true);
         } catch (error: any) {
@@ -558,7 +561,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       setAgentModel(resolveModel(agent.model));
       setAgentRole(agent.role || '');
       setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
-      setSelectedProjectTypeIds(agent.projectTypes?.map(pt => pt.id) || []);
+      const projectTypeIds = agent.projectTypes?.map(pt => pt.id) || [];
+      setSelectedProjectTypeIds(projectTypeIds);
+      initialProjectTypeIdsRef.current = [...projectTypeIds]; // Сохраняем исходные типы проектов
       // Загружаем файлы агента-шаблона только если есть ID
       if (agent.id) {
         try {
@@ -599,6 +604,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         setAgentRole(newAgent.role || '');
         setAgentIsHiddenFromSidebar(newAgent.isHiddenFromSidebar || false);
         setSelectedProjectTypeIds([]);
+        initialProjectTypeIdsRef.current = []; // Сохраняем исходные типы проектов (пустой массив для нового агента)
         setAgentFiles([]);
         // Загружаем список агентов, чтобы новый агент появился в списке
         await loadAgents();
@@ -620,6 +626,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     localStorage.removeItem(STORAGE_KEY);
     setIsAgentDialogOpen(false);
     setEditingAgent(null);
+    initialProjectTypeIdsRef.current = []; // Сбрасываем исходные типы проектов при закрытии диалога
     setIsProjectTypesDropdownOpen(false);
     setIsRoleDropdownOpen(false);
     setIsModelDropdownOpen(false);
@@ -668,7 +675,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         setAgentModel(draft.model || LLMModel.GPT5_MINI);
         setAgentRole(draft.role || '');
         setAgentIsHiddenFromSidebar(draft.isHiddenFromSidebar || false);
-        setSelectedProjectTypeIds(draft.selectedProjectTypeIds || []);
+        const projectTypeIds = draft.selectedProjectTypeIds || [];
+        setSelectedProjectTypeIds(projectTypeIds);
+        initialProjectTypeIdsRef.current = [...projectTypeIds]; // Сохраняем исходные типы проектов из draft
         return true;
       }
     } catch (error) {
@@ -696,18 +705,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           role: agentRole?.trim() || undefined,
           isHiddenFromSidebar: agentIsHiddenFromSidebar,
         });
-        // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
-        try {
-          await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
-          // Обновляем агентов для всех затронутых типов проектов
-          const allAffectedTypes = new Set([
-            ...selectedProjectTypeIds,
-            ...(editingAgent.projectTypes?.map(pt => pt.id) || [])
-          ]);
-          await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
-        } catch (error: any) {
-          // Если ошибка при привязке типов проектов - логируем, но не блокируем сохранение
-          console.warn('Failed to attach project types', error);
+        // Обновляем привязки к типам проектов только если они действительно изменились
+        const initialIds = initialProjectTypeIdsRef.current;
+        const currentIds = selectedProjectTypeIds;
+        const idsChanged = initialIds.length !== currentIds.length || 
+          !initialIds.every(id => currentIds.includes(id)) ||
+          !currentIds.every(id => initialIds.includes(id));
+        
+        if (idsChanged) {
+          try {
+            await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
+            // Обновляем исходные типы проектов после успешного сохранения
+            initialProjectTypeIdsRef.current = [...selectedProjectTypeIds];
+            // Обновляем агентов для всех затронутых типов проектов
+            const allAffectedTypes = new Set([
+              ...selectedProjectTypeIds,
+              ...(editingAgent.projectTypes?.map(pt => pt.id) || [])
+            ]);
+            await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
+          } catch (error: any) {
+            // Если ошибка при привязке типов проектов - логируем, но не блокируем сохранение
+            console.warn('Failed to attach project types', error);
+          }
         }
         // Обновляем список агентов
         await loadAgents();
@@ -927,6 +946,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       });
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
       await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
+      // Обновляем исходные типы проектов после успешного сохранения
+      initialProjectTypeIdsRef.current = [...selectedProjectTypeIds];
       // Обновляем агентов для всех затронутых типов проектов
       const allAffectedTypes = new Set([
         ...selectedProjectTypeIds,

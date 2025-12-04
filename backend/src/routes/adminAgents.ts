@@ -857,6 +857,44 @@ router.post('/:id/project-types', asyncHandler(async (req: Request, res: Respons
     return res.status(404).json({ error: 'Один или несколько типов проектов не найдены' });
   }
 
+  // Загружаем существующие связи с их порядком перед удалением
+  const existingConnections = await withRetry(
+    () => (prisma as any).projectTypeAgentProjectType.findMany({
+      where: { projectTypeAgentId: id },
+      select: {
+        projectTypeId: true,
+        order: true,
+      },
+    }),
+    3,
+    `POST /admin/agents/${id}/project-types - load existing connections`
+  ) as Array<{ projectTypeId: string; order: number | null }>;
+
+  // Создаем карту существующих порядков по projectTypeId
+  const existingOrderMap = new Map<string, number>();
+  existingConnections.forEach(conn => {
+    if (conn.order !== null && conn.order !== undefined) {
+      existingOrderMap.set(conn.projectTypeId, conn.order);
+    }
+  });
+
+  // Для каждого типа проекта находим максимальный порядок среди всех агентов этого типа
+  const maxOrderMap = new Map<string, number>();
+  for (const projectTypeId of projectTypeIds) {
+    const maxOrderResult = await withRetry(
+      () => (prisma as any).projectTypeAgentProjectType.findFirst({
+        where: { projectTypeId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      }),
+      3,
+      `POST /admin/agents/${id}/project-types - find max order for ${projectTypeId}`
+    ) as { order: number | null } | null;
+    
+    const maxOrder = maxOrderResult?.order ?? -1;
+    maxOrderMap.set(projectTypeId, maxOrder);
+  }
+
   // Удаляем существующие связи
   await withRetry(
     () => (prisma as any).projectTypeAgentProjectType.deleteMany({
@@ -866,12 +904,24 @@ router.post('/:id/project-types', asyncHandler(async (req: Request, res: Respons
     `POST /admin/agents/${id}/project-types - delete existing`
   );
 
-  // Создаем новые связи
-  const connections = projectTypeIds.map((projectTypeId, index) => ({
-    projectTypeAgentId: id,
-    projectTypeId,
-    order: index,
-  }));
+  // Создаем новые связи, сохраняя существующий порядок или используя максимальный + 1
+  const connections = projectTypeIds.map((projectTypeId) => {
+    // Если связь уже существовала, сохраняем её порядок
+    if (existingOrderMap.has(projectTypeId)) {
+      return {
+        projectTypeAgentId: id,
+        projectTypeId,
+        order: existingOrderMap.get(projectTypeId)!,
+      };
+    }
+    // Для новой связи используем максимальный порядок + 1
+    const maxOrder = maxOrderMap.get(projectTypeId) ?? -1;
+    return {
+      projectTypeAgentId: id,
+      projectTypeId,
+      order: maxOrder + 1,
+    };
+  });
 
   await withRetry(
     () => (prisma as any).projectTypeAgentProjectType.createMany({
