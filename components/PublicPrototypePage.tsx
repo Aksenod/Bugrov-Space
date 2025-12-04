@@ -37,7 +37,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10">
-        <h1 className="text-white font-medium flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+        <h1 className="text-white font-medium flex flex-col md:flex-row md:items-center md:gap-2">
           <span>Просмотр прототипа{versionNumber !== undefined ? ` (Версия ${versionNumber})` : ''}</span>
           {username && <span className="text-white/60 md:ml-2">• {username}</span>}
         </h1>
