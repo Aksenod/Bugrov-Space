@@ -6,6 +6,8 @@ import { generateAgentResponse, generateSummaryContent, generateDocumentResult, 
 import { withRetry } from '../utils/prismaRetry';
 import { logger } from '../utils/logger';
 import { syncProjectAgentsForProject } from '../services/projectTypeSync';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { AuthenticatedRequest } from '../types/express';
 
 const router = Router();
 
