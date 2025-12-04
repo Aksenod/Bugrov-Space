@@ -83,14 +83,12 @@ export async function ensureConnection(): Promise<void> {
   }
 }
 
-// Логируем путь к базе данных при старте
+// Логируем информацию о базе данных при старте (без раскрытия структуры)
 if (process.env.DATABASE_URL) {
-  const dbUrl = process.env.DATABASE_URL;
-  // Скрываем пароль в логах
-  const safeUrl = dbUrl.replace(/:[^:@]+@/, ':****@');
   logger.info({
-    databaseUrl: safeUrl,
     databaseType: 'PostgreSQL',
+    host: 'masked',
+    configured: true,
   }, 'Database connection configured');
 } else {
   logger.warn('DATABASE_URL not set, using default from schema.prisma');

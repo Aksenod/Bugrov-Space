@@ -20,6 +20,15 @@ import {
   AdminAgentsTab,
   AdminProjectTypesTab,
 } from './admin';
+import {
+  useAgentDialog,
+  useAgentForm,
+  useAgentAutoSave,
+  useAgentFileUpload,
+  useAgentFilters,
+  useAgentSort,
+  useGlobalPrompt,
+} from '../hooks/admin';
 
 export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, onAgentUpdated }) => {
   const [activeTab, setActiveTab] = useState<TabType>('agents');
@@ -45,69 +54,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [totalProjects, setTotalProjects] = useState<number>(0);
-  const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<ApiProjectTypeAgent | null>(null);
 
-  // Filters and sorting state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProjectTypeFilters, setSelectedProjectTypeFilters] = useState<string[]>([]);
-  const [selectedRoleFilters, setSelectedRoleFilters] = useState<string[]>([]);
-  const [selectedModelFilters, setSelectedModelFilters] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'projectTypesCount'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
-
-  const FILTERS_STORAGE_KEY = 'admin_agents_filters';
-  const SORT_STORAGE_KEY = 'admin_agents_sort';
-
-  // Agent form state
-  const [agentName, setAgentName] = useState('');
-  const [agentDescription, setAgentDescription] = useState('');
-  const [agentSystemInstruction, setAgentSystemInstruction] = useState('');
-  const [agentSummaryInstruction, setAgentSummaryInstruction] = useState('');
-  const [agentModel, setAgentModel] = useState<LLMModel>(LLMModel.GPT5_MINI);
-  const [agentRole, setAgentRole] = useState('');
-  const [agentIsHiddenFromSidebar, setAgentIsHiddenFromSidebar] = useState(false);
-  const [selectedProjectTypeIds, setSelectedProjectTypeIds] = useState<string[]>([]);
-  const [isSavingAgent, setIsSavingAgent] = useState(false);
-  const [isProjectTypesDropdownOpen, setIsProjectTypesDropdownOpen] = useState(false);
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-  const [agentFiles, setAgentFiles] = useState<UploadedFile[]>([]);
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoOpenedRef = useRef(false); // Флаг для отслеживания автоматического открытия
-  const onAgentUpdatedRef = useRef(onAgentUpdated); // Храним актуальную версию callback
-  const initialProjectTypeIdsRef = useRef<string[]>([]); // Исходные типы проектов для сравнения
-  const STORAGE_KEY = 'admin_agent_draft';
-  const GLOBAL_PROMPT_LIMIT = 5000;
-  const [globalPrompt, setGlobalPrompt] = useState('');
-  const [initialGlobalPrompt, setInitialGlobalPrompt] = useState('');
-  const [isLoadingGlobalPrompt, setIsLoadingGlobalPrompt] = useState(false);
-  const [isSavingGlobalPrompt, setIsSavingGlobalPrompt] = useState(false);
-  const [globalPromptUpdatedAt, setGlobalPromptUpdatedAt] = useState<string | null>(null);
-  const [globalPromptError, setGlobalPromptError] = useState<string | null>(null);
-  const globalPromptHasChanges = useMemo(
-    () => globalPrompt !== initialGlobalPrompt,
-    [globalPrompt, initialGlobalPrompt],
-  );
-  const formattedGlobalPromptUpdatedAt = useMemo(() => {
-    if (!globalPromptUpdatedAt) {
-      return null;
-    }
-    try {
-      return new Date(globalPromptUpdatedAt).toLocaleString('ru-RU');
-    } catch {
-      return globalPromptUpdatedAt;
-    }
-  }, [globalPromptUpdatedAt]);
-
-  // Обновляем ref при изменении callback
-  useEffect(() => {
-    onAgentUpdatedRef.current = onAgentUpdated;
-  }, [onAgentUpdated]);
 
   // Dialog states
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -131,40 +79,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     isOpen: false,
     message: '',
   });
-
-  const loadGlobalPrompt = useCallback(async () => {
-    setIsLoadingGlobalPrompt(true);
-    setGlobalPromptError(null);
-    try {
-      const { globalPrompt: prompt } = await api.getGlobalPrompt();
-      const content = prompt?.content ?? '';
-      setGlobalPrompt(content);
-      setInitialGlobalPrompt(content);
-      setGlobalPromptUpdatedAt(prompt?.updatedAt ?? prompt?.createdAt ?? null);
-    } catch (error: any) {
-      // Если маршрут не найден (404), это нормально - возможно, функция еще не развернута
-      // Инициализируем пустым содержимым вместо показа ошибки
-      if (error?.status === 404) {
-        console.warn('Global prompt endpoint not found (404), initializing with empty content');
-        setGlobalPrompt('');
-        setInitialGlobalPrompt('');
-        setGlobalPromptUpdatedAt(null);
-      } else {
-        console.error('Failed to load global prompt', error);
-        setGlobalPromptError(error?.message || 'Не удалось загрузить глобальный промт');
-      }
-    } finally {
-      setIsLoadingGlobalPrompt(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProjectTypes();
-  }, []);
-
-  useEffect(() => {
-    loadGlobalPrompt();
-  }, [loadGlobalPrompt]);
 
   // Helper functions for dialogs
   const showConfirm = (
@@ -204,6 +118,105 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     }
   };
 
+  // Используем хуки для управления состоянием
+  const {
+    isAgentDialogOpen,
+    editingAgent,
+    agentFiles,
+    setAgentFiles,
+    handleOpenAgentDialog,
+    handleCloseAgentDialog,
+    onAgentUpdatedRef,
+  } = useAgentDialog({ onAgentUpdated, projectTypes });
+
+  const {
+    agentName,
+    setAgentName,
+    agentDescription,
+    setAgentDescription,
+    agentSystemInstruction,
+    setAgentSystemInstruction,
+    agentSummaryInstruction,
+    setAgentSummaryInstruction,
+    agentModel,
+    setAgentModel,
+    agentRole,
+    setAgentRole,
+    agentIsHiddenFromSidebar,
+    setAgentIsHiddenFromSidebar,
+    selectedProjectTypeIds,
+    setSelectedProjectTypeIds,
+    isProjectTypesDropdownOpen,
+    setIsProjectTypesDropdownOpen,
+    isRoleDropdownOpen,
+    setIsRoleDropdownOpen,
+    isModelDropdownOpen,
+    setIsModelDropdownOpen,
+    toggleProjectType,
+    initialProjectTypeIdsRef,
+  } = useAgentForm({ editingAgent, isDialogOpen: isAgentDialogOpen });
+
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedProjectTypeFilters,
+    selectedRoleFilters,
+    selectedModelFilters,
+    isFiltersOpen,
+    setIsFiltersOpen,
+    toggleProjectTypeFilter,
+    toggleRoleFilter,
+    toggleModelFilter,
+    resetFilters,
+  } = useAgentFilters();
+
+  const {
+    sortBy,
+    setSortBy,
+    sortOrder,
+    setSortOrder,
+    isSortDropdownOpen,
+    setIsSortDropdownOpen,
+  } = useAgentSort();
+
+  const {
+    globalPrompt,
+    setGlobalPrompt,
+    isLoadingGlobalPrompt,
+    isSavingGlobalPrompt,
+    globalPromptUpdatedAt,
+    globalPromptError,
+    setGlobalPromptError,
+    globalPromptHasChanges,
+    formattedGlobalPromptUpdatedAt,
+    GLOBAL_PROMPT_LIMIT,
+    loadGlobalPrompt,
+    handleSaveGlobalPrompt,
+  } = useGlobalPrompt(showAlert);
+
+  const {
+    isUploadingFiles,
+    fileInputRef,
+    handleFileChange,
+    handleDragOver,
+    handleDrop,
+    handleRemoveFile,
+  } = useAgentFileUpload({
+    editingAgent,
+    agentFiles,
+    setAgentFiles,
+    showAlert,
+    showConfirm,
+  });
+
+  useEffect(() => {
+    loadProjectTypes();
+  }, []);
+
+  useEffect(() => {
+    loadGlobalPrompt();
+  }, [loadGlobalPrompt]);
+
   useEffect(() => {
     if (activeTab === 'agents') {
       loadAgents();
@@ -212,56 +225,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     }
   }, [activeTab]);
 
-  // Restore filters and sort from localStorage
-  useEffect(() => {
-    try {
-      const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
-      if (savedFilters) {
-        const filters = JSON.parse(savedFilters);
-        setSearchQuery(filters.searchQuery || '');
-        setSelectedProjectTypeFilters(filters.selectedProjectTypeFilters || []);
-        setSelectedRoleFilters(filters.selectedRoleFilters || []);
-        setSelectedModelFilters(filters.selectedModelFilters || []);
-        setIsFiltersOpen(filters.isFiltersOpen || false);
-      }
-
-      const savedSort = localStorage.getItem(SORT_STORAGE_KEY);
-      if (savedSort) {
-        const sort = JSON.parse(savedSort);
-        setSortBy(sort.sortBy || 'name');
-        setSortOrder(sort.sortOrder || 'asc');
-      }
-    } catch (error) {
-      console.error('Failed to restore filters/sort from localStorage', error);
-    }
-  }, []);
-
-  // Save filters to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
-        searchQuery,
-        selectedProjectTypeFilters,
-        selectedRoleFilters,
-        selectedModelFilters,
-        isFiltersOpen,
-      }));
-    } catch (error) {
-      console.error('Failed to save filters to localStorage', error);
-    }
-  }, [searchQuery, selectedProjectTypeFilters, selectedRoleFilters, selectedModelFilters, isFiltersOpen]);
-
-  // Save sort to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify({
-        sortBy,
-        sortOrder,
-      }));
-    } catch (error) {
-      console.error('Failed to save sort to localStorage', error);
-    }
-  }, [sortBy, sortOrder]);
 
   // Сбрасываем флаг при изменении initialAgentId и переключаемся на вкладку агентов
   useEffect(() => {
@@ -551,375 +514,37 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     );
   };
 
-  const handleOpenAgentDialog = async (agent?: ApiProjectTypeAgent) => {
-    if (agent) {
-      setEditingAgent(agent);
-      setAgentName(agent.name);
-      setAgentDescription(agent.description || '');
-      setAgentSystemInstruction(agent.systemInstruction || '');
-      setAgentSummaryInstruction(agent.summaryInstruction || '');
-      setAgentModel(resolveModel(agent.model));
-      setAgentRole(agent.role || '');
-      setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
-      const projectTypeIds = agent.projectTypes?.map(pt => pt.id) || [];
-      setSelectedProjectTypeIds(projectTypeIds);
-      initialProjectTypeIdsRef.current = [...projectTypeIds]; // Сохраняем исходные типы проектов
-      // Загружаем файлы агента-шаблона только если есть ID
-      if (agent.id) {
-        try {
-          const { files } = await api.getAdminAgentFiles(agent.id);
-          setAgentFiles(files.map(file => ({
-            id: file.id,
-            name: file.name,
-            type: file.mimeType,
-            data: file.content,
-            agentId: file.agentId,
-          })));
-        } catch (error) {
-          console.error('Failed to load agent files', error);
-          setAgentFiles([]);
-        }
-      } else {
-        setAgentFiles([]);
-      }
-      // Очищаем черновик при редактировании существующего агента
-      localStorage.removeItem(STORAGE_KEY);
-    } else {
-      // Создаем нового агента сразу
-      try {
-        const { agent: newAgent } = await api.createAgentTemplate({
-          name: 'Новый агент',
-          description: '',
-          systemInstruction: '',
-          summaryInstruction: '',
-          model: LLMModel.GPT5_MINI,
-          isHiddenFromSidebar: false,
-        });
-        setEditingAgent(newAgent);
-        setAgentName(newAgent.name);
-        setAgentDescription(newAgent.description || '');
-        setAgentSystemInstruction(newAgent.systemInstruction || '');
-        setAgentSummaryInstruction(newAgent.summaryInstruction || '');
-        setAgentModel(resolveModel(newAgent.model));
-        setAgentRole(newAgent.role || '');
-        setAgentIsHiddenFromSidebar(newAgent.isHiddenFromSidebar || false);
-        setSelectedProjectTypeIds([]);
-        initialProjectTypeIdsRef.current = []; // Сохраняем исходные типы проектов (пустой массив для нового агента)
-        setAgentFiles([]);
+  // Используем хук для автосохранения
+  const { saveTimeoutRef, clearSaveTimeout } = useAgentAutoSave({
+    editingAgent,
+    agentName,
+    agentDescription,
+    agentSystemInstruction,
+    agentSummaryInstruction,
+    agentModel,
+    agentRole,
+    agentIsHiddenFromSidebar,
+    selectedProjectTypeIds,
+    initialProjectTypeIdsRef,
+    onAgentUpdatedRef,
+    loadAgents,
+    loadAgentsForType,
+  });
+
+  // Обновляем handleOpenAgentDialog для загрузки агентов после создания
+  const handleOpenAgentDialogWithLoad = async (agent?: ApiProjectTypeAgent) => {
+    try {
+      await handleOpenAgentDialog(agent);
+      if (!agent) {
         // Загружаем список агентов, чтобы новый агент появился в списке
         await loadAgents();
-      } catch (error: any) {
-        console.error('Failed to create agent', error);
-        const errorMessage = error?.status === 404
-          ? 'Эндпоинт для создания агентов не найден. Убедитесь, что сервер перезапущен.'
-          : error?.message || 'Не удалось создать агента';
-        showAlert(errorMessage, 'Ошибка', 'error');
-        return;
       }
-    }
-    setIsProjectTypesDropdownOpen(false);
-    setIsAgentDialogOpen(true);
-  };
-
-  const handleCloseAgentDialog = () => {
-    // Очищаем черновик при закрытии
-    localStorage.removeItem(STORAGE_KEY);
-    setIsAgentDialogOpen(false);
-    setEditingAgent(null);
-    initialProjectTypeIdsRef.current = []; // Сбрасываем исходные типы проектов при закрытии диалога
-    setIsProjectTypesDropdownOpen(false);
-    setIsRoleDropdownOpen(false);
-    setIsModelDropdownOpen(false);
-    setAgentFiles([]);
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-  };
-
-  // Автосохранение в localStorage
-  const saveDraftToStorage = () => {
-    if (!editingAgent) return;
-
-    const draft = {
-      agentId: editingAgent.id,
-      name: agentName,
-      description: agentDescription,
-      systemInstruction: agentSystemInstruction,
-      summaryInstruction: agentSummaryInstruction,
-      model: agentModel,
-      role: agentRole,
-      isHiddenFromSidebar: agentIsHiddenFromSidebar,
-      selectedProjectTypeIds,
-    };
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    } catch (error) {
-      console.error('Failed to save draft to localStorage', error);
-    }
-  };
-
-  // Восстановление из localStorage
-  const loadDraftFromStorage = () => {
-    try {
-      const draftStr = localStorage.getItem(STORAGE_KEY);
-      if (!draftStr) return false;
-
-      const draft = JSON.parse(draftStr);
-      if (draft.agentId && editingAgent && draft.agentId === editingAgent.id) {
-        setAgentName(draft.name || '');
-        setAgentDescription(draft.description || '');
-        setAgentSystemInstruction(draft.systemInstruction || '');
-        setAgentSummaryInstruction(draft.summaryInstruction || '');
-        setAgentModel(draft.model || LLMModel.GPT5_MINI);
-        setAgentRole(draft.role || '');
-        setAgentIsHiddenFromSidebar(draft.isHiddenFromSidebar || false);
-        const projectTypeIds = draft.selectedProjectTypeIds || [];
-        setSelectedProjectTypeIds(projectTypeIds);
-        initialProjectTypeIdsRef.current = [...projectTypeIds]; // Сохраняем исходные типы проектов из draft
-        return true;
-      }
-    } catch (error) {
-      console.error('Failed to load draft from localStorage', error);
-    }
-    return false;
-  };
-
-  // Автосохранение в API с debounce
-  const autoSaveAgent = async () => {
-    if (!editingAgent || !agentName?.trim()) return;
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        await api.updateAgentTemplate(editingAgent.id, {
-          name: agentName?.trim() || '',
-          description: agentDescription?.trim() || '',
-          systemInstruction: agentSystemInstruction?.trim() || '',
-          summaryInstruction: agentSummaryInstruction?.trim() || '',
-          model: agentModel,
-          role: agentRole?.trim() || undefined,
-          isHiddenFromSidebar: agentIsHiddenFromSidebar,
-        });
-        // Обновляем привязки к типам проектов только если они действительно изменились
-        const initialIds = initialProjectTypeIdsRef.current;
-        const currentIds = selectedProjectTypeIds;
-        const idsChanged = initialIds.length !== currentIds.length || 
-          !initialIds.every(id => currentIds.includes(id)) ||
-          !currentIds.every(id => initialIds.includes(id));
-        
-        if (idsChanged) {
-          try {
-            await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
-            // Обновляем исходные типы проектов после успешного сохранения
-            initialProjectTypeIdsRef.current = [...selectedProjectTypeIds];
-            // Обновляем агентов для всех затронутых типов проектов
-            const allAffectedTypes = new Set([
-              ...selectedProjectTypeIds,
-              ...(editingAgent.projectTypes?.map(pt => pt.id) || [])
-            ]);
-            await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
-          } catch (error: any) {
-            // Если ошибка при привязке типов проектов - логируем, но не блокируем сохранение
-            console.warn('Failed to attach project types', error);
-          }
-        }
-        // Обновляем список агентов
-        await loadAgents();
-        // Уведомляем родительский компонент об обновлении агента
-        // Используем ref для получения актуальной версии callback
-        if (onAgentUpdatedRef.current) {
-          onAgentUpdatedRef.current();
-        }
-      } catch (error: any) {
-        console.error('Auto-save failed', error);
-        // Не показываем ошибку пользователю при автосохранении, только логируем
-        // Если это критическая ошибка (не 404), можно показать предупреждение
-        if (error?.status && error.status !== 404 && error.status !== 401) {
-          console.warn('Auto-save failed with non-404 error:', error);
-        }
-      }
-    }, 1000); // Сохраняем через 1 секунду после последнего изменения
-  };
-
-  // Сохраняем в localStorage при изменении полей
-  useEffect(() => {
-    if (editingAgent) {
-      saveDraftToStorage();
-      autoSaveAgent();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, selectedProjectTypeIds, editingAgent?.id, onAgentUpdated]);
-
-  // Восстанавливаем из localStorage при открытии диалога
-  useEffect(() => {
-    if (isAgentDialogOpen && editingAgent) {
-      loadDraftFromStorage();
-    }
-  }, [isAgentDialogOpen]);
-
-  const readFileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-  const handleFileUpload = async (fileList: FileList) => {
-    if (!editingAgent || !fileList.length) {
-      if (!editingAgent) {
-        showAlert('Сначала создайте агента', 'Ошибка', 'error');
-      }
-      return;
-    }
-
-    setIsUploadingFiles(true);
-    const uploads: UploadedFile[] = [];
-    const errors: string[] = [];
-
-    const allowedExtensions = ['.txt', '.md'];
-    const allowedMimeTypes = ['text/plain', 'text/markdown'];
-    const FILE_SIZE_LIMIT = 2 * 1024 * 1024;
-
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-
-      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-      const isValidExtension = allowedExtensions.includes(fileExtension);
-      const isValidMimeType = !file.type || allowedMimeTypes.includes(file.type);
-
-      if (!isValidExtension && !isValidMimeType) {
-        errors.push(`Файл ${file.name} не поддерживается. Разрешены только .txt и .md файлы.`);
-        continue;
-      }
-
-      if (file.size > FILE_SIZE_LIMIT) {
-        errors.push(`Файл ${file.name} слишком большой (>2MB)`);
-        continue;
-      }
-
-      try {
-        const base64 = await readFileToBase64(file);
-        const { file: uploaded } = await api.uploadAdminAgentFile(editingAgent.id, {
-          name: file.name,
-          mimeType: file.type || 'text/plain',
-          content: base64,
-          isKnowledgeBase: true,
-        });
-        uploads.push({
-          id: uploaded.id,
-          name: uploaded.name,
-          type: uploaded.mimeType,
-          data: uploaded.content,
-          agentId: uploaded.agentId,
-        });
-      } catch (error: any) {
-        console.error('File upload failed', error);
-        // Детальное логирование ошибки
-        const errorMessage = error?.message || 'Неизвестная ошибка';
-        const errorStatus = error?.status || error?.statusCode || 'unknown';
-        console.error('Upload error details:', {
-          fileName: file.name,
-          errorMessage,
-          errorStatus,
-          errorName: error?.name,
-          errorCode: error?.code,
-          fullError: error,
-        });
-
-        // Формируем понятное сообщение об ошибке для пользователя
-        let userMessage = `Не удалось загрузить ${file.name}`;
-        if (errorStatus === 500) {
-          userMessage += ': Ошибка сервера. Возможно, миграция базы данных не применена.';
-        } else if (errorStatus === 404) {
-          userMessage += ': Агент не найден.';
-        } else if (errorStatus === 401 || errorStatus === 403) {
-          userMessage += ': Недостаточно прав доступа.';
-        } else if (errorMessage) {
-          userMessage += `: ${errorMessage}`;
-        } else {
-          userMessage += ': Неизвестная ошибка. Проверьте консоль браузера.';
-        }
-
-        errors.push(userMessage);
-      }
-    }
-
-    if (errors.length > 0) {
-      showAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error');
-    }
-
-    if (uploads.length > 0) {
-      // Добавляем загруженные файлы в список
-      setAgentFiles(prev => [...prev, ...uploads]);
-
-      // Перезагружаем файлы с сервера для получения актуального списка
-      try {
-        const { files: refreshedFiles } = await api.getAdminAgentFiles(editingAgent.id);
-        setAgentFiles(refreshedFiles.map(file => ({
-          id: file.id,
-          name: file.name,
-          type: file.mimeType,
-          data: file.content,
-          agentId: file.agentId,
-        })));
-        console.log(`[AdminPage] Reloaded ${refreshedFiles.length} files after upload`);
-      } catch (error: any) {
-        console.error('[AdminPage] Failed to reload files after upload', error);
-        // Не показываем ошибку пользователю, так как файлы уже добавлены в состояние
-      }
-
-      showAlert(`Успешно загружено файлов: ${uploads.length}`, 'Успех', 'success', 3000);
-    }
-
-    setIsUploadingFiles(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleRemoveFile = async (fileId: string) => {
-    if (!editingAgent) return;
-
-    showConfirm(
-      'Удалить файл из базы знаний?',
-      'Файл будет удален из базы знаний.\n\nЭто действие нельзя отменить.',
-      async () => {
-        try {
-          await api.deleteAdminAgentFile(editingAgent.id, fileId);
-          setAgentFiles(prev => prev.filter(file => file.id !== fileId));
-          showAlert('Файл успешно удален', undefined, 'success', 3000);
-        } catch (error: any) {
-          console.error('Failed to remove file', error);
-          showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
-        }
-      },
-      'danger'
-    );
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFileUpload(e.target.files);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileUpload(e.dataTransfer.files);
+    } catch (error: any) {
+      console.error('Failed to open agent dialog', error);
+      const errorMessage = error?.status === 404
+        ? 'Эндпоинт для создания агентов не найден. Убедитесь, что сервер перезапущен.'
+        : error?.message || 'Не удалось создать агента';
+      showAlert(errorMessage, 'Ошибка', 'error');
     }
   };
 
@@ -927,10 +552,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     if (!editingAgent || !agentName?.trim()) return;
 
     // Очищаем таймер автосохранения
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
+    clearSaveTimeout();
 
     setIsSavingAgent(true);
     try {
@@ -960,7 +582,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         onAgentUpdated();
       }
       // Очищаем черновик после успешного сохранения
-      localStorage.removeItem(STORAGE_KEY);
+      // Черновик очищается автоматически в хуке useAgentForm
       handleCloseAgentDialog();
     } catch (error: any) {
       console.error('Failed to save agent', error);
@@ -970,37 +592,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     }
   };
 
-  const handleSaveGlobalPrompt = async () => {
-    if (isSavingGlobalPrompt || isLoadingGlobalPrompt || !globalPromptHasChanges) {
-      return;
-    }
-    setIsSavingGlobalPrompt(true);
-    setGlobalPromptError(null);
-    try {
-      const { globalPrompt: prompt } = await api.updateGlobalPrompt({
-        content: globalPrompt,
-      });
-      const content = prompt?.content ?? '';
-      setGlobalPrompt(content);
-      setInitialGlobalPrompt(content);
-      setGlobalPromptUpdatedAt(prompt?.updatedAt ?? prompt?.createdAt ?? null);
-      showAlert(
-        'Глобальный промт обновлён и будет применяться ко всем агентам',
-        'Готово',
-        'success',
-        3000,
-      );
-    } catch (error: any) {
-      let message = error?.message || 'Не удалось сохранить глобальный промт';
-      if (error?.status === 404) {
-        message = 'Функция глобального промта не доступна на сервере (404). Возможно, требуется обновление сервера.';
-      }
-      setGlobalPromptError(message);
-      showAlert(message, 'Ошибка', 'error', 4000);
-    } finally {
-      setIsSavingGlobalPrompt(false);
-    }
-  };
 
   const handleDeleteAgent = async (id: string, name: string) => {
     showConfirm(
@@ -1029,13 +620,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     return <Cpu size={14} className="text-pink-400" />;
   };
 
-  const toggleProjectType = (projectTypeId: string) => {
-    setSelectedProjectTypeIds(prev =>
-      prev.includes(projectTypeId)
-        ? prev.filter(id => id !== projectTypeId)
-        : [...prev, projectTypeId]
-    );
-  };
 
   const handleReorderAgents = async (projectTypeId: string, newOrder: ApiProjectTypeAgent[]) => {
     setReorderingTypeId(projectTypeId);
@@ -1096,38 +680,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     handleReorderAgents(projectTypeId, newOrder);
   };
 
-  // Reset filters
-  const resetFilters = () => {
-    setSearchQuery('');
-    setSelectedProjectTypeFilters([]);
-    setSelectedRoleFilters([]);
-    setSelectedModelFilters([]);
-  };
-
-  // Toggle filter values
-  const toggleProjectTypeFilter = (projectTypeId: string) => {
-    setSelectedProjectTypeFilters(prev =>
-      prev.includes(projectTypeId)
-        ? prev.filter(id => id !== projectTypeId)
-        : [...prev, projectTypeId]
-    );
-  };
-
-  const toggleRoleFilter = (role: string) => {
-    setSelectedRoleFilters(prev =>
-      prev.includes(role)
-        ? prev.filter(r => r !== role)
-        : [...prev, role]
-    );
-  };
-
-  const toggleModelFilter = (model: string) => {
-    setSelectedModelFilters(prev =>
-      prev.includes(model)
-        ? prev.filter(m => m !== model)
-        : [...prev, model]
-    );
-  };
 
   const toggleCollapse = (typeId: string) => {
     setCollapsedTypes(prev => {
@@ -1229,8 +781,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
               setSortOrder={setSortOrder}
               isFiltersOpen={isFiltersOpen}
               setIsFiltersOpen={setIsFiltersOpen}
-              onCreateAgent={handleOpenAgentDialog}
-              onEditAgent={handleOpenAgentDialog}
+              onCreateAgent={handleOpenAgentDialogWithLoad}
+              onEditAgent={handleOpenAgentDialogWithLoad}
               onDeleteAgent={handleDeleteAgent}
               onToggleProjectTypeFilter={toggleProjectTypeFilter}
               onToggleRoleFilter={toggleRoleFilter}
@@ -1303,7 +855,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                       }
 
                       // Проверяем, есть ли активный таймер автосохранения
-                      const isPendingSave = saveTimeoutRef.current !== null;
+                      const isPendingSave = saveTimeoutRef?.current !== null;
 
                       if (hasChanges && isPendingSave) {
                         return (

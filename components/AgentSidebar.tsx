@@ -62,7 +62,8 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
     !!currentUser &&
     (currentUser.role === 'admin' || (currentUser?.username && ADMIN_USERNAMES.has(currentUser.username)));
   
-  const handleAgentMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, agent: Agent) => {
+  const handleInfoIconMouseEnter = useCallback((e: React.MouseEvent<HTMLDivElement>, agent: Agent) => {
+    e.stopPropagation();
     if (!agent.description) {
       setTooltipState(null);
       return;
@@ -72,7 +73,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
     const tooltipWidth = 192; // w-48 = 12rem = 192px
     const padding = 8;
     
-    // Позиционируем тултип справа от элемента
+    // Позиционируем тултип справа от иконки
     let x = rect.right + padding;
     let y = rect.top + rect.height / 2;
     
@@ -100,7 +101,8 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
     tooltipStateRef.current = newState;
   }, []);
   
-  const handleAgentMouseLeave = useCallback(() => {
+  const handleInfoIconMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
     setTooltipState(null);
     tooltipStateRef.current = null;
   }, []);
@@ -115,14 +117,27 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       
       const agentElement = document.querySelector(`[data-agent-id="${currentState.agentId}"]`) as HTMLElement;
       if (agentElement) {
-        const rect = agentElement.getBoundingClientRect();
-        const newState = {
-          ...currentState,
-          x: rect.right + 8,
-          y: rect.top + rect.height / 2,
-        };
-        setTooltipState(newState);
-        tooltipStateRef.current = newState;
+        // Находим иконку Info внутри элемента агента
+        const infoIcon = agentElement.querySelector(`[data-info-icon="${currentState.agentId}"]`) as HTMLElement;
+        if (infoIcon) {
+          const rect = infoIcon.getBoundingClientRect();
+          const tooltipWidth = 192;
+          const padding = 8;
+          let x = rect.right + padding;
+          let y = rect.top + rect.height / 2;
+          
+          if (x + tooltipWidth > window.innerWidth - padding) {
+            x = rect.left - tooltipWidth - padding;
+          }
+          
+          const newState = {
+            ...currentState,
+            x,
+            y,
+          };
+          setTooltipState(newState);
+          tooltipStateRef.current = newState;
+        }
       }
     };
     
@@ -266,39 +281,57 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
               <div
                 key={agent.id}
                 data-agent-id={agent.id}
-                onMouseEnter={(e) => handleAgentMouseEnter(e, agent)}
-                onMouseLeave={handleAgentMouseLeave}
-                onClick={() => {
+                onClick={(e) => {
+                  // Не выбираем агента, если клик был по иконке Info
+                  if ((e.target as HTMLElement).closest('[data-info-icon]')) {
+                    return;
+                  }
                   onSelectAgent(agent.id);
                   onCloseMobile();
                 }}
-                className={`group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                className={`relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
                   agent.id === activeAgentId
                     ? 'bg-indigo-500/20 border border-indigo-400/50 text-white'
-                    : 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/70 hover:text-white'
+                    : 'bg-white/5 border border-white/10 text-white/70'
                 }`}
               >
                 <div className={`p-1.5 rounded-lg ${
                   agent.id === activeAgentId
                     ? 'bg-indigo-500/30'
-                    : 'bg-white/5 group-hover:bg-indigo-500/20'
+                    : 'bg-white/5'
                 } transition-colors relative`}>
                   {getIcon(agent.name, agent.id)}
                   <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-medium text-white/80 bg-white/10 rounded-full border border-white/10 transition-all duration-300">
                     {index + 1}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                <div className="flex-1 min-w-0">
                   <div className="font-semibold text-xs truncate">{agent.name}</div>
-                  {agent.description && (
-                    <div title="Наведите для просмотра описания">
-                      <Info 
-                        size={12} 
-                        className="text-white/40 group-hover:text-white/60 transition-colors flex-shrink-0" 
-                      />
-                    </div>
-                  )}
                 </div>
+                {agent.description && (
+                  <div 
+                    title="Наведите для просмотра описания"
+                    data-info-icon={agent.id}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation();
+                      handleInfoIconMouseEnter(e, agent);
+                    }}
+                    onMouseLeave={(e) => {
+                      e.stopPropagation();
+                      handleInfoIconMouseLeave(e);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    className="flex-shrink-0 ml-auto relative z-10"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <Info 
+                      size={24} 
+                      className="text-white/40 hover:text-white/60 transition-colors cursor-help" 
+                    />
+                  </div>
+                )}
                 {/* Mobile tooltip (bottom) */}
                 {agent.description && (
                   <div className="absolute top-full mt-2 left-0 right-0 px-3 py-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg text-xs text-white/90 whitespace-normal z-50 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 shadow-xl md:hidden">
@@ -537,26 +570,27 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       </aside>
       
       {/* Desktop tooltip portal - rendered outside overflow container */}
-      {tooltipState && typeof document !== 'undefined' && document.body && (() => {
-        const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
-        if (!isDesktop) return null;
-        
-        return createPortal(
-          <div
-            className="fixed px-3 py-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg text-xs text-white/90 whitespace-normal w-48 z-[9999] pointer-events-none shadow-xl"
-            style={{
-              left: `${tooltipState.x}px`,
-              top: `${tooltipState.y}px`,
-              transform: 'translateY(-50%)',
-            }}
-            data-tooltip="true"
-            data-agent-id={tooltipState.agentId}
-          >
-            {tooltipState.description}
-          </div>,
-          document.body
-        );
-      })()}
+      {tooltipState && typeof document !== 'undefined' && document.body && createPortal(
+        <div
+          className="fixed px-3 py-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg text-xs text-white/90 whitespace-normal w-48 z-[9999] shadow-xl"
+          style={{
+            left: `${tooltipState.x}px`,
+            top: `${tooltipState.y}px`,
+            transform: 'translateY(-50%)',
+          }}
+          data-tooltip="true"
+          data-agent-id={tooltipState.agentId}
+          onMouseEnter={() => {
+            // Держим тултип видимым при наведении на него
+          }}
+          onMouseLeave={(e) => {
+            handleInfoIconMouseLeave(e);
+          }}
+        >
+          {tooltipState.description}
+        </div>,
+        document.body
+      )}
     </>
   );
 };

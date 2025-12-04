@@ -1,0 +1,116 @@
+import { useRef, useEffect } from 'react';
+import { ApiProjectTypeAgent } from '../../services/api';
+import { LLMModel } from '../../types';
+import { api } from '../../services/api';
+
+interface UseAgentAutoSaveProps {
+  editingAgent: ApiProjectTypeAgent | null;
+  agentName: string;
+  agentDescription: string;
+  agentSystemInstruction: string;
+  agentSummaryInstruction: string;
+  agentModel: LLMModel;
+  agentRole: string;
+  agentIsHiddenFromSidebar: boolean;
+  selectedProjectTypeIds: string[];
+  initialProjectTypeIdsRef: React.MutableRefObject<string[]>;
+  onAgentUpdatedRef: React.MutableRefObject<(() => void) | undefined>;
+  loadAgents: () => Promise<void>;
+  loadAgentsForType: (typeId: string) => Promise<void>;
+}
+
+export const useAgentAutoSave = ({
+  editingAgent,
+  agentName,
+  agentDescription,
+  agentSystemInstruction,
+  agentSummaryInstruction,
+  agentModel,
+  agentRole,
+  agentIsHiddenFromSidebar,
+  selectedProjectTypeIds,
+  initialProjectTypeIdsRef,
+  onAgentUpdatedRef,
+  loadAgents,
+  loadAgentsForType,
+}: UseAgentAutoSaveProps) => {
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const autoSaveAgent = async () => {
+    if (!editingAgent || !agentName?.trim()) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await api.updateAgentTemplate(editingAgent.id, {
+          name: agentName?.trim() || '',
+          description: agentDescription?.trim() || '',
+          systemInstruction: agentSystemInstruction?.trim() || '',
+          summaryInstruction: agentSummaryInstruction?.trim() || '',
+          model: agentModel,
+          role: agentRole?.trim() || undefined,
+          isHiddenFromSidebar: agentIsHiddenFromSidebar,
+        });
+        
+        // Обновляем привязки к типам проектов только если они действительно изменились
+        const initialIds = initialProjectTypeIdsRef.current;
+        const currentIds = selectedProjectTypeIds;
+        const idsChanged = initialIds.length !== currentIds.length || 
+          !initialIds.every(id => currentIds.includes(id)) ||
+          !currentIds.every(id => initialIds.includes(id));
+        
+        if (idsChanged) {
+          try {
+            await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
+            initialProjectTypeIdsRef.current = [...selectedProjectTypeIds];
+            const allAffectedTypes = new Set([
+              ...selectedProjectTypeIds,
+              ...(editingAgent.projectTypes?.map(pt => pt.id) || [])
+            ]);
+            await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
+          } catch (error: any) {
+            console.warn('Failed to attach project types', error);
+          }
+        }
+        
+        await loadAgents();
+        if (onAgentUpdatedRef.current) {
+          onAgentUpdatedRef.current();
+        }
+      } catch (error: any) {
+        console.error('Auto-save failed', error);
+        if (error?.status && error.status !== 404 && error.status !== 401) {
+          console.warn('Auto-save failed with non-404 error:', error);
+        }
+      }
+    }, 1000);
+  };
+
+  // Автосохранение при изменении полей
+  useEffect(() => {
+    if (editingAgent) {
+      autoSaveAgent();
+    }
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, selectedProjectTypeIds, editingAgent?.id]);
+
+  const clearSaveTimeout = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+  };
+
+  return {
+    saveTimeoutRef,
+    clearSaveTimeout,
+  };
+};
+

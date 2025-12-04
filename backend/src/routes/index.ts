@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import authRouter from './auth';
-import agentsRouter from './agents';
+import agentsRouter from './agents/index';
 import projectsRouter from './projects';
 import projectTypesRouter from './projectTypes';
-import adminAgentsRouter from './adminAgents';
+import adminAgentsRouter from './admin/agents/index';
 import adminGlobalPromptRouter from './adminGlobalPrompt';
 import adminUsersRouter from './adminUsers';
 import publicRoutes from './publicRoutes';
