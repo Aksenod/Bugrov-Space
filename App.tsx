@@ -664,6 +664,16 @@ export default function App() {
       } else if (hash === '#/admin') {
         setIsAdminOpen(true);
         setIsLandingOpen(false);
+      } else if (hash === '#/projects') {
+        // Закрываем все специальные страницы и показываем основное приложение
+        setIsAdminOpen(false);
+        setIsLandingOpen(false);
+        setIsCreativeLandingOpen(false);
+        setIsOfferOpen(false);
+        setIsPrivacyOpen(false);
+        setIsRequisitesOpen(false);
+        setPrototypeHash(null);
+        setAdminInitialAgentId(undefined);
       } else if (hash === '#/offer') {
         setIsOfferOpen(true);
         setIsLandingOpen(false);
@@ -720,6 +730,16 @@ export default function App() {
     } else if (hash === '#/admin') {
       setIsAdminOpen(true);
       setIsLandingOpen(false);
+    } else if (hash === '#/projects') {
+      // Закрываем все специальные страницы и показываем основное приложение
+      setIsAdminOpen(false);
+      setIsLandingOpen(false);
+      setIsCreativeLandingOpen(false);
+      setIsOfferOpen(false);
+      setIsPrivacyOpen(false);
+      setIsRequisitesOpen(false);
+      setPrototypeHash(null);
+      setAdminInitialAgentId(undefined);
     } else if (hash === '#/offer') {
       setIsOfferOpen(true);
       setIsLandingOpen(false);
@@ -1732,10 +1752,9 @@ export default function App() {
       onClose={() => {
         setIsAdminOpen(false);
         setAdminInitialAgentId(undefined);
-        // Удаляем hash из URL, но не вызываем событие hashchange
-        // чтобы не сработала логика показа лендинга
+        // Устанавливаем hash в #/projects, чтобы вернуться на страницу проектов
         if (window.location.hash === '#/admin') {
-          window.history.replaceState(null, '', window.location.pathname);
+          window.location.hash = '#/projects';
         }
         // Перезагружаем агентов после закрытия AdminPage, чтобы обновить порядок
         reloadAgents();
