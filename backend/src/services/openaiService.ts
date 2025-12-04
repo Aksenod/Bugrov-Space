@@ -29,6 +29,11 @@ type AgentWithFiles = {
   files: AgentFile[];
 };
 
+export type ProjectInfo = {
+  description?: string | null;
+  projectTypeName?: string | null;
+};
+
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -82,7 +87,7 @@ function processFileContent(file: AgentFile): string | null {
   }
 }
 
-async function buildSystemPrompt(agent: AgentWithFiles) {
+async function buildSystemPrompt(agent: AgentWithFiles, projectInfo?: ProjectInfo) {
   const [globalPrompt] = await Promise.all([getGlobalPromptText()]);
   const globalPromptText = globalPrompt.trim();
   const agentInstruction = (agent.systemInstruction || '').trim();
@@ -95,6 +100,23 @@ async function buildSystemPrompt(agent: AgentWithFiles) {
 
   if (agentInstruction) {
     introParts.push(agentInstruction);
+  }
+
+  // Добавляем информацию о проекте, если она предоставлена
+  if (projectInfo) {
+    const projectInfoParts: string[] = [];
+    
+    if (projectInfo.projectTypeName) {
+      projectInfoParts.push(`Тип проекта: ${projectInfo.projectTypeName}`);
+    }
+    
+    if (projectInfo.description) {
+      projectInfoParts.push(`Описание: ${projectInfo.description}`);
+    }
+    
+    if (projectInfoParts.length > 0) {
+      introParts.push(`Информация о проекте:\n${projectInfoParts.join('\n')}`);
+    }
   }
 
   const intro = introParts.join('\n\n').trim();
@@ -263,8 +285,9 @@ export async function generateAgentResponse(
   agent: AgentWithFiles,
   history: ConversationMessage[],
   newMessage: string,
+  projectInfo?: ProjectInfo,
 ): Promise<string> {
-  const systemPrompt = await buildSystemPrompt(agent);
+  const systemPrompt = await buildSystemPrompt(agent, projectInfo);
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...mapHistory(history),
@@ -338,6 +361,7 @@ export async function generateDocumentResult(
   agent: Pick<AgentWithFiles, 'name' | 'systemInstruction' | 'model' | 'files'> & { id?: string; summaryInstruction?: string | null },
   documentContent: string,
   role: 'dsl' | 'verstka',
+  projectInfo?: ProjectInfo,
 ): Promise<string> {
   const agentWithFiles: AgentWithFiles = {
     id: agent.id || '',
@@ -347,7 +371,7 @@ export async function generateDocumentResult(
     model: agent.model || null,
     files: agent.files,
   };
-  const systemPrompt = await buildSystemPrompt(agentWithFiles);
+  const systemPrompt = await buildSystemPrompt(agentWithFiles, projectInfo);
 
   const roleInstruction = role === 'dsl'
     ? 'Преобразуй предоставленный контент в DSL формат согласно твоей инструкции.'

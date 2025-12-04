@@ -508,9 +508,11 @@ router.post('/:agentId/messages', async (req, res) => {
   }
 
   // Проверяем, что проект принадлежит пользователю (дополнительная проверка безопасности)
+  // Загружаем проект с projectType для передачи информации в промпт
   const project = await withRetry(
     () => prisma.project.findFirst({
       where: { id: parsed.data.projectId, userId },
+      include: { projectType: true },
     }),
     3,
     `POST /agents/${agentId}/messages - verify project ${parsed.data.projectId}`
@@ -688,10 +690,17 @@ router.post('/:agentId/messages', async (req, res) => {
   }));
 
   try {
+    // Подготавливаем информацию о проекте для передачи в промпт
+    const projectInfo = project ? {
+      description: project.description || null,
+      projectTypeName: project.projectType?.name || null,
+    } : undefined;
+
     const responseText = await generateAgentResponse(
       agentWithAllFiles,
       conversationHistory,
       parsed.data.text,
+      projectInfo,
     );
 
     const modelMessage = await withRetry(
@@ -1248,6 +1257,16 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
       return res.status(400).json({ error: 'File is not associated with a project' });
     }
 
+    // Загружаем проект с projectType для передачи информации в промпт
+    const project = await withRetry(
+      () => prisma.project.findFirst({
+        where: { id: projectId },
+        include: { projectType: true },
+      }),
+      3,
+      `POST /agents/${agentId}/files/${fileId}/generate-prototype - find project`
+    );
+
     // 3. Find DSL and Verstka agents in the project
     const projectAgents = await withRetry(
       () => prisma.agent.findMany({
@@ -1298,6 +1317,12 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
       return res.status(400).json({ error: 'Verstka agent not found in project' });
     }
 
+    // Подготавливаем информацию о проекте для передачи в промпт
+    const projectInfo = project ? {
+      description: project.description || null,
+      projectTypeName: project.projectType?.name || null,
+    } : undefined;
+
     // 4. Generate DSL
     logger.info({ fileId, dslAgentId: dslAgent.id }, 'Generating DSL content');
 
@@ -1307,7 +1332,8 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
     const dslContent = await generateDocumentResult(
       dslAgentWithFiles,
       decodeBase64ToText(file.content),
-      'dsl'
+      'dsl',
+      projectInfo
     );
 
     // 5. Generate HTML (Verstka)
@@ -1318,7 +1344,8 @@ router.post('/:agentId/files/:fileId/generate-prototype', async (req, res) => {
     const verstkaContent = await generateDocumentResult(
       verstkaAgentWithFiles,
       dslContent,
-      'verstka'
+      'verstka',
+      projectInfo
     );
 
     // 6. Save to DB
