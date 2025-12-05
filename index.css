@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Typography improvements */
+/* 
+  ВАЖНО: Все стили типографики настраиваются в tailwind.config.js → typography.invert.css
+  Не добавляйте переопределения типографики здесь!
+*/
+
 @layer base {
   body {
     @apply antialiased;
@@ -10,11 +14,6 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-  
-  /* Improve line height for readability */
-  p {
-    @apply leading-relaxed;
   }
   
   /* Better text selection */

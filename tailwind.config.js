@@ -73,6 +73,12 @@ export default {
         },
         invert: {
           css: {
+            // ============================================
+            // ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ ДЛЯ ВСЕХ СТИЛЕЙ ТИПОГРАФИКИ
+            // Все изменения стилей текста делаются ТОЛЬКО здесь!
+            // ============================================
+            
+            // CSS переменные для цветов
             color: 'rgba(255, 255, 255, 0.9)',
             '--tw-prose-body': 'rgba(255, 255, 255, 0.9)',
             '--tw-prose-headings': 'rgba(255, 255, 255, 1)',
@@ -90,6 +96,103 @@ export default {
             '--tw-prose-pre-bg': 'rgba(30, 41, 59, 0.8)',
             '--tw-prose-th-borders': 'rgba(255, 255, 255, 0.2)',
             '--tw-prose-td-borders': 'rgba(255, 255, 255, 0.1)',
+            
+            // Параграфы - отступы между абзацами
+            p: {
+              marginTop: '0',
+              marginBottom: '0.75rem', // Изменить здесь для изменения отступов между абзацами
+              color: 'rgba(255, 255, 255, 0.95)',
+              lineHeight: '1.75',
+            },
+            'p:last-child': {
+              marginBottom: '0',
+            },
+            
+            // Заголовки
+            h1: {
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: 'rgba(255, 255, 255, 1)',
+              marginTop: '1rem',
+              marginBottom: '0.75rem',
+              lineHeight: '1.2',
+            },
+            'h1:first-child': {
+              marginTop: '0',
+            },
+            h2: {
+              fontSize: '1.25rem',
+              fontWeight: '700',
+              color: 'rgba(255, 255, 255, 1)',
+              marginTop: '1rem',
+              marginBottom: '0.5rem',
+              lineHeight: '1.3',
+            },
+            'h2:first-child': {
+              marginTop: '0',
+            },
+            h3: {
+              fontSize: '1.125rem',
+              fontWeight: '600',
+              color: 'rgba(255, 255, 255, 1)',
+              marginTop: '0.75rem',
+              marginBottom: '0.5rem',
+              lineHeight: '1.4',
+            },
+            'h3:first-child': {
+              marginTop: '0',
+            },
+            
+            // Списки
+            ul: {
+              listStyleType: 'disc',
+              marginTop: '0.75rem',
+              marginBottom: '0.75rem',
+              paddingLeft: '1.25rem',
+              color: 'rgba(255, 255, 255, 0.95)',
+            },
+            ol: {
+              listStyleType: 'decimal',
+              marginTop: '0.75rem',
+              marginBottom: '0.75rem',
+              paddingLeft: '1.25rem',
+              color: 'rgba(255, 255, 255, 0.95)',
+            },
+            li: {
+              marginTop: '0.5rem',
+              marginBottom: '0.5rem',
+            },
+            
+            // Цитаты
+            blockquote: {
+              borderLeftWidth: '4px',
+              borderLeftColor: 'rgba(99, 102, 241, 0.5)',
+              paddingLeft: '1rem',
+              marginTop: '0.75rem',
+              marginBottom: '0.75rem',
+              fontStyle: 'italic',
+              color: 'rgba(255, 255, 255, 0.9)',
+            },
+            
+            // Ссылки
+            a: {
+              color: 'rgba(96, 165, 250, 1)',
+              textDecoration: 'none',
+            },
+            'a:hover': {
+              color: 'rgba(147, 197, 253, 1)',
+              textDecoration: 'underline',
+            },
+            
+            // Выделение текста
+            strong: {
+              fontWeight: '600',
+              color: 'rgba(255, 255, 255, 1)',
+            },
+            em: {
+              fontStyle: 'italic',
+              color: 'rgba(255, 255, 255, 0.95)',
+            },
           },
         },
       },

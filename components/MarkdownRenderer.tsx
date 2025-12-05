@@ -142,7 +142,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
   };
 
   return (
-    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
+    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -214,42 +214,45 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
               </code>
             );
           },
+          // Все стили типографики настраиваются в tailwind.config.js → typography.invert.css
+          // Здесь оставляем только минимальные классы для функциональности
+          
           ul({ children }) {
-            return <ul className={`list-disc ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`}>{children}</ul>;
+            return <ul>{children}</ul>;
           },
           ol({ children }) {
-            return <ol className={`list-decimal ml-5 my-3 space-y-2 text-white/95 text-base ${lineHeightClass}`} style={{ counterReset: 'list-counter' }}>{children}</ol>;
+            return <ol style={{ counterReset: 'list-counter' }}>{children}</ol>;
           },
           li({ children }) {
             return <li className="[counter-increment:list-counter]" style={{ display: 'list-item' }}>{children}</li>;
           },
           a({ href, children }) {
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
+              <a href={href} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
             );
           },
           p({ children }) {
-            return <p className={`mb-3 last:mb-0 text-white/95 text-base ${lineHeightClass}`}>{children}</p>;
+            return <p>{children}</p>;
           },
           h1({ children }) {
-            return <h1 className="text-2xl font-bold text-white mb-3 mt-4 first:mt-0">{children}</h1>;
+            return <h1>{children}</h1>;
           },
           h2({ children }) {
-            return <h2 className="text-xl font-bold text-white mb-2 mt-4 first:mt-0">{children}</h2>;
+            return <h2>{children}</h2>;
           },
           h3({ children }) {
-            return <h3 className="text-lg font-semibold text-white mb-2 mt-3 first:mt-0">{children}</h3>;
+            return <h3>{children}</h3>;
           },
           strong({ children }) {
-            return <strong className="font-semibold text-white">{children}</strong>;
+            return <strong>{children}</strong>;
           },
           em({ children }) {
-            return <em className="italic text-white/95">{children}</em>;
+            return <em>{children}</em>;
           },
           blockquote({ children }) {
-            return <blockquote className={`border-l-4 border-indigo-500/50 pl-4 my-3 text-white/90 italic text-base ${lineHeightClass}`}>{children}</blockquote>;
+            return <blockquote>{children}</blockquote>;
           }
         }}
       >
