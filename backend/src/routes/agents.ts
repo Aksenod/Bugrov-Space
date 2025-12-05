@@ -309,8 +309,23 @@ router.get('/', async (req, res, next) => {
 
         logger.debug({
           projectTypeId: project.projectTypeId,
-          connectionsCount: connections.length
-        }, 'Found project type agent connections');
+          connectionsCount: connections.length,
+          connectionsWithQuickMessages: connections
+            .filter((conn: any) => conn.projectTypeAgent?.quickMessages && conn.projectTypeAgent.quickMessages.length > 0)
+            .map((conn: any) => ({
+              id: conn.projectTypeAgent?.id,
+              name: conn.projectTypeAgent?.name,
+              quickMessages: conn.projectTypeAgent?.quickMessages,
+              quickMessagesLength: Array.isArray(conn.projectTypeAgent?.quickMessages) ? conn.projectTypeAgent.quickMessages.length : 'not array'
+            })),
+          allConnectionsQuickMessages: connections.map((conn: any) => ({
+            id: conn.projectTypeAgent?.id,
+            name: conn.projectTypeAgent?.name,
+            quickMessages: conn.projectTypeAgent?.quickMessages,
+            quickMessagesType: typeof conn.projectTypeAgent?.quickMessages,
+            hasQuickMessages: conn.projectTypeAgent?.quickMessages && Array.isArray(conn.projectTypeAgent.quickMessages) && conn.projectTypeAgent.quickMessages.length > 0
+          }))
+        }, 'Found project type agent connections with quickMessages check');
 
         // Преобразуем данные в нужный формат
         // Фильтруем только агентов, которые действительно связаны с типом проекта
