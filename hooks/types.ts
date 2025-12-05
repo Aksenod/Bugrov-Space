@@ -35,7 +35,7 @@ export interface UseProjectsReturn {
   selectProject: (projectId: string | null) => void;
   getProject: (projectId: string) => Project | undefined;
   // Внутренние методы для использования в bootstrap
-  loadProjects: () => Promise<void>;
+  loadProjects: () => Promise<string | null>; // Возвращает выбранный projectId
   loadProjectTypes: () => Promise<void>;
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   setProjectTypes: React.Dispatch<React.SetStateAction<ProjectType[]>>;

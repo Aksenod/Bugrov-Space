@@ -61,15 +61,17 @@ export const useBootstrap = (
       await auth.loadUser();
 
       // Загружаем проекты и типы проектов
-      await Promise.all([
+      const [selectedProjectId] = await Promise.all([
         projects.loadProjects(),
         projects.loadProjectTypes(),
       ]);
 
       // Загружаем агентов выбранного проекта
-      if (projects.activeProjectId && projects.activeProjectId.trim() !== '') {
+      // Используем возвращаемое значение из loadProjects вместо состояния,
+      // так как состояние React обновляется асинхронно
+      if (selectedProjectId && selectedProjectId.trim() !== '') {
         try {
-          await agents.loadAgents(projects.activeProjectId);
+          await agents.loadAgents(selectedProjectId);
         } catch (error) {
           console.error('Failed to load agents in bootstrap', error);
           agents.setAgents([]);

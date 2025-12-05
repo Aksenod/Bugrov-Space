@@ -41,8 +41,9 @@ export const useProjects = (): UseProjectsReturn => {
 
   /**
    * Загружает проекты с сервера
+   * @returns Выбранный projectId или null, если проектов нет
    */
-  const loadProjects = useCallback(async (): Promise<void> => {
+  const loadProjects = useCallback(async (): Promise<string | null> => {
     setIsLoading(true);
     try {
       const { projects: apiProjects } = await getProjectsService();
@@ -61,6 +62,9 @@ export const useProjects = (): UseProjectsReturn => {
       } else {
         setActiveProjectId(null);
       }
+
+      // Возвращаем выбранный projectId для использования в bootstrap
+      return projectToSelect;
     } catch (error) {
       console.error('Failed to load projects', error);
       throw error;
