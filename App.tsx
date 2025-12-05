@@ -873,7 +873,9 @@ export default function App() {
             isAdmin={isAdmin}
             activeAgentId={activeAgentId}
             onSidebarToggle={() => setIsSidebarOpen(true)}
-            onSendMessage={handleSendMessage}
+            onSendMessage={handleSendMessage || (async () => {
+              console.error('[App] handleSendMessage is undefined when passing to WorkspacePage');
+            })}
             onClearChat={handleClearChat}
             onOpenAdmin={() => {
               routing.navigateTo('#/admin');
