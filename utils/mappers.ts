@@ -23,21 +23,33 @@ export const mapFile = (file: ApiFile): UploadedFile => ({
 /**
  * Преобразует ApiAgent в Agent
  */
-export const mapAgent = (agent: ApiAgent): Agent => ({
-  id: agent.id,
-  name: agent.name,
-  description: agent.description,
-  systemInstruction: agent.systemInstruction,
-  summaryInstruction: agent.summaryInstruction,
-  files: (agent.files ?? []).filter(file => !file.name.startsWith('Summary')).map(mapFile),
-  avatarColor: pickColor(agent.id),
-  model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
-  role: agent.role,
-  order: agent.order ?? 0,
-  projectTypeAgentId: agent.projectTypeAgentId,
-  isHiddenFromSidebar: agent.isHiddenFromSidebar,
-  quickMessages: agent.quickMessages,
-});
+export const mapAgent = (agent: ApiAgent): Agent => {
+  // Логирование для диагностики quickMessages
+  if (import.meta.env.DEV) {
+    console.log('[mapAgent] Mapping agent:', {
+      id: agent.id,
+      name: agent.name,
+      quickMessages: agent.quickMessages,
+      hasQuickMessages: agent.quickMessages && agent.quickMessages.length > 0
+    });
+  }
+
+  return {
+    id: agent.id,
+    name: agent.name,
+    description: agent.description,
+    systemInstruction: agent.systemInstruction,
+    summaryInstruction: agent.summaryInstruction,
+    files: (agent.files ?? []).filter(file => !file.name.startsWith('Summary')).map(mapFile),
+    avatarColor: pickColor(agent.id),
+    model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
+    role: agent.role,
+    order: agent.order ?? 0,
+    projectTypeAgentId: agent.projectTypeAgentId,
+    isHiddenFromSidebar: agent.isHiddenFromSidebar,
+    quickMessages: agent.quickMessages,
+  };
+};
 
 /**
  * Преобразует ApiMessage в Message
@@ -63,19 +75,31 @@ export const mapUser = (user: ApiUser): User => ({
 /**
  * Преобразует ApiProjectTypeAgent в Agent
  */
-export const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => ({
-  id: agent.id,
-  name: agent.name,
-  description: agent.description,
-  systemInstruction: agent.systemInstruction,
-  summaryInstruction: agent.summaryInstruction,
-  files: [], // Агенты типов проектов не имеют файлов
-  avatarColor: pickColor(agent.id),
-  model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
-  role: agent.role,
-  order: agent.order ?? 0,
-  quickMessages: agent.quickMessages,
-});
+export const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => {
+  // Логирование для диагностики quickMessages
+  if (import.meta.env.DEV) {
+    console.log('[mapProjectTypeAgent] Mapping project type agent:', {
+      id: agent.id,
+      name: agent.name,
+      quickMessages: agent.quickMessages,
+      hasQuickMessages: agent.quickMessages && agent.quickMessages.length > 0
+    });
+  }
+
+  return {
+    id: agent.id,
+    name: agent.name,
+    description: agent.description,
+    systemInstruction: agent.systemInstruction,
+    summaryInstruction: agent.summaryInstruction,
+    files: [], // Агенты типов проектов не имеют файлов
+    avatarColor: pickColor(agent.id),
+    model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
+    role: agent.role,
+    order: agent.order ?? 0,
+    quickMessages: agent.quickMessages,
+  };
+};
 
 /**
  * Преобразует ApiProject в Project

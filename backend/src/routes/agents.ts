@@ -234,10 +234,12 @@ router.get('/', async (req, res, next) => {
     }
 
     try {
+      logger.debug({ projectId }, 'Calling syncProjectAgentsForProject before loading agents');
       await syncProjectAgentsForProject(projectId);
+      logger.debug({ projectId }, 'syncProjectAgentsForProject completed successfully');
     } catch (syncError: any) {
       logger.error(
-        { projectId, error: syncError?.message },
+        { projectId, error: syncError?.message, stack: syncError?.stack },
         'Failed to sync project agents before GET /agents response'
       );
     }
@@ -260,6 +262,18 @@ router.get('/', async (req, res, next) => {
       3,
       `GET /agents?projectId=${projectId}`
     );
+
+    // Логирование для диагностики quickMessages из БД
+    logger.debug({
+      projectId,
+      agentsFromDb: agents.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        quickMessages: a.quickMessages,
+        quickMessagesType: typeof a.quickMessages,
+        quickMessagesLength: Array.isArray(a.quickMessages) ? a.quickMessages.length : 'not array'
+      }))
+    }, 'Agents loaded from database with quickMessages');
 
     // ... (logic for projectTypeAgents remains the same)
 
@@ -323,6 +337,18 @@ router.get('/', async (req, res, next) => {
             }],
           }));
 
+        // Логирование для диагностики quickMessages из ProjectTypeAgent
+        logger.debug({
+          projectTypeId: project.projectTypeId,
+          projectTypeAgentsFromDb: projectTypeAgents.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            quickMessages: a.quickMessages,
+            quickMessagesType: typeof a.quickMessages,
+            quickMessagesLength: Array.isArray(a.quickMessages) ? a.quickMessages.length : 'not array'
+          }))
+        }, 'ProjectTypeAgents loaded from database with quickMessages');
+
         logger.debug({
           projectTypeId: project.projectTypeId,
           projectTypeAgentsCount: projectTypeAgents.length,
@@ -351,16 +377,33 @@ router.get('/', async (req, res, next) => {
 
     // Добавляем пустой массив files для каждого агента (для совместимости с фронтендом)
     // И наследуем isHiddenFromSidebar от шаблона, если он есть
+    // Явно включаем quickMessages, чтобы убедиться, что оно передается на фронтенд
     const agentsWithEmptyFiles = agents.map(agent => {
       const isHidden = (agent as any).isHiddenFromSidebar || ((agent as any).projectTypeAgent?.isHiddenFromSidebar ?? false);
       return {
         ...agent,
         files: [],
         isHiddenFromSidebar: isHidden,
+        quickMessages: (agent as any).quickMessages ?? [], // Явно включаем quickMessages
       };
     });
 
-    logger.debug({ userId, agentsCount: agents.length, projectTypeAgentsCount: projectTypeAgents.length }, 'Agents loaded');
+    // Логирование для диагностики quickMessages
+    logger.debug({
+      userId,
+      agentsCount: agents.length,
+      projectTypeAgentsCount: projectTypeAgents.length,
+      agentsWithQuickMessages: agentsWithEmptyFiles.filter((a: any) => a.quickMessages && a.quickMessages.length > 0).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        quickMessages: a.quickMessages
+      })),
+      projectTypeAgentsWithQuickMessages: projectTypeAgents.filter((a: any) => a.quickMessages && a.quickMessages.length > 0).map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        quickMessages: a.quickMessages
+      }))
+    }, 'Agents loaded with quickMessages check');
 
     // Возвращаем как шаблоны, так и реальные агенты пользователя
     res.json({

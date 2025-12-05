@@ -18,6 +18,20 @@ const loadTemplateConnections = async (projectTypeId: string) => {
       { createdAt: 'asc' },
     ],
   });
+  
+  // Логирование для диагностики quickMessages в шаблонах
+  logger.debug({
+    projectTypeId,
+    connectionsCount: connections.length,
+    templatesWithQuickMessages: connections
+      .filter((conn: any) => conn.projectTypeAgent?.quickMessages && conn.projectTypeAgent.quickMessages.length > 0)
+      .map((conn: any) => ({
+        id: conn.projectTypeAgent?.id,
+        name: conn.projectTypeAgent?.name,
+        quickMessages: conn.projectTypeAgent?.quickMessages
+      }))
+  }, 'Loaded template connections with quickMessages check');
+  
   return connections as TemplateConnection[];
 };
 
@@ -82,6 +96,19 @@ const syncProjectAgents = async (
   templateKnowledgeMap: Map<string, any[]>,
   templateAgentIds: string[]
 ) => {
+  logger.debug({
+    projectId,
+    userId,
+    connectionsCount: connections.length,
+    templatesWithQuickMessages: connections
+      .filter((conn) => conn.projectTypeAgent?.quickMessages && conn.projectTypeAgent.quickMessages.length > 0)
+      .map((conn) => ({
+        id: conn.projectTypeAgent?.id,
+        name: conn.projectTypeAgent?.name,
+        quickMessages: conn.projectTypeAgent?.quickMessages
+      }))
+  }, 'Starting syncProjectAgents with quickMessages check');
+
   await prisma.$transaction(async (tx) => {
     const existingAgents = await (tx as any).agent.findMany({
       where: { projectId },
@@ -123,6 +150,17 @@ const syncProjectAgents = async (
           : (typeof existing.order === 'number' && existing.order !== null
               ? existing.order  // Сохраняем существующий order агента
               : desiredOrder);  // Fallback на index
+
+        // Логирование для диагностики quickMessages при синхронизации
+        logger.debug({
+          agentId: existing.id,
+          agentName: existing.name,
+          templateId: template.id,
+          templateName: template.name,
+          templateQuickMessages: template.quickMessages,
+          templateQuickMessagesLength: Array.isArray(template.quickMessages) ? template.quickMessages.length : 'not array',
+          updatingQuickMessages: template.quickMessages ?? []
+        }, 'Syncing agent with quickMessages from template');
 
         await (tx as any).agent.update({
           where: { id: existing.id },

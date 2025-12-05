@@ -13,6 +13,19 @@ interface EmptyChatStateProps {
 }
 
 export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onSendMessage }) => {
+  // Логирование для диагностики quickMessages
+  React.useEffect(() => {
+    if (import.meta.env.DEV && activeAgent) {
+      console.log('[EmptyChatState] Active agent:', {
+        id: activeAgent.id,
+        name: activeAgent.name,
+        quickMessages: activeAgent.quickMessages,
+        hasQuickMessages: activeAgent.quickMessages && activeAgent.quickMessages.length > 0,
+        quickMessagesLength: activeAgent.quickMessages?.length || 0
+      });
+    }
+  }, [activeAgent?.id, activeAgent?.quickMessages]);
+
   const handleExampleClick = async (example: string) => {
     if (!example || !example.trim()) {
       console.warn('[EmptyChatState] Empty example text, cannot send');
