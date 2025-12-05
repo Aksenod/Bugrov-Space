@@ -35,10 +35,20 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
   onOpenAdmin,
   onSelectAgent,
 }) => {
+  // Логирование для диагностики onSendMessage в рендере
+  if (import.meta.env.DEV) {
+    console.log('[WorkspacePage] Render - onSendMessage prop:', {
+      type: typeof onSendMessage,
+      isFunction: typeof onSendMessage === 'function',
+      value: onSendMessage,
+      hasActiveAgent: !!activeAgent
+    });
+  }
+
   // Логирование для диагностики onSendMessage
   React.useEffect(() => {
     if (import.meta.env.DEV) {
-      console.log('[WorkspacePage] onSendMessage prop:', {
+      console.log('[WorkspacePage] useEffect - onSendMessage prop:', {
         type: typeof onSendMessage,
         isFunction: typeof onSendMessage === 'function',
         value: onSendMessage
