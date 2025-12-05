@@ -10,6 +10,7 @@ import { AlertDialog } from './components/AlertDialog';
 import { OnboardingModal } from './components/OnboardingModal';
 import { WorkspacePage } from './components/WorkspacePage';
 import { EmptyStatePage } from './components/EmptyStatePage';
+import { InlineHint } from './components/InlineHint';
 import { useOnboarding } from './components/OnboardingContext';
 import { onboardingSteps } from './components/onboardingSteps';
 // Старый api.ts оставлен для обратной совместимости с некоторыми методами
