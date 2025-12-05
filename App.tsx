@@ -496,6 +496,7 @@ export default function App() {
             onRegister={handleRegisterWithBootstrap}
             onResetPassword={handleResetPassword}
             error={authError}
+            onClearError={clearAuthError}
           />
         </Suspense>
       );

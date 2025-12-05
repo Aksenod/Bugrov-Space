@@ -16,7 +16,7 @@ const normalizeUsername = (username: string): string => {
 };
 
 const registerSchema = z.object({
-  username: z.string().min(1).max(50),
+  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscore'),
   password: z.string().min(6),
 }).transform((data) => ({
   ...data,
@@ -82,7 +82,7 @@ authRouter.post('/register', authRateLimiter, async (req, res, next) => {
 });
 
 const loginSchema = z.object({
-  username: z.string().min(1),
+  username: z.string().min(3).max(20),
   password: z.string().min(1),
 }).transform((data) => ({
   ...data,
@@ -141,7 +141,7 @@ authRouter.post('/login', authRateLimiter, async (req, res, next) => {
 });
 
 const resetSchema = z.object({
-  username: z.string().min(1),
+  username: z.string().min(3).max(20),
   newPassword: z.string().min(6),
 }).transform((data) => ({
   ...data,

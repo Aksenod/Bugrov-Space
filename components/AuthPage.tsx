@@ -6,6 +6,7 @@ interface AuthPageProps {
   onRegister: (username: string, password: string) => Promise<void>;
   onResetPassword: (username: string, newPass: string) => Promise<void>;
   error: string | null;
+  onClearError?: () => void;
 }
 
 const formatError = (error: string | null): string => {
@@ -47,7 +48,7 @@ const validateUsername = (username: string): { valid: boolean; message: string }
   return { valid: true, message: '' };
 };
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onResetPassword, error }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onResetPassword, error, onClearError }) => {
   const [mode, setMode] = useState<AuthMode>('signin');
   const [isLoading, setIsLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -162,6 +163,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
     setUsernameError('');
     setPasswordError('');
     setTouched({ username: false, password: false, newPassword: false });
+    // Очищаем ошибки авторизации при переключении режимов
+    if (onClearError) {
+      onClearError();
+    }
   };
 
   const getTitle = () => {
