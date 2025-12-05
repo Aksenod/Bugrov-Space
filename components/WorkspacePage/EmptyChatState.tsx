@@ -2,7 +2,7 @@
  * Компонент пустого состояния чата
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Bot } from 'lucide-react';
 import { InlineHint } from '../InlineHint';
 import { Agent } from '../../types';
@@ -37,7 +37,8 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onS
     }
   }, [onSendMessage]);
 
-  const handleExampleClick = async (example: string) => {
+  // Используем useCallback для сохранения актуальной ссылки на onSendMessage
+  const handleExampleClick = useCallback(async (example: string) => {
     if (!example || !example.trim()) {
       console.warn('[EmptyChatState] Empty example text, cannot send');
       return;
@@ -53,7 +54,10 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onS
     }
 
     if (import.meta.env.DEV) {
-      console.log('[EmptyChatState] Sending example message:', example);
+      console.log('[EmptyChatState] Sending example message:', example, {
+        onSendMessageType: typeof onSendMessage,
+        onSendMessageIsFunction: typeof onSendMessage === 'function'
+      });
     }
 
     try {
@@ -65,7 +69,7 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onS
       // Ошибка уже обработана в handleSendMessage
       console.error('[EmptyChatState] Failed to send example message:', error);
     }
-  };
+  }, [onSendMessage]);
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 pointer-events-none px-4">
