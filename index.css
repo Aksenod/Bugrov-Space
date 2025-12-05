@@ -7,6 +7,34 @@
   Не добавляйте переопределения типографики здесь!
 */
 
+/* Переопределение отступов между абзацами - переопределяет стили prose */
+div.prose.prose-invert.prose-base p[data-markdown-p] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  line-height: 1.3 !important;
+}
+
+div.prose.prose-invert.prose-base p[data-markdown-p]:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Дублируем для надежности без data-атрибута */
+div.prose.prose-invert.prose-base > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  line-height: 1.3 !important;
+}
+
+div.prose.prose-invert.prose-base > p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Отступы для разделителей (hr) */
+div.prose.prose-invert.prose-base hr {
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
 @layer base {
   body {
     @apply antialiased;

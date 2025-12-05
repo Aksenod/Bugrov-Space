@@ -100,9 +100,9 @@ export default {
             // Параграфы - отступы между абзацами
             p: {
               marginTop: '0',
-              marginBottom: '0.75rem', // Изменить здесь для изменения отступов между абзацами
+              marginBottom: '0.75rem', // Значение по умолчанию (переопределяется inline стилями в MarkdownRenderer)
               color: 'rgba(255, 255, 255, 0.95)',
-              lineHeight: '1.75',
+              lineHeight: '1.3',
             },
             'p:last-child': {
               marginBottom: '0',

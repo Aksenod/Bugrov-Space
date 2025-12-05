@@ -234,7 +234,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             );
           },
           p({ children }) {
-            return <p>{children}</p>;
+            return <p data-markdown-p style={{ marginTop: 0, marginBottom: 0, lineHeight: '1.3' }} className="!mt-0 !mb-0 leading-[1.3]">{children}</p>;
           },
           h1({ children }) {
             return <h1>{children}</h1>;
@@ -253,6 +253,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           },
           blockquote({ children }) {
             return <blockquote>{children}</blockquote>;
+          },
+          hr() {
+            return <hr style={{ marginTop: '1rem', marginBottom: '1rem' }} />;
           }
         }}
       >
