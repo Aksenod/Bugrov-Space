@@ -187,6 +187,16 @@ export default function App() {
     !!currentUser &&
     (currentUser.role === 'admin' || (currentUser.username && ADMIN_USERNAMES.has(currentUser.username)));
 
+  // Загружаем документы при открытии модального окна
+  useEffect(() => {
+    if (isDocsOpen && activeAgentId && activeProjectId && !bootstrap.isBootstrapping) {
+      documents.ensureSummaryLoaded().catch((error) => {
+        console.error('[Frontend] Failed to load documents when opening modal:', error);
+        showAlert('Не удалось загрузить документы', 'Ошибка', 'error', 5000);
+      });
+    }
+  }, [isDocsOpen, activeAgentId, activeProjectId, bootstrap.isBootstrapping, documents, showAlert]);
+
   // Keyboard shortcuts
   useEffect(() => {
     if (!currentUser || !activeAgent) return;
@@ -318,7 +328,7 @@ export default function App() {
       chat.clearLoadedAgents();
     } catch (error) {
       console.error('Failed to load agents for project', error);
-      showAlert('Ошибка при загрузке агентов проекта', 'error');
+      showAlert('Ошибка при загрузке агентов проекта', 'Ошибка', 'error', 5000);
     }
   }, [selectProject, loadAgents, showAlert, chat]);
 
@@ -820,7 +830,17 @@ export default function App() {
       </main>
 
       {isDocsOpen && (
-        <Suspense fallback={null}>
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
+                <Bot size={64} className="relative mx-auto animate-bounce" />
+              </div>
+              <p className="text-white/60">Загрузка документов...</p>
+            </div>
+          </div>
+        }>
           <ProjectDocumentsModal
             isOpen={isDocsOpen}
             onClose={() => setIsDocsOpen(false)}

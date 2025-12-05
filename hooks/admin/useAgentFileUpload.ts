@@ -39,7 +39,7 @@ export const useAgentFileUpload = ({
   const handleFileUpload = async (fileList: FileList) => {
     if (!editingAgent || !fileList.length) {
       if (!editingAgent) {
-        showAlert('Сначала создайте агента', 'Ошибка', 'error');
+        showAlert('Сначала создайте агента', 'Ошибка', 'error', 5000);
       }
       return;
     }
@@ -100,7 +100,7 @@ export const useAgentFileUpload = ({
     }
 
     if (errors.length > 0) {
-      showAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error');
+      showAlert(`Ошибки при загрузке файлов:\n${errors.join('\n')}`, 'Ошибка', 'error', 5000);
     }
 
     if (uploads.length > 0) {
@@ -139,7 +139,7 @@ export const useAgentFileUpload = ({
           showAlert('Файл успешно удален', undefined, 'success', 3000);
         } catch (error: any) {
           console.error('Failed to remove file', error);
-          showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+          showAlert(`Не удалось удалить файл: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
         }
       },
       'danger'

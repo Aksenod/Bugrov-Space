@@ -76,6 +76,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     title?: string;
     message: string;
     variant?: 'success' | 'error' | 'info' | 'warning';
+    duration?: number;
   }>({
     isOpen: false,
     message: '',
@@ -111,6 +112,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       message,
       title,
       variant,
+      duration,
     });
     if (duration > 0) {
       setTimeout(() => {
@@ -404,7 +406,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       console.error('Failed to load agents', error);
       // Не показываем ошибку пользователю, если это 404 (возможно, эндпоинт еще не развернут)
       if (error?.status !== 404) {
-        showAlert('Не удалось загрузить список агентов', 'Ошибка', 'error');
+        showAlert('Не удалось загрузить список агентов', 'Ошибка', 'error', 5000);
       }
     } finally {
       setIsLoadingAgents(false);
@@ -454,11 +456,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
 
       // Если это 403, показываем специальное сообщение
       if (error?.status === 403) {
-        showAlert('Доступ запрещен. Требуются права администратора. Убедитесь, что вы вошли под учетной записью администратора.', 'Ошибка доступа', 'error');
+        showAlert('Доступ запрещен. Требуются права администратора. Убедитесь, что вы вошли под учетной записью администратора.', 'Ошибка доступа', 'error', 5000);
       } else if (error?.status !== 404) {
         // Для других ошибок (кроме 404) показываем сообщение
         const errorMessage = error?.message || 'Неизвестная ошибка';
-        showAlert(`Не удалось загрузить список пользователей: ${errorMessage}`, 'Ошибка', 'error');
+        showAlert(`Не удалось загрузить список пользователей: ${errorMessage}`, 'Ошибка', 'error', 5000);
       }
       // Для 404 не показываем ошибку (endpoint может быть еще не развернут)
     } finally {
@@ -508,7 +510,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           await api.deleteProjectType(id);
           await loadProjectTypes();
         } catch (error: any) {
-          showAlert(error?.message || 'Не удалось удалить тип проекта', 'Ошибка', 'error');
+          showAlert(error?.message || 'Не удалось удалить тип проекта', 'Ошибка', 'error', 5000);
         }
       },
       'danger'
@@ -545,7 +547,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       const errorMessage = error?.status === 404
         ? 'Эндпоинт для создания агентов не найден. Убедитесь, что сервер перезапущен.'
         : error?.message || 'Не удалось создать агента';
-      showAlert(errorMessage, 'Ошибка', 'error');
+      showAlert(errorMessage, 'Ошибка', 'error', 5000);
     }
   };
 
@@ -587,7 +589,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       handleCloseAgentDialog();
     } catch (error: any) {
       console.error('Failed to save agent', error);
-      showAlert(error?.message || 'Не удалось сохранить агента', 'Ошибка', 'error');
+      showAlert(error?.message || 'Не удалось сохранить агента', 'Ошибка', 'error', 5000);
     } finally {
       setIsSavingAgent(false);
     }
@@ -604,7 +606,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           await loadAgents();
           showAlert('Агент успешно удален', undefined, 'success', 3000);
         } catch (error: any) {
-          showAlert(error?.message || 'Не удалось удалить агента', 'Ошибка', 'error');
+          showAlert(error?.message || 'Не удалось удалить агента', 'Ошибка', 'error', 5000);
         }
       },
       'danger'
@@ -652,7 +654,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
       }, 500);
     } catch (error: any) {
       console.error('Failed to reorder agents', error);
-      showAlert(error?.message || 'Не удалось изменить порядок агентов', 'Ошибка', 'error');
+      showAlert(error?.message || 'Не удалось изменить порядок агентов', 'Ошибка', 'error', 5000);
       // Перезагружаем агентов в случае ошибки
       await loadAgentsForType(projectTypeId);
     } finally {
@@ -1669,7 +1671,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         title={alertDialog.title}
         message={alertDialog.message}
         variant={alertDialog.variant}
-        duration={3000}
+        duration={alertDialog.duration ?? 0}
       />
     </div>
   );
