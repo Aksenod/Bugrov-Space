@@ -24,6 +24,7 @@ export const useDialogs = (): UseDialogsReturn => {
   const [alertDialog, setAlertDialog] = useState<UseDialogsReturn['alertDialog']>({
     isOpen: false,
     message: '',
+    duration: 0,
   });
 
   // Храним таймеры для автоматического закрытия alert
@@ -86,6 +87,7 @@ export const useDialogs = (): UseDialogsReturn => {
       message,
       title,
       variant,
+      duration,
     });
 
     // Автоматически закрываем через указанное время

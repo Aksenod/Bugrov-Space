@@ -219,7 +219,36 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
       throw error;
     }
 
-    return response.json();
+    // Проверяем, есть ли тело ответа (статусы 204 No Content и 205 Reset Content не имеют тела)
+    if (response.status === 204 || response.status === 205) {
+      return undefined as T;
+    }
+
+    // Проверяем Content-Length - если 0, возвращаем undefined
+    const contentLength = response.headers.get('content-length');
+    if (contentLength === '0') {
+      return undefined as T;
+    }
+
+    // Читаем текст ответа один раз
+    const text = await response.text();
+    
+    // Если текст пустой, возвращаем undefined
+    if (!text || text.trim() === '') {
+      return undefined as T;
+    }
+
+    // Пытаемся распарсить JSON
+    try {
+      return JSON.parse(text) as T;
+    } catch (error: any) {
+      // Если ошибка парсинга JSON из-за пустого ответа, возвращаем undefined
+      if (error.message?.includes('Unexpected end of JSON input')) {
+        return undefined as T;
+      }
+      // Для других ошибок парсинга пробрасываем дальше
+      throw error;
+    }
   } catch (error: any) {
     if (timeoutId) {
       clearTimeout(timeoutId);

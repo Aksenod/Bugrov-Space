@@ -154,10 +154,19 @@ export default function App() {
   // Вызываем bootstrap при изменении токена
   // Используем ref для отслеживания, был ли bootstrap вызван вручную (через handleLoginWithBootstrap)
   const bootstrapCalledManuallyRef = useRef(false);
+  // Используем ref для хранения стабильных ссылок на функции
+  const bootstrapRef = useRef(bootstrap);
+  const handleLogoutWithCleanupRef = useRef(handleLogoutWithCleanup);
+  
+  // Обновляем refs при изменении функций
+  useEffect(() => {
+    bootstrapRef.current = bootstrap;
+    handleLogoutWithCleanupRef.current = handleLogoutWithCleanup;
+  }, [bootstrap, handleLogoutWithCleanup]);
   
   useEffect(() => {
     if (!authToken) {
-      handleLogoutWithCleanup();
+      handleLogoutWithCleanupRef.current();
       bootstrapCalledManuallyRef.current = false;
       return;
     }
@@ -169,8 +178,9 @@ export default function App() {
     }
     
     // Вызываем bootstrap для случая, когда пользователь уже залогинен (например, при перезагрузке страницы)
-    bootstrap.bootstrap();
-  }, [authToken, bootstrap, handleLogoutWithCleanup]);
+    bootstrapRef.current.bootstrap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken]); // Только authToken в зависимостях, чтобы избежать бесконечного цикла
 
   // Проверка, является ли пользователь администратором
   const isAdmin =
@@ -393,7 +403,11 @@ export default function App() {
 
           setIsEditProjectOpen(false);
           setEditingProject(null);
-          showAlert('Проект успешно удален', undefined, 'success', 3000);
+          
+          // Показываем тост с небольшой задержкой, чтобы убедиться, что все обновления состояния завершены
+          setTimeout(() => {
+            showAlert('Проект успешно удален', undefined, 'success', 3000);
+          }, 100);
         } catch (error: any) {
           console.error('Failed to delete project', error);
           showAlert(`Не удалось удалить проект: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error', 5000);
@@ -860,7 +874,7 @@ export default function App() {
         title={alertDialog.title}
         message={alertDialog.message}
         variant={alertDialog.variant}
-        duration={3000}
+        duration={alertDialog.duration ?? 3000}
       />
 
       <CreateProjectDialog

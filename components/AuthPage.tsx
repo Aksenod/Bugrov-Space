@@ -423,6 +423,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
                 <button
                   type="submit"
                   disabled={isLoading || (touched.username && !!usernameError) || (touched.password && !!passwordError)}
+                  onClick={(e) => {
+                    if (import.meta.env.DEV) {
+                      console.log('[AuthPage] Button clicked', {
+                        isLoading,
+                        usernameError,
+                        passwordError,
+                        touched,
+                        disabled: isLoading || (touched.username && !!usernameError) || (touched.password && !!passwordError)
+                      });
+                    }
+                    // Если кнопка disabled, предотвращаем отправку
+                    if (isLoading || (touched.username && !!usernameError) || (touched.password && !!passwordError)) {
+                      e.preventDefault();
+                      return;
+                    }
+                  }}
                   className="w-full mt-6 py-4 bg-white text-black rounded-xl font-bold text-sm hover:bg-indigo-50 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   {isLoading ? (

@@ -122,6 +122,7 @@ export interface UseDialogsReturn {
     title?: string;
     message: string;
     variant?: 'success' | 'error' | 'info' | 'warning';
+    duration?: number;
   };
   closeAlert: () => void;
 }
