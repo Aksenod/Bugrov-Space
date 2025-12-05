@@ -12,9 +12,10 @@ interface ChatAreaProps {
   messages: Message[];
   isLoading: boolean;
   activeAgent: Agent | undefined;
+  onSendMessage: (text: string) => Promise<void>;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ messages, isLoading, activeAgent }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({ messages, isLoading, activeAgent, onSendMessage }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Автопрокрутка к последнему сообщению
@@ -24,7 +25,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ messages, isLoading, activeA
 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin relative bg-gradient-to-b from-transparent via-transparent to-black/20">
-      {messages.length === 0 && <EmptyChatState activeAgent={activeAgent} />}
+      {messages.length === 0 && <EmptyChatState activeAgent={activeAgent} onSendMessage={onSendMessage} />}
       <MessagesList messages={messages} isLoading={isLoading} />
       <div ref={messagesEndRef} />
     </div>

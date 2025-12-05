@@ -72,7 +72,7 @@ export const createAgent = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    const { name, description, systemInstruction, summaryInstruction, model, role, isHiddenFromSidebar } = parsed.data;
+    const { name, description, systemInstruction, summaryInstruction, model, role, isHiddenFromSidebar, quickMessages } = parsed.data;
 
     let agent: any;
     try {
@@ -84,6 +84,7 @@ export const createAgent = async (req: Request, res: Response, next: NextFunctio
         model,
         role,
         isHiddenFromSidebar,
+        quickMessages,
       });
     } catch (error: any) {
       if (error?.name === 'PrismaClientValidationError' || 

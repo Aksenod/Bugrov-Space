@@ -36,6 +36,7 @@ export const mapAgent = (agent: ApiAgent): Agent => ({
   order: agent.order ?? 0,
   projectTypeAgentId: agent.projectTypeAgentId,
   isHiddenFromSidebar: agent.isHiddenFromSidebar,
+  quickMessages: agent.quickMessages,
 });
 
 /**
@@ -73,6 +74,7 @@ export const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => ({
   model: (agent.model as LLMModel) || LLMModel.GPT5_MINI,
   role: agent.role,
   order: agent.order ?? 0,
+  quickMessages: agent.quickMessages,
 });
 
 /**

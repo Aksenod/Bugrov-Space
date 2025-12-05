@@ -289,6 +289,7 @@ export interface ApiAgent {
   order?: number;
   isTemplate?: boolean;
   projectTypeId?: string;
+  quickMessages?: string[];
   projectTypeAgentId?: string;
   files: ApiFile[];
   isHiddenFromSidebar?: boolean;
@@ -312,6 +313,7 @@ export interface ApiProjectTypeAgent {
   model: string;
   role?: string;
   order?: number;
+  quickMessages?: string[];
   projectTypes?: Array<{ id: string; name: string; order?: number }>; // Новое поле для связи многие-ко-многим
   createdAt?: string;
   updatedAt?: string;
@@ -630,6 +632,7 @@ export const api = {
     model?: string;
     role?: string;
     isHiddenFromSidebar?: boolean;
+    quickMessages?: string[];
   }) {
     return request<{ agent: ApiProjectTypeAgent }>(`/admin/agents/${agentId}`, {
       method: 'PUT',

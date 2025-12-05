@@ -53,6 +53,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
         messages={messages}
         isLoading={isLoading}
         activeAgent={activeAgent}
+        onSendMessage={onSendMessage}
       />
       <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
         <ChatInput onSend={onSendMessage} disabled={isLoading || !activeAgent} />

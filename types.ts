@@ -57,6 +57,7 @@ export interface Agent {
   order: number;
   projectTypeAgentId?: string;
   isHiddenFromSidebar?: boolean; // Hide agent from sidebar
+  quickMessages?: string[]; // Quick message hints for the agent
 }
 
 export interface User {
@@ -96,6 +97,7 @@ export interface ProjectTypeAgent {
   role?: string;
   order: number;
   isHiddenFromSidebar?: boolean;
+  quickMessages?: string[]; // Quick message hints for the agent
   createdAt?: string;
   updatedAt?: string;
 }

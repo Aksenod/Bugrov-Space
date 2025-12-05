@@ -18,6 +18,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
   const [agentModel, setAgentModel] = useState<LLMModel>(LLMModel.GPT5_MINI);
   const [agentRole, setAgentRole] = useState('');
   const [agentIsHiddenFromSidebar, setAgentIsHiddenFromSidebar] = useState(false);
+  const [agentQuickMessages, setAgentQuickMessages] = useState<string[]>([]);
   const [selectedProjectTypeIds, setSelectedProjectTypeIds] = useState<string[]>([]);
   const [isProjectTypesDropdownOpen, setIsProjectTypesDropdownOpen] = useState(false);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
@@ -34,6 +35,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
       setAgentModel(resolveModel(editingAgent.model));
       setAgentRole(editingAgent.role || '');
       setAgentIsHiddenFromSidebar(editingAgent.isHiddenFromSidebar || false);
+      setAgentQuickMessages(editingAgent.quickMessages || []);
       const projectTypeIds = editingAgent.projectTypes?.map(pt => pt.id) || [];
       setSelectedProjectTypeIds(projectTypeIds);
       initialProjectTypeIdsRef.current = [...projectTypeIds];
@@ -56,6 +58,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
           setAgentModel(draft.model || LLMModel.GPT5_MINI);
           setAgentRole(draft.role || '');
           setAgentIsHiddenFromSidebar(draft.isHiddenFromSidebar || false);
+          setAgentQuickMessages(draft.quickMessages || []);
           const projectTypeIds = draft.selectedProjectTypeIds || [];
           setSelectedProjectTypeIds(projectTypeIds);
           initialProjectTypeIdsRef.current = [...projectTypeIds];
@@ -79,6 +82,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
       model: agentModel,
       role: agentRole,
       isHiddenFromSidebar: agentIsHiddenFromSidebar,
+      quickMessages: agentQuickMessages,
       selectedProjectTypeIds,
     };
 
@@ -94,7 +98,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
     if (editingAgent && isDialogOpen) {
       saveDraftToStorage();
     }
-  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, selectedProjectTypeIds, editingAgent?.id, isDialogOpen]);
+  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, agentQuickMessages, selectedProjectTypeIds, editingAgent?.id, isDialogOpen]);
 
   const toggleProjectType = (projectTypeId: string) => {
     setSelectedProjectTypeIds(prev =>
@@ -120,6 +124,8 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
     setAgentRole,
     agentIsHiddenFromSidebar,
     setAgentIsHiddenFromSidebar,
+    agentQuickMessages,
+    setAgentQuickMessages,
     selectedProjectTypeIds,
     setSelectedProjectTypeIds,
     // Dropdowns

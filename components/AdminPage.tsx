@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu, Sparkles, Trash2, Globe } from 'lucide-react';
+import { X, Loader2, Edit3, FileCheck, Upload, FileText, Info, Layout, PenTool, Code2, Type, ChevronDown, Bot, Zap, Brain, Cpu, Sparkles, Trash2, Globe, MessageCircle, Plus } from 'lucide-react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { DragEndEvent } from '@dnd-kit/core';
 import { api, ApiProjectType, ApiProjectTypeAgent, ApiFile, ApiAdminUser } from '../services/api';
@@ -147,6 +147,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     setAgentRole,
     agentIsHiddenFromSidebar,
     setAgentIsHiddenFromSidebar,
+    agentQuickMessages,
+    setAgentQuickMessages,
     selectedProjectTypeIds,
     setSelectedProjectTypeIds,
     isProjectTypesDropdownOpen,
@@ -298,6 +300,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
           setAgentModel(resolveModel(agent.model));
           setAgentRole(agent.role || '');
           setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
+          setAgentQuickMessages(agent.quickMessages || []);
           const projectTypeIds = projectTypes.map(pt => pt.id);
           setSelectedProjectTypeIds(projectTypeIds);
           initialProjectTypeIdsRef.current = [...projectTypeIds]; // Сохраняем исходные типы проектов
@@ -527,6 +530,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
     agentModel,
     agentRole,
     agentIsHiddenFromSidebar,
+    agentQuickMessages,
     selectedProjectTypeIds,
     initialProjectTypeIdsRef,
     onAgentUpdatedRef,
@@ -568,6 +572,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         model: agentModel,
         role: agentRole?.trim() || undefined,
         isHiddenFromSidebar: agentIsHiddenFromSidebar,
+        quickMessages: agentQuickMessages || [],
       });
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
       await api.attachAgentToProjectTypes(editingAgent.id, selectedProjectTypeIds);
@@ -839,6 +844,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                     {(() => {
                       if (!editingAgent) return null;
 
+                      const currentQuickMessages = agentQuickMessages || [];
+                      const originalQuickMessages = editingAgent.quickMessages || [];
+                      const quickMessagesChanged = currentQuickMessages.length !== originalQuickMessages.length ||
+                        !currentQuickMessages.every((msg, i) => msg === originalQuickMessages[i]);
+
                       const hasChanges =
                         agentName.trim() !== (editingAgent.name || '') ||
                         agentDescription.trim() !== (editingAgent.description || '') ||
@@ -846,7 +856,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                         agentSummaryInstruction.trim() !== (editingAgent.summaryInstruction || '') ||
                         agentModel !== resolveModel(editingAgent.model) ||
                         agentRole !== (editingAgent.role || '') ||
-                        agentIsHiddenFromSidebar !== (editingAgent.isHiddenFromSidebar || false);
+                        agentIsHiddenFromSidebar !== (editingAgent.isHiddenFromSidebar || false) ||
+                        quickMessagesChanged;
 
                       if (isSavingAgent) {
                         return (
@@ -1594,7 +1605,67 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
                 )}
               </section>
 
-              {/* Настройки отображения - Группа 6 */}
+              {/* Подсказки для пользователя - Группа 6 */}
+              <section className="bg-gradient-to-br from-blue-900/20 to-cyan-900/10 p-3 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border border-blue-500/20">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="p-1 sm:p-1.5 bg-blue-500/20 rounded-lg">
+                    <MessageCircle size={12} className="sm:w-3.5 sm:h-3.5 text-blue-300" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xs sm:text-sm font-bold text-white">Подсказки для пользователя</h3>
+                    <p className="text-[9px] sm:text-[10px] text-blue-300/60 mt-0.5">
+                      Быстрые сообщения, которые будут показаны пользователю при пустом чате
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {agentQuickMessages.map((message, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-black/30 border border-white/10 rounded-lg p-2 sm:p-3">
+                      <input
+                        type="text"
+                        value={message}
+                        onChange={(e) => {
+                          const newMessages = [...agentQuickMessages];
+                          newMessages[index] = e.target.value;
+                          setAgentQuickMessages(newMessages);
+                        }}
+                        className="flex-1 bg-transparent border-none outline-none text-xs sm:text-sm text-white placeholder-white/40 focus:ring-0"
+                        placeholder="Введите текст подсказки..."
+                        maxLength={200}
+                      />
+                      <button
+                        onClick={() => {
+                          const newMessages = agentQuickMessages.filter((_, i) => i !== index);
+                          setAgentQuickMessages(newMessages);
+                        }}
+                        className="p-1.5 text-white/40 hover:text-red-400 transition-colors rounded hover:bg-red-500/10 shrink-0"
+                        title="Удалить подсказку"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  <button
+                    onClick={() => {
+                      setAgentQuickMessages([...agentQuickMessages, '']);
+                    }}
+                    className="w-full px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-xs sm:text-sm text-blue-300 font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus size={14} />
+                    Добавить подсказку
+                  </button>
+                  
+                  {agentQuickMessages.length === 0 && (
+                    <p className="text-[9px] sm:text-[10px] text-white/40 text-center py-2">
+                      Подсказки не заданы. Пользователи увидят стандартное сообщение.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {/* Настройки отображения - Группа 7 */}
               <section className="bg-gradient-to-br from-purple-900/20 to-indigo-900/10 p-3 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border border-purple-500/20">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 sm:gap-2">

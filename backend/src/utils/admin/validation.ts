@@ -11,6 +11,7 @@ export const agentTemplateSchema = z.object({
   model: z.string().optional().default('gpt-5-mini'),
   role: z.string().optional().default(''),
   isHiddenFromSidebar: z.boolean().optional().default(false),
+  quickMessages: z.array(z.string()).optional().default([]),
 });
 
 /**

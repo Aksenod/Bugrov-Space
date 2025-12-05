@@ -135,6 +135,7 @@ const syncProjectAgents = async (
             role: template.role ?? '',
             order: finalOrder,
             projectTypeAgentId: template.id,
+            quickMessages: template.quickMessages ?? [],
           },
         });
 
@@ -155,6 +156,7 @@ const syncProjectAgents = async (
             model: template.model ?? 'gpt-5-mini',
             role: template.role ?? '',
             order: desiredOrder,
+            quickMessages: template.quickMessages ?? [],
           },
         });
         await cloneKnowledgeBase(template.id, newAgent.id, templateKnowledgeMap, tx);

@@ -15,6 +15,7 @@ export const createAgentTemplate = async (data: {
   model?: string;
   role?: string;
   isHiddenFromSidebar?: boolean;
+  quickMessages?: string[];
 }) => {
   return await withRetry(
     () => (prisma as any).projectTypeAgent.create({
@@ -26,6 +27,7 @@ export const createAgentTemplate = async (data: {
         model: data.model || 'gpt-5-mini',
         role: data.role || '',
         isHiddenFromSidebar: data.isHiddenFromSidebar || false,
+        quickMessages: data.quickMessages || [],
       },
     }),
     3,
@@ -44,6 +46,7 @@ export const updateAgentTemplate = async (id: string, data: Partial<{
   model: string;
   role: string;
   isHiddenFromSidebar: boolean;
+  quickMessages: string[];
 }>) => {
   const updated = await withRetry(
     () => (prisma as any).projectTypeAgent.update({
@@ -168,6 +171,7 @@ export const getAllAgentTemplates = async () => {
       model: agent.model || 'gpt-5.1',
       role: agent.role || '',
       isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
+      quickMessages: agent.quickMessages || [],
       createdAt: agent.createdAt,
       updatedAt: agent.updatedAt,
       projectTypes: (connectionsByAgentId[agent.id] || []).map((pt: any) => ({
@@ -259,6 +263,7 @@ export const getAgentTemplateWithProjectTypes = async (id: string) => {
     model: agent.model || 'gpt-5-mini',
     role: agent.role || '',
     isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
+    quickMessages: agent.quickMessages || [],
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
     projectTypes: (connections || []).map((pt: any) => ({

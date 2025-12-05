@@ -10,6 +10,7 @@ interface InlineHintProps {
   defaultExpanded?: boolean;
   onDismiss?: () => void;
   dismissible?: boolean;
+  onExampleClick?: (example: string) => void;
 }
 
 export const InlineHint: React.FC<InlineHintProps> = ({
@@ -21,6 +22,7 @@ export const InlineHint: React.FC<InlineHintProps> = ({
   defaultExpanded = true,
   onDismiss,
   dismissible = false,
+  onExampleClick,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -80,12 +82,30 @@ export const InlineHint: React.FC<InlineHintProps> = ({
                 {examples && examples.length > 0 && (
                   <div className="space-y-1.5 mt-3">
                     {examples.map((example, index) => (
-                      <div
-                        key={index}
-                        className="text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2"
-                      >
-                        {example}
-                      </div>
+                      onExampleClick ? (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (import.meta.env.DEV) {
+                              console.log('[InlineHint] Example clicked:', example);
+                            }
+                            onExampleClick(example);
+                          }}
+                          className="w-full text-left text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2 hover:bg-white/10 hover:text-white/70 hover:border-white/20 transition-all cursor-pointer"
+                        >
+                          {example}
+                        </button>
+                      ) : (
+                        <div
+                          key={index}
+                          className="text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2"
+                        >
+                          {example}
+                        </div>
+                      )
                     ))}
                   </div>
                 )}

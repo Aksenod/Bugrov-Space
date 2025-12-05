@@ -215,6 +215,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
             model: template.model ?? 'gpt-5-mini',
             role: template.role ?? '',
             order: typeof connection.order === 'number' ? connection.order : index,
+            quickMessages: template.quickMessages ?? [],
           },
         });
 

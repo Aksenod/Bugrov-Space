@@ -267,20 +267,60 @@ export default function App() {
   }, [handleRegister, setProjects, selectProject, setAgents, setActiveAgentId, chat, bootstrap]);
 
   const handleSendMessage = useCallback(async (text: string) => {
-    if (!activeAgent || !text.trim() || chat.isLoading) return;
+    if (import.meta.env.DEV) {
+      console.log('[App] handleSendMessage called:', {
+        text: text?.substring(0, 50),
+        hasActiveAgent: !!activeAgent,
+        activeAgentId,
+        activeProjectId,
+        isLoading: chat.isLoading,
+      });
+    }
+
+    if (!activeAgent) {
+      if (import.meta.env.DEV) {
+        console.warn('[App] Cannot send message: no active agent');
+      }
+      showAlert('Ошибка: не выбран активный агент', undefined, 'error', 3000);
+      return;
+    }
+
+    if (!text || !text.trim()) {
+      if (import.meta.env.DEV) {
+        console.warn('[App] Cannot send message: empty text');
+      }
+      return;
+    }
+
+    if (chat.isLoading) {
+      if (import.meta.env.DEV) {
+        console.warn('[App] Cannot send message: chat is loading');
+      }
+      return;
+    }
 
     if (!activeProjectId) {
+      if (import.meta.env.DEV) {
+        console.warn('[App] Cannot send message: no active project');
+      }
       showAlert('Ошибка: не выбран активный проект', undefined, 'error', 3000);
       return;
     }
 
     try {
+      if (import.meta.env.DEV) {
+        console.log('[App] Calling chat.sendMessage');
+      }
       await chat.sendMessage(text);
+      if (import.meta.env.DEV) {
+        console.log('[App] Message sent successfully');
+      }
     } catch (error: any) {
       const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
+      console.error('[App] Failed to send message:', error);
       showAlert(errorMessage, 'Ошибка', 'error', 5000);
     }
-  }, [activeAgent, activeProjectId, chat, showAlert]);
+  }, [activeAgent, activeAgentId, activeProjectId, chat, showAlert]);
 
   const handleClearChat = useCallback(async () => {
     if (!activeAgent || !activeAgentId) return;

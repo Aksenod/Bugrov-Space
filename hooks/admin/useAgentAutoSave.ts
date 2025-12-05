@@ -12,6 +12,7 @@ interface UseAgentAutoSaveProps {
   agentModel: LLMModel;
   agentRole: string;
   agentIsHiddenFromSidebar: boolean;
+  agentQuickMessages: string[];
   selectedProjectTypeIds: string[];
   initialProjectTypeIdsRef: React.MutableRefObject<string[]>;
   onAgentUpdatedRef: React.MutableRefObject<(() => void) | undefined>;
@@ -28,6 +29,7 @@ export const useAgentAutoSave = ({
   agentModel,
   agentRole,
   agentIsHiddenFromSidebar,
+  agentQuickMessages,
   selectedProjectTypeIds,
   initialProjectTypeIdsRef,
   onAgentUpdatedRef,
@@ -53,6 +55,7 @@ export const useAgentAutoSave = ({
           model: agentModel,
           role: agentRole?.trim() || undefined,
           isHiddenFromSidebar: agentIsHiddenFromSidebar,
+          quickMessages: agentQuickMessages || [],
         });
         
         // Обновляем привязки к типам проектов только если они действительно изменились
@@ -99,7 +102,7 @@ export const useAgentAutoSave = ({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, selectedProjectTypeIds, editingAgent?.id]);
+  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, agentQuickMessages, selectedProjectTypeIds, editingAgent?.id]);
 
   const clearSaveTimeout = () => {
     if (saveTimeoutRef.current) {

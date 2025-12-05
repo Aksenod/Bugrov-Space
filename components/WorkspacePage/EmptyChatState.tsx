@@ -5,15 +5,34 @@
 import React from 'react';
 import { Bot } from 'lucide-react';
 import { InlineHint } from '../InlineHint';
-import { useOnboarding } from '../OnboardingContext';
 import { Agent } from '../../types';
 
 interface EmptyChatStateProps {
   activeAgent: Agent | undefined;
+  onSendMessage: (text: string) => Promise<void>;
 }
 
-export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent }) => {
-  const { shouldShowStep, completeStep } = useOnboarding();
+export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onSendMessage }) => {
+  const handleExampleClick = async (example: string) => {
+    if (!example || !example.trim()) {
+      console.warn('[EmptyChatState] Empty example text, cannot send');
+      return;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('[EmptyChatState] Sending example message:', example);
+    }
+
+    try {
+      await onSendMessage(example);
+      if (import.meta.env.DEV) {
+        console.log('[EmptyChatState] Example message sent successfully');
+      }
+    } catch (error) {
+      // Ошибка уже обработана в handleSendMessage
+      console.error('[EmptyChatState] Failed to send example message:', error);
+    }
+  };
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 pointer-events-none px-4">
@@ -28,28 +47,17 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent }) =
         Задайте вопрос или попросите помочь с задачей
       </p>
 
-      {/* Примеры вопросов */}
-      {shouldShowStep({
-        id: 'empty-chat-hint',
-        component: 'inline',
-        content: {
-          title: 'Что написать агенту',
-          description: 'Вы можете задавать любые вопросы агенту. Агент использует документы проекта для контекста, поэтому загрузите файлы, чтобы получить более точные ответы.',
-        },
-        showOnce: true,
-      }) && (
+      {/* Примеры вопросов - показываем только если есть подсказки у агента */}
+      {activeAgent?.quickMessages && activeAgent.quickMessages.length > 0 && (
         <div className="max-w-md mx-auto pointer-events-auto">
           <InlineHint
             title="Что написать агенту"
             description="Вы можете задавать любые вопросы агенту. Агент использует документы проекта для контекста, поэтому загрузите файлы, чтобы получить более точные ответы."
-            examples={[
-              'Привет, расскажи что ты умеешь',
-            ]}
+            examples={activeAgent.quickMessages.filter(msg => msg.trim())}
             variant="info"
-            collapsible={true}
-            defaultExpanded={false}
-            dismissible={true}
-            onDismiss={() => completeStep('empty-chat-hint')}
+            collapsible={false}
+            dismissible={false}
+            onExampleClick={handleExampleClick}
           />
         </div>
       )}
