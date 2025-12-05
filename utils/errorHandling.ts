@@ -66,6 +66,20 @@ export const translateErrorMessage = (message: string): string => {
     'A database error occurred. Please try again later.': 'Произошла ошибка базы данных. Попробуйте позже.',
     'Cannot reach database': 'Не удается подключиться к базе данных',
     'Server has closed the connection': 'Соединение с базой данных было закрыто',
+    // Ошибки таймаута
+    'Request timeout': 'Запрос превысил время ожидания',
+    // Сетевые ошибки
+    'Failed to fetch': 'Не удалось подключиться к серверу',
+    'NetworkError': 'Ошибка сети',
+    'Network request failed': 'Сетевой запрос не выполнен',
+    'Load failed': 'Не удалось загрузить данные',
+    // Ошибки сервера
+    'Bad Gateway': 'Сервер временно недоступен',
+    'Service Unavailable': 'Сервис временно недоступен',
+    'Gateway Timeout': 'Сервер не отвечает',
+    // Rate limit
+    'Rate limit exceeded': 'Превышен лимит запросов',
+    'Too many requests': 'Слишком много запросов',
   };
 
   // Проверяем точные совпадения
@@ -89,8 +103,48 @@ export const translateErrorMessage = (message: string): string => {
     }
   }
 
+  // Обработка сообщений с частичным совпадением для сетевых ошибок
+  if (message.toLowerCase().includes('failed to fetch') || 
+      message.toLowerCase().includes('networkerror') ||
+      message.toLowerCase().includes('network request failed') ||
+      message.toLowerCase().includes('load failed')) {
+    return 'Не удалось подключиться к серверу. Проверьте подключение к интернету или попробуйте позже.';
+  }
+
+  // Обработка сообщений о таймауте
+  if (message.toLowerCase().includes('timeout') || message.toLowerCase().includes('превысил время ожидания')) {
+    // Если сообщение уже на русском и содержит информацию о секундах, оставляем как есть
+    if (message.includes('секунд')) {
+      return message;
+    }
+    return 'Запрос превысил время ожидания. Сервер может быть перегружен или недоступен.';
+  }
+
+  // Обработка сообщений о недоступности сервера
+  if (message.toLowerCase().includes('unavailable') || 
+      message.toLowerCase().includes('недоступен') ||
+      message.toLowerCase().includes('не отвечает')) {
+    // Если сообщение уже на русском, оставляем как есть
+    if (/[а-яё]/i.test(message)) {
+      return message;
+    }
+    return 'Сервер временно недоступен. Попробуйте позже.';
+  }
+
+  // Обработка rate limit
+  if (message.toLowerCase().includes('rate limit') || 
+      message.toLowerCase().includes('too many requests') ||
+      message.toLowerCase().includes('превышен лимит')) {
+    // Если сообщение уже на русском, оставляем как есть
+    if (/[а-яё]/i.test(message)) {
+      return message;
+    }
+    return 'Превышен лимит запросов. Пожалуйста, подождите немного и попробуйте снова.';
+  }
+
   // Если сообщение содержит только техническую информацию, возвращаем понятное сообщение
-  if (message.includes('Request failed') || message.includes('Network')) {
+  if (message.includes('Request failed') || 
+      (message.includes('Network') && !/[а-яё]/i.test(message))) {
     return 'Ошибка соединения. Проверьте подключение к интернету.';
   }
 

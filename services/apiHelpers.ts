@@ -190,6 +190,28 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
       throw error;
     }
 
+    // Специальная обработка статусов, когда сервер недоступен
+    if (response.status === 502) {
+      const error = new Error('Сервер временно недоступен. Сервер может быть на техническом обслуживании. Попробуйте позже.') as Error & { status?: number; isServerError?: boolean };
+      error.status = 502;
+      error.isServerError = true;
+      throw error;
+    }
+
+    if (response.status === 503) {
+      const error = new Error('Сервис временно недоступен. Сервер может быть перегружен или на техническом обслуживании. Попробуйте позже.') as Error & { status?: number; isServerError?: boolean };
+      error.status = 503;
+      error.isServerError = true;
+      throw error;
+    }
+
+    if (response.status === 504) {
+      const error = new Error('Сервер не отвечает. Превышено время ожидания ответа от сервера. Попробуйте позже.') as Error & { status?: number; isServerError?: boolean };
+      error.status = 504;
+      error.isServerError = true;
+      throw error;
+    }
+
     if (!response.ok) {
       const errorMessage = await parseError(response);
       const error = new Error(errorMessage) as Error & { status?: number };
@@ -202,11 +224,37 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-    if (error.name === 'AbortError') {
-      const timeoutError = new Error('Request timeout') as Error & { status?: number };
+
+    // Обработка ошибки таймаута
+    if (error.name === 'AbortError' || (controller && controller.signal.aborted)) {
+      const timeoutSeconds = Math.ceil(timeout / 1000);
+      const timeoutError = new Error(`Запрос превысил время ожидания (${timeoutSeconds} секунд). Сервер может быть перегружен или недоступен.`) as Error & { status?: number; isTimeout?: boolean };
       timeoutError.status = 408;
+      timeoutError.isTimeout = true;
       throw timeoutError;
     }
+
+    // Обработка сетевых ошибок (когда сервер вообще не отвечает)
+    if (
+      error.message?.includes('Failed to fetch') ||
+      error.message?.includes('NetworkError') ||
+      error.message?.includes('Network request failed') ||
+      error.message?.includes('Load failed') ||
+      error.name === 'TypeError' ||
+      (error.message && typeof error.message === 'string' && error.message.toLowerCase().includes('network'))
+    ) {
+      const networkError = new Error('Не удалось подключиться к серверу. Проверьте подключение к интернету или попробуйте позже. Сервер может быть недоступен.') as Error & { status?: number; isNetworkError?: boolean };
+      networkError.status = 0;
+      networkError.isNetworkError = true;
+      throw networkError;
+    }
+
+    // Если ошибка уже имеет статус (например, 502, 503, 504), пробрасываем её как есть
+    if (error.status) {
+      throw error;
+    }
+
+    // Для всех остальных ошибок пробрасываем как есть
     throw error;
   }
 }
