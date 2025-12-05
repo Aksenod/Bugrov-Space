@@ -274,6 +274,8 @@ export default function App() {
         activeAgentId,
         activeProjectId,
         isLoading: chat.isLoading,
+        chatType: typeof chat,
+        chatSendMessageType: typeof chat?.sendMessage,
       });
     }
 
@@ -311,6 +313,18 @@ export default function App() {
       if (import.meta.env.DEV) {
         console.log('[App] Calling chat.sendMessage');
       }
+      
+      // Проверка, что chat.sendMessage существует
+      if (!chat || typeof chat.sendMessage !== 'function') {
+        console.error('[App] chat.sendMessage is not a function:', {
+          chat: chat,
+          chatSendMessage: chat?.sendMessage,
+          chatSendMessageType: typeof chat?.sendMessage
+        });
+        showAlert('Ошибка: функция отправки сообщений не доступна', 'Ошибка', 'error', 5000);
+        return;
+      }
+      
       await chat.sendMessage(text);
       if (import.meta.env.DEV) {
         console.log('[App] Message sent successfully');
@@ -321,6 +335,17 @@ export default function App() {
       showAlert(errorMessage, 'Ошибка', 'error', 5000);
     }
   }, [activeAgent, activeAgentId, activeProjectId, chat, showAlert]);
+
+  // Логирование для диагностики handleSendMessage
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[App] handleSendMessage check:', {
+        type: typeof handleSendMessage,
+        isFunction: typeof handleSendMessage === 'function',
+        value: handleSendMessage
+      });
+    }
+  }, [handleSendMessage]);
 
   const handleClearChat = useCallback(async () => {
     if (!activeAgent || !activeAgentId) return;

@@ -26,9 +26,29 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onS
     }
   }, [activeAgent?.id, activeAgent?.quickMessages]);
 
+  // Логирование для диагностики onSendMessage
+  React.useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[EmptyChatState] onSendMessage prop:', {
+        type: typeof onSendMessage,
+        isFunction: typeof onSendMessage === 'function',
+        value: onSendMessage
+      });
+    }
+  }, [onSendMessage]);
+
   const handleExampleClick = async (example: string) => {
     if (!example || !example.trim()) {
       console.warn('[EmptyChatState] Empty example text, cannot send');
+      return;
+    }
+
+    // Проверка, что onSendMessage является функцией
+    if (typeof onSendMessage !== 'function') {
+      console.error('[EmptyChatState] onSendMessage is not a function:', {
+        type: typeof onSendMessage,
+        value: onSendMessage
+      });
       return;
     }
 
