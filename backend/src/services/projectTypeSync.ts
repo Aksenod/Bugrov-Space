@@ -154,7 +154,6 @@ const syncProjectAgents = async (
         // Логирование для диагностики quickMessages при синхронизации
         logger.debug({
           agentId: existing.id,
-          agentName: existing.name,
           templateId: template.id,
           templateName: template.name,
           templateQuickMessages: template.quickMessages,
