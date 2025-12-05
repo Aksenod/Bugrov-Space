@@ -4,6 +4,7 @@ import './index.css';
 import App from './App';
 import { OnboardingProvider } from './components/OnboardingContext';
 import { onboardingSteps } from './components/onboardingSteps';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   AuthProvider,
   ProjectProvider,
@@ -45,10 +46,20 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <OnboardingProvider steps={onboardingSteps}>
-      <AppProviders>
-        <App />
-      </AppProviders>
-    </OnboardingProvider>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        // Дополнительное логирование ошибок в продакшене
+        if (!import.meta.env.DEV) {
+          console.error('[ErrorBoundary] Production error:', error, errorInfo);
+          // Здесь можно отправить ошибку в систему мониторинга (Sentry, LogRocket и т.д.)
+        }
+      }}
+    >
+      <OnboardingProvider steps={onboardingSteps}>
+        <AppProviders>
+          <App />
+        </AppProviders>
+      </OnboardingProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

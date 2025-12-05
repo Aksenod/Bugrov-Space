@@ -13,6 +13,7 @@ import { EmptyStatePage } from './components/EmptyStatePage';
 import { InlineHint } from './components/InlineHint';
 import { useOnboarding } from './components/OnboardingContext';
 import { onboardingSteps } from './components/onboardingSteps';
+import { LoadingFallback, ModalLoadingFallback } from './components/LoadingFallback';
 // Старый api.ts оставлен для обратной совместимости с некоторыми методами
 // Постепенно будет заменен на отдельные сервисы
 import { api } from './services/api';
@@ -43,18 +44,7 @@ const ProjectDocumentsModal = React.lazy(() => import('./components/ProjectDocum
 const FileUploadModal = React.lazy(() => import('./components/FileUploadModal').then(m => ({ default: m.FileUploadModal })));
 const PaymentModal = React.lazy(() => import('./components/PaymentModal')); // default export
 
-// Fallback компонент для Suspense
-const LoadingFallback = () => (
-  <div className="flex items-center justify-center h-full w-full bg-black text-white">
-    <div className="text-center space-y-4">
-      <div className="relative">
-        <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
-        <Bot size={64} className="relative mx-auto animate-bot" />
-      </div>
-      <p className="text-white/60">Загрузка...</p>
-    </div>
-  </div>
-);
+// LoadingFallback теперь импортируется из components/LoadingFallback.tsx
 
 // Все утилиты и константы теперь импортируются из ./utils
 
@@ -870,7 +860,7 @@ export default function App() {
       )}
 
       {isFileUploadOpen && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalLoadingFallback />}>
           <FileUploadModal
             isOpen={isFileUploadOpen}
             onClose={() => setIsFileUploadOpen(false)}
