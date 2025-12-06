@@ -14,24 +14,27 @@ interface MessagesListProps {
 
 export const MessagesList: React.FC<MessagesListProps> = ({ messages, isLoading }) => {
   // Уникальные сообщения (убираем дубликаты)
+  // Теперь не фильтруем пустые streaming сообщения - они будут показываться как индикатор генерации
   const uniqueMessages = useMemo(() => {
     const unique = new Map<string, Message>();
-    messages
-      .filter((msg) => !(msg.isStreaming && msg.text.length === 0))
-      .forEach((msg) => {
-        if (!unique.has(msg.id) || msg.timestamp > unique.get(msg.id)!.timestamp) {
-          unique.set(msg.id, msg);
-        }
-      });
+    messages.forEach((msg) => {
+      if (!unique.has(msg.id) || msg.timestamp > unique.get(msg.id)!.timestamp) {
+        unique.set(msg.id, msg);
+      }
+    });
     return Array.from(unique.values());
   }, [messages]);
+
+  // Проверяем, есть ли уже streaming сообщение в списке
+  const hasStreamingMessage = uniqueMessages.some((msg) => msg.isStreaming && msg.text.length === 0);
 
   return (
     <>
       {uniqueMessages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
-      {isLoading && uniqueMessages.length > 0 && <MessageSkeleton />}
+      {/* Показываем MessageSkeleton только если isLoading и нет streaming сообщения (чтобы избежать дублирования) */}
+      {isLoading && !hasStreamingMessage && <MessageSkeleton />}
     </>
   );
 };
