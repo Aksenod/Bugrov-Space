@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HelpCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { HelpCircle, ChevronDown, ChevronUp, X, MessageCircle } from 'lucide-react';
 
 interface InlineHintProps {
   title?: string;
@@ -94,9 +94,10 @@ export const InlineHint: React.FC<InlineHintProps> = ({
                             }
                             onExampleClick(example);
                           }}
-                          className="w-full text-left text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2 hover:bg-white/10 hover:text-white/70 hover:border-white/20 transition-all cursor-pointer"
+                          className="w-full text-left text-xs text-white/90 bg-gradient-to-r from-indigo-500/20 via-indigo-500/15 to-blue-500/20 border border-indigo-500/30 rounded-lg px-3 py-2.5 hover:from-indigo-500/30 hover:via-indigo-500/25 hover:to-blue-500/30 hover:border-indigo-400/50 hover:text-white hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-all cursor-pointer flex items-center gap-2 group"
                         >
-                          {example}
+                          <MessageCircle size={14} className="text-indigo-300 group-hover:text-indigo-200 flex-shrink-0 transition-colors" />
+                          <span className="flex-1">{example}</span>
                         </button>
                       ) : (
                         <div
