@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Check, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
+import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING } from '../utils/constants';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -26,7 +27,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
 
         try {
             const data = await api.createPayment({
-                amount: '1000.00',
+                amount: `${CURRENT_PRICE}.00`,
                 description: 'Подписка на Bugrov Space',
             });
 
@@ -80,8 +81,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, token }) =
                                 <h3 className="font-semibold text-white">Полный доступ</h3>
                                 <p className="text-sm text-white/60">Доступ ко всем функциям платформы</p>
                             </div>
-                            <div className="ml-auto font-bold text-white">
-                                1000 ₽ <span className="text-xs text-white/50 font-normal">/ мес</span>
+                            <div className="ml-auto font-bold text-white flex items-center gap-2">
+                                <span>{CURRENT_PRICE} ₽</span>
+                                {IS_BETA_PRICING && (
+                                    <>
+                                        <span className="text-sm text-white/40 line-through font-normal">{FUTURE_PRICE} ₽</span>
+                                    </>
+                                )}
+                                <span className="text-xs text-white/50 font-normal">/ мес</span>
                             </div>
                         </div>
 

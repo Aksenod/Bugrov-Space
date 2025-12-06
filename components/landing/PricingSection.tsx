@@ -1,5 +1,6 @@
 import React from 'react';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Sparkles, Zap } from 'lucide-react';
+import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING } from '../../utils/constants';
 
 interface PricingSectionProps {
   isAuthenticated: boolean;
@@ -41,8 +42,14 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
 
             {/* Card */}
             <div className="relative bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-xl rounded-3xl border border-white/20 overflow-hidden">
-              {/* Badge */}
-              <div className="relative sm:absolute sm:top-0 sm:right-0 p-6 sm:p-0 sm:m-6 pb-0 sm:pb-0">
+              {/* Badges */}
+              <div className="relative sm:absolute sm:top-0 sm:right-0 p-6 sm:p-0 sm:m-6 pb-0 sm:pb-0 flex flex-col gap-2">
+                {IS_BETA_PRICING && (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500/30 to-orange-500/30 rounded-full border border-amber-500/40 animate-pulse">
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm font-semibold text-white">Бета-цена</span>
+                  </div>
+                )}
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full border border-white/20">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
                   <span className="text-sm font-semibold text-white">Для фрилансеров и мини‑студий</span>
@@ -53,10 +60,24 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
                 {/* Plan name and price */}
                 <div className="mb-8">
                   <h3 className="text-2xl font-bold text-white mb-4">Тариф «База»</h3>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-5xl sm:text-6xl font-bold text-white">1000 ₽</span>
-                    <span className="text-2xl text-white/60">/ месяц</span>
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span className="text-5xl sm:text-6xl font-bold text-white">{CURRENT_PRICE} ₽</span>
+                    {IS_BETA_PRICING && (
+                      <>
+                        <span className="text-2xl sm:text-3xl font-semibold text-white/40 line-through">{FUTURE_PRICE} ₽</span>
+                        <span className="text-2xl text-white/60">/ месяц</span>
+                      </>
+                    )}
+                    {!IS_BETA_PRICING && (
+                      <span className="text-2xl text-white/60">/ месяц</span>
+                    )}
                   </div>
+                  {IS_BETA_PRICING && (
+                    <p className="text-sm text-amber-400/80 mt-3 flex items-center gap-2">
+                      <Zap className="w-4 h-4" />
+                      Цена повысится до {FUTURE_PRICE} ₽ после завершения бета-тестирования
+                    </p>
+                  )}
                 </div>
 
                 {/* What's included */}
@@ -97,7 +118,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isAuthenticated,
                     onClick={handleBuyClick}
                     className="w-full px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black/50"
                   >
-                    Подключить — 1000 ₽/мес
+                    Подключить — {CURRENT_PRICE} ₽/мес
                   </button>
 
                   {/* Hint */}

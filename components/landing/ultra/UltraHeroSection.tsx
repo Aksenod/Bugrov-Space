@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ArrowRight, Sparkles, Zap, Rocket, Code, Users } from 'lucide-react';
+import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING } from '../../../utils/constants';
 
 interface UltraHeroSectionProps {
     isAuthenticated?: boolean;
@@ -116,16 +117,27 @@ export const UltraHeroSection: React.FC<UltraHeroSectionProps> = ({ isAuthentica
                     </div>
 
                     {/* CTA Buttons */}
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
+                    <div className="flex flex-col items-center justify-center gap-4 mb-16">
                         <button
                             onClick={onOpenPayment}
                             className="group relative px-10 py-5 bg-white text-black rounded-2xl font-bold text-lg hover:bg-indigo-50 hover:scale-105 transition-all duration-300 overflow-hidden shadow-2xl shadow-white/20"
                         >
                             <span className="relative flex items-center gap-3">
-                                Подключить — 1000 ₽/мес <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                Подключить — {CURRENT_PRICE} ₽/мес <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </span>
                         </button>
-                        <p className="text-sm text-gray-400 text-center">Отмена в любой момент</p>
+                        <div className="flex flex-col items-center gap-2">
+                            {IS_BETA_PRICING && (
+                                <div className="flex items-center gap-3 text-sm">
+                                    <span className="text-white font-semibold">{CURRENT_PRICE} ₽</span>
+                                    <span className="text-gray-500 line-through">{FUTURE_PRICE} ₽</span>
+                                    <span className="px-3 py-1 bg-gradient-to-r from-amber-500/30 to-orange-500/30 text-amber-300 rounded-full text-xs font-semibold border border-amber-500/40 animate-pulse">
+                                        Бета-цена
+                                    </span>
+                                </div>
+                            )}
+                            <p className="text-sm text-gray-400 text-center">Отмена в любой момент</p>
+                        </div>
                     </div>
 
                     {/* Trust elements */}

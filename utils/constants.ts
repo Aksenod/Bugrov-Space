@@ -29,3 +29,10 @@ export const QUESTION_PREFIXES = [
   'should',
 ] as const;
 
+/**
+ * Константы цен
+ */
+export const CURRENT_PRICE = 1000; // Текущая бета-цена
+export const FUTURE_PRICE = 3000; // Будущая цена после бета
+export const IS_BETA_PRICING = true; // Флаг бета-цены
+

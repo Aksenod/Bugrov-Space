@@ -1,5 +1,6 @@
 import React from 'react';
 import { Zap, Users } from 'lucide-react';
+import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING } from '../../utils/constants';
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
@@ -69,9 +70,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
                   onClick={handleBuyClick}
                   className="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
                 >
-                  Подключить — 1000 ₽/мес
+                  Подключить — {CURRENT_PRICE} ₽/мес
                 </button>
-                <span className="text-sm text-white/60 text-center">Отмена в любой момент</span>
+                <div className="flex flex-col items-center gap-1">
+                  {IS_BETA_PRICING && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-white/90 font-semibold">{CURRENT_PRICE} ₽</span>
+                      <span className="text-white/40 line-through">{FUTURE_PRICE} ₽</span>
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs font-semibold border border-amber-500/30">
+                        Бета-цена
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-sm text-white/60 text-center">Отмена в любой момент</span>
+                </div>
               </div>
             </div>
 

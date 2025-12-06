@@ -176,14 +176,22 @@ export const DocumentsSidebar: React.FC<DocumentsSidebarProps> = ({
               <button
                 key={doc.id}
                 onClick={() => onSelectFile(doc.id)}
-                className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-4 group relative overflow-hidden ${selectedFileId === doc.id
-                  ? 'bg-white/10 shadow-lg border border-white/10'
-                  : 'hover:bg-white/5 border border-transparent'
+                className={`w-full text-left p-4 rounded-2xl transition-all duration-200 flex items-center gap-4 group relative overflow-hidden cursor-pointer ${selectedFileId === doc.id
+                  ? 'bg-white/15 shadow-lg border border-white/20'
+                  : 'hover:bg-white/10 hover:border-white/20 hover:shadow-md hover:scale-[1.02] border border-transparent'
                   }`}
               >
                 {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
+                <FileText 
+                  size={18} 
+                  className={`flex-shrink-0 transition-colors duration-200 ${
+                    selectedFileId === doc.id 
+                      ? 'text-white/90' 
+                      : 'text-white/60 group-hover:text-white/80'
+                  }`}
+                />
                 <div className="min-w-0 flex-1">
-                  <h4 className={`text-sm font-semibold line-clamp-2 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70'}`}>
+                  <h4 className={`text-sm font-semibold line-clamp-2 transition-colors duration-200 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70 group-hover:text-white/90'}`}>
                     {getDocumentDisplayName(doc)}
                   </h4>
                 </div>
