@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { UploadedFile, Agent } from '../../types';
 import { api } from '../../services/api';
 
@@ -7,7 +7,7 @@ interface UsePrototypeGenerationProps {
   documentCreatorAgent: Agent | null | undefined;
   selectedFileId: string | null;
   onDocumentUpdate?: (file: UploadedFile) => void;
-  onShowAlert?: (message: string, title?: string, variant?: 'success' | 'error' | 'info' | 'warning') => void;
+  onShowAlert?: (message: string, title?: string, variant?: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
   setActiveTab: (tab: 'text' | 'prototype') => void;
   setPrototypeVersions: (versions: any[]) => void;
   setSelectedVersionNumber: (version: number | null) => void;
@@ -24,42 +24,6 @@ export const usePrototypeGeneration = ({
   setSelectedVersionNumber,
 }: UsePrototypeGenerationProps) => {
   const [isGeneratingPrototype, setIsGeneratingPrototype] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-
-  // Timer for prototype generation - calculates duration based on content size
-  useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
-    if (isGeneratingPrototype && selectedFile && selectedFile.data) {
-      try {
-        // Calculate estimated time based on content size
-        const decodeContent = (base64: string): string => {
-          try {
-            return decodeURIComponent(escape(window.atob(base64)));
-          } catch (e) {
-            return "";
-          }
-        };
-        const contentSize = decodeContent(selectedFile.data).length;
-        // Formula: 30s base + 1s per 100 characters, min 30s, max 180s
-        const estimatedSeconds = Math.min(180, Math.max(30, 30 + Math.floor(contentSize / 100)));
-
-        setTimeLeft(estimatedSeconds);
-        interval = setInterval(() => {
-          setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
-        }, 1000);
-      } catch (error) {
-        console.error('Error calculating timer:', error);
-        setTimeLeft(null);
-      }
-    } else {
-      setTimeLeft(null);
-    }
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isGeneratingPrototype, selectedFile]);
 
   const handleGenerateResult = async () => {
     if (!selectedFile || !documentCreatorAgent) return;
@@ -86,6 +50,11 @@ export const usePrototypeGeneration = ({
       // Обновляем документ в родительском компоненте
       if (onDocumentUpdate) {
         onDocumentUpdate(updatedFile);
+      }
+
+      // Показываем уведомление об успешной генерации
+      if (onShowAlert) {
+        onShowAlert('Прототип успешно сгенерирован', 'Успех', 'success', 4000);
       }
 
       // Переключаемся на таб прототипа
@@ -115,7 +84,6 @@ export const usePrototypeGeneration = ({
 
   return {
     isGeneratingPrototype,
-    timeLeft,
     handleGenerateResult,
   };
 };
