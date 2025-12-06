@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertCircle, RefreshCw, Home } from 'lucide-react';
+import { AlertCircle, RefreshCw, Home, Copy, Check } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -11,6 +11,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  copied: boolean;
 }
 
 /**
@@ -24,14 +25,16 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      copied: false,
     };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return {
       hasError: true,
       error,
       errorInfo: null,
+      copied: false,
     };
   }
 
@@ -65,6 +68,27 @@ export class ErrorBoundary extends Component<Props, State> {
 
   handleGoHome = () => {
     window.location.href = '/';
+  };
+
+  handleCopyError = async () => {
+    const { error, errorInfo } = this.state;
+    if (!error) return;
+
+    const errorText = [
+      `Ошибка: ${error.message}`,
+      error.stack ? `\nСтек вызовов:\n${error.stack}` : '',
+      errorInfo?.componentStack ? `\nКомпонент:\n${errorInfo.componentStack}` : '',
+    ].join('');
+
+    try {
+      await navigator.clipboard.writeText(errorText);
+      this.setState({ copied: true });
+      setTimeout(() => {
+        this.setState({ copied: false });
+      }, 2000);
+    } catch (err) {
+      console.error('Не удалось скопировать текст:', err);
+    }
   };
 
   render() {
@@ -102,7 +126,26 @@ export class ErrorBoundary extends Component<Props, State> {
               {/* Детали ошибки (только в dev режиме) */}
               {isDev && this.state.error && (
                 <div className="mt-6 p-4 bg-red-950/30 border border-red-500/20 rounded-lg text-left">
-                  <p className="text-sm font-semibold text-red-400 mb-2">Детали ошибки:</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-red-400">Детали ошибки:</p>
+                    <button
+                      onClick={this.handleCopyError}
+                      className="px-3 py-1.5 text-xs font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-colors flex items-center gap-1.5"
+                      title="Копировать в буфер обмена"
+                    >
+                      {this.state.copied ? (
+                        <>
+                          <Check size={14} />
+                          Скопировано
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} />
+                          Копировать
+                        </>
+                      )}
+                    </button>
+                  </div>
                   <p className="text-xs text-red-300 font-mono break-all mb-2">{errorMessage}</p>
                   {errorStack && (
                     <details className="mt-2">

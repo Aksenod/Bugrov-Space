@@ -31,7 +31,7 @@ interface ProjectDocumentsModalProps {
   onRemoveAgentFile?: (fileId: string) => void;
   onAgentFilesUpdate?: (agentId: string, files: UploadedFile[]) => void;
   onShowConfirm?: (title: string, message: string, onConfirm: () => void, variant?: 'danger' | 'warning' | 'info') => void;
-  onShowAlert?: (message: string, title?: string, variant?: 'success' | 'error' | 'info' | 'warning') => void;
+  onShowAlert?: (message: string, title?: string, variant?: 'success' | 'error' | 'info' | 'warning', duration?: number) => void;
   currentUser?: User | null;
 }
 
@@ -45,6 +45,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
   onFileUpload,
   onDocumentUpdate,
   onShowAlert,
+  onShowConfirm,
   currentUser
 }) => {
   const { shouldShowStep, completeStep } = useOnboarding();
@@ -99,7 +100,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   const {
     isGeneratingPrototype,
-    timeLeft,
     handleGenerateResult,
   } = usePrototypeGeneration({
     selectedFile,
@@ -438,13 +438,19 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                           handleGenerateResult();
                         }}
                         disabled={isGeneratingPrototype}
-                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm font-medium"
+                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
                       >
                         {isGeneratingPrototype ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            Генерация... ({timeLeft}s)
-                          </>
+                          <span className="flex items-center gap-2">
+                            <span className="relative flex items-center justify-center">
+                              <span className="absolute inset-0 bg-cyan-500/20 blur-md rounded-full animate-pulse"></span>
+                              <Loader2 size={14} className="relative animate-spin text-cyan-400" />
+                            </span>
+                            <span className="flex flex-col items-start">
+                              <span className="leading-tight">Генерация прототипа...</span>
+                              <span className="text-xs text-cyan-400/70 leading-tight">В среднем до 3 минут</span>
+                            </span>
+                          </span>
                         ) : (
                           "Сгенерировать прототип"
                         )}
