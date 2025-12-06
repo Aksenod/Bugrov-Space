@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, X, Upload, ChevronLeft } from 'lucide-react';
+import { FileText, X, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UploadedFile, Project } from '../../types';
 import { getDocumentDisplayName } from './helpers';
 
@@ -161,7 +161,7 @@ export const DocumentsSidebar: React.FC<DocumentsSidebarProps> = ({
             : 'opacity-100 pointer-events-auto'
         }`}
       >
-        <div className="h-full overflow-y-auto p-4 space-y-2 md:no-scrollbar">
+        <div className="h-full overflow-y-auto md:no-scrollbar">
           {documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-60 text-white/40 text-center p-6 border-2 border-dashed border-white/10 rounded-3xl m-4">
               <div className="relative mb-4">
@@ -172,31 +172,46 @@ export const DocumentsSidebar: React.FC<DocumentsSidebarProps> = ({
               <p className="text-xs text-white/50 max-w-[200px]">Используйте кнопку "Сохранить" в чате для создания отчетов.</p>
             </div>
           ) : (
-            documents.map(doc => (
-              <button
-                key={doc.id}
-                onClick={() => onSelectFile(doc.id)}
-                className={`w-full text-left p-4 rounded-2xl transition-all duration-200 flex items-center gap-4 group relative overflow-hidden cursor-pointer ${selectedFileId === doc.id
-                  ? 'bg-white/15 shadow-lg border border-white/20'
-                  : 'hover:bg-white/10 hover:border-white/20 hover:shadow-md hover:scale-[1.02] border border-transparent'
+            <div className="divide-y divide-white/10">
+              {documents.map((doc, index) => (
+                <button
+                  key={doc.id}
+                  onClick={() => onSelectFile(doc.id)}
+                  className={`w-full text-left px-4 py-3 transition-all duration-200 flex items-center gap-3 group relative cursor-pointer ${
+                    selectedFileId === doc.id
+                      ? 'bg-white/15'
+                      : 'bg-transparent hover:bg-white/10'
                   }`}
-              >
-                {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
-                <FileText 
-                  size={18} 
-                  className={`flex-shrink-0 transition-colors duration-200 ${
-                    selectedFileId === doc.id 
-                      ? 'text-white/90' 
-                      : 'text-white/60 group-hover:text-white/80'
-                  }`}
-                />
-                <div className="min-w-0 flex-1">
-                  <h4 className={`text-sm font-semibold line-clamp-2 transition-colors duration-200 ${selectedFileId === doc.id ? 'text-white' : 'text-white/70 group-hover:text-white/90'}`}>
-                    {getDocumentDisplayName(doc)}
-                  </h4>
-                </div>
-              </button>
-            ))
+                >
+                  {selectedFileId === doc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400"></div>}
+                  <FileText 
+                    size={18} 
+                    className={`flex-shrink-0 transition-colors duration-200 ${
+                      selectedFileId === doc.id 
+                        ? 'text-white/90' 
+                        : 'text-white/60 group-hover:text-white/80'
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h4 className={`text-sm font-semibold line-clamp-2 transition-colors duration-200 ${
+                      selectedFileId === doc.id 
+                        ? 'text-white' 
+                        : 'text-white/70 group-hover:text-white/90'
+                    }`}>
+                      {getDocumentDisplayName(doc)}
+                    </h4>
+                  </div>
+                  <ChevronRight 
+                    size={16} 
+                    className={`flex-shrink-0 transition-colors duration-200 ${
+                      selectedFileId === doc.id 
+                        ? 'text-white/70' 
+                        : 'text-white/40 group-hover:text-white/70'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

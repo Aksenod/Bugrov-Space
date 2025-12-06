@@ -284,7 +284,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
         {/* Preview Area */}
         <div 
-          className={`flex-1 md:flex flex-col bg-black/30 relative min-h-0 transition-all duration-300 ease-in-out ${!selectedFile ? 'hidden md:flex' : 'flex'}`}
+          className={`flex-1 md:flex flex-col bg-black relative min-h-0 transition-all duration-300 ease-in-out ${!selectedFile ? 'hidden md:flex' : 'flex'}`}
           style={{ 
             width: isSidebarCollapsed ? 'calc(100% - 60px)' : undefined,
             transitionProperty: 'width',
