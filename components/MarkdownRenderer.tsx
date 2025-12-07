@@ -262,7 +262,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
   }
 
   return (
-    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, overflowX: 'visible' }}>
+    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass} min-w-0 w-full`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -325,9 +325,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             }
 
             return !inline && match ? (
-              <SyntaxHighlighterWrapper language={match[1]} {...props}>
-                {codeContent}
-              </SyntaxHighlighterWrapper>
+              <div className="overflow-x-auto w-full rounded-lg border border-white/20 my-2">
+                <SyntaxHighlighterWrapper language={match[1]} {...props}>
+                  {codeContent}
+                </SyntaxHighlighterWrapper>
+              </div>
             ) : (
               <code className={`${className} bg-slate-800/80 px-1.5 py-0.5 rounded text-amber-200 font-mono text-sm border border-slate-700/50`} {...props}>
                 {children}
@@ -386,13 +388,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           },
           table({ children }) {
             return (
-              <div className="my-4">
+              <div className="my-4 overflow-x-auto w-full max-w-full">
                 <table 
                   className="border-collapse" 
                   style={{ 
+                    tableLayout: 'auto',
                     width: 'max-content',
-                    minWidth: '100%',
-                    tableLayout: 'auto'
+                    minWidth: '100%'
                   }}
                 >
                   {children}
@@ -412,11 +414,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           th({ children }) {
             return (
               <th 
-                className="border border-white/20 px-4 py-2 text-left font-semibold text-white max-w-[160px] md:max-w-[300px]" 
+                className="border border-white/20 px-4 py-2 text-left font-semibold text-white" 
                 style={{ 
                   wordWrap: 'break-word',
                   overflowWrap: 'break-word',
-                  lineHeight: '1.4'
+                  lineHeight: '1.4',
+                  maxWidth: '200px',
+                  minWidth: '120px'
                 }}
               >
                 {children}
@@ -426,11 +430,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           td({ children }) {
             return (
               <td 
-                className="border border-white/10 px-4 py-2 text-white/90 max-w-[160px] md:max-w-[300px]" 
+                className="border border-white/10 px-4 py-2 text-white/90" 
                 style={{ 
                   wordWrap: 'break-word',
                   overflowWrap: 'break-word',
-                  lineHeight: '1.4'
+                  lineHeight: '1.4',
+                  maxWidth: '200px',
+                  minWidth: '120px'
                 }}
               >
                 {children}

@@ -551,7 +551,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                 )}
 
                 <div
-                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-hidden flex-1 p-4 sm:p-6 md:p-8"
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto overflow-x-hidden flex-1 p-4 sm:p-6 md:p-8 min-w-0"
                   style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}
                 >
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
@@ -595,7 +595,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                       }
 
                       return (
-                        <div className="prose prose-invert prose-lg max-w-none overflow-x-auto break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
+                        <div className="prose prose-invert prose-lg max-w-none break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 min-w-0">
                           <MarkdownRenderer content={decodeContent(content)} />
                         </div>
                       );
