@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, Users } from 'lucide-react';
 import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING } from '../../utils/constants';
+import { VKVideoEmbed } from './VKVideoEmbed';
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
@@ -24,34 +25,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left column - Text content */}
           <div className="text-white space-y-8">
-            {/* Media placeholder - mobile only, before heading */}
+            {/* Media - mobile only, before heading */}
             <div className="relative lg:hidden mb-8">
-              <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
-                {/* Placeholder for future image/video */}
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl backdrop-blur-sm border border-white/10 flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <div className="w-16 h-16 mx-auto bg-white/10 rounded-full flex items-center justify-center">
-                      <Zap className="w-8 h-8 text-indigo-400" />
-                    </div>
-                    <p className="text-white/60 text-sm">Место для медиа</p>
-                  </div>
-                </div>
-                {/* Decorative elements */}
-                <div className="absolute -top-2 -right-2 w-16 h-16 bg-indigo-500/30 rounded-full blur-xl"></div>
-                <div className="absolute -bottom-2 -left-2 w-20 h-20 bg-purple-500/30 rounded-full blur-xl"></div>
-              </div>
+              <VKVideoEmbed aspectRatio="16 / 9" rounded="2xl" />
             </div>
 
             {/* H1 - главное сообщение */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
-              Прототип с{' '}
+              Прототип с{'\u00A0'}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
                 продающими
               </span>{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
                 текстами
               </span>{' '}
-              за 30 минут
+              за{'\u00A0'}30{'\u00A0'}минут
             </h1>
 
             {/* Subtitle - только суть, без деталей */}
@@ -97,21 +85,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
             </div>
           </div>
 
-          {/* Right column - Media placeholder (desktop only) */}
+          {/* Right column - Media (desktop only) */}
           <div className="relative hidden lg:block">
-            <div className="relative aspect-square max-w-lg mx-auto">
-              {/* Placeholder for future image/video */}
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-3xl backdrop-blur-sm border border-white/10 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <div className="w-20 h-20 mx-auto bg-white/10 rounded-full flex items-center justify-center">
-                    <Zap className="w-10 h-10 text-indigo-400" />
-                  </div>
-                  <p className="text-white/60 text-sm">Место для медиа</p>
-                </div>
-              </div>
-              {/* Decorative elements */}
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-indigo-500/30 rounded-full blur-2xl"></div>
-              <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-purple-500/30 rounded-full blur-2xl"></div>
+            <div className="relative max-w-lg mx-auto">
+              <VKVideoEmbed aspectRatio="1 / 1" />
             </div>
           </div>
         </div>
