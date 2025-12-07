@@ -100,7 +100,7 @@ export default {
             // Параграфы - отступы между абзацами
             p: {
               marginTop: '0',
-              marginBottom: '0.75rem', // Значение по умолчанию (переопределяется inline стилями в MarkdownRenderer)
+              marginBottom: '20px',
               color: 'rgba(255, 255, 255, 0.95)',
               lineHeight: '1.3',
             },
@@ -159,7 +159,14 @@ export default {
               color: 'rgba(255, 255, 255, 0.95)',
             },
             li: {
+              marginTop: '0.75rem',
+              marginBottom: '0.75rem',
+              lineHeight: '1.6',
+            },
+            'li:first-child': {
               marginTop: '0.5rem',
+            },
+            'li:last-child': {
               marginBottom: '0.5rem',
             },
             

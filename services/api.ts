@@ -136,6 +136,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...init,
       ...(controller ? { signal: controller.signal } : {}),
       headers: getHeaders(init.headers as Record<string, string>),
+      // Передаем keepalive если он указан в init
+      ...(init.keepalive !== undefined ? { keepalive: init.keepalive } : {}),
     });
 
     const duration = Date.now() - startTime;
@@ -461,8 +463,10 @@ export const api = {
 
   async generatePrototype(agentId: string, fileId: string) {
     // Увеличенный таймаут (120 сек) обрабатывается в функции request
+    // Используем keepalive для продолжения запроса даже после закрытия страницы
     return request<{ file: ApiFile }>(`/agents/${agentId}/files/${fileId}/generate-prototype`, {
       method: 'POST',
+      keepalive: true,
     });
   },
 

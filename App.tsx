@@ -39,8 +39,10 @@ const CreativeLandingPage = React.lazy(() => import('./components/landing/Creati
 const UltraCreativeLandingPage = React.lazy(() => import('./components/landing/UltraCreativeLandingPage').then(m => ({ default: m.UltraCreativeLandingPage })));
 const PublicPrototypePage = React.lazy(() => import('./components/PublicPrototypePage').then(m => ({ default: m.PublicPrototypePage })));
 
+// Lazy loading для страниц
+const DocumentsPage = React.lazy(() => import('./components/DocumentsPage').then(m => ({ default: m.DocumentsPage })));
+
 // Lazy loading для модальных окон (загружаются по требованию)
-const ProjectDocumentsModal = React.lazy(() => import('./components/ProjectDocumentsModal').then(m => ({ default: m.ProjectDocumentsModal })));
 const FileUploadModal = React.lazy(() => import('./components/FileUploadModal').then(m => ({ default: m.FileUploadModal })));
 const PaymentModal = React.lazy(() => import('./components/PaymentModal')); // default export
 
@@ -105,7 +107,6 @@ export default function App() {
   // Используем хук для роутинга
   const routing = useRouting(currentUser);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
@@ -177,25 +178,26 @@ export default function App() {
     !!currentUser &&
     (currentUser.role === 'admin' || (currentUser.username && ADMIN_USERNAMES.has(currentUser.username)));
 
-  // Загружаем документы при открытии модального окна
+  // Загружаем документы при открытии страницы документов
   useEffect(() => {
-    if (isDocsOpen && activeAgentId && activeProjectId && !bootstrap.isBootstrapping) {
+    if (routing.routeState.isDocumentsOpen && activeAgentId && activeProjectId && !bootstrap.isBootstrapping) {
       documents.ensureSummaryLoaded().catch((error) => {
-        console.error('[Frontend] Failed to load documents when opening modal:', error);
+        console.error('[Frontend] Failed to load documents when opening page:', error);
         showAlert('Не удалось загрузить документы', 'Ошибка', 'error', 5000);
       });
     }
-  }, [isDocsOpen, activeAgentId, activeProjectId, bootstrap.isBootstrapping, documents, showAlert]);
+  }, [routing.routeState.isDocumentsOpen, activeAgentId, activeProjectId, bootstrap.isBootstrapping, documents, showAlert]);
 
   // Keyboard shortcuts
   useEffect(() => {
     if (!currentUser || !activeAgent) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape - закрыть модальные окна
+      // Escape - закрыть модальные окна и страницы
       if (e.key === 'Escape') {
-        if (isDocsOpen) {
-          setIsDocsOpen(false);
+        if (routing.routeState.isDocumentsOpen) {
+          routing.setRouteState({ isDocumentsOpen: false });
+          routing.navigateTo('#/projects');
         }
         if (isSidebarOpen) {
           setIsSidebarOpen(false);
@@ -205,15 +207,27 @@ export default function App() {
       // Cmd/Ctrl + / - открыть документы
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault();
-        setIsDocsOpen(true);
+        routing.navigateTo('#/documents');
+        routing.setRouteState({ isDocumentsOpen: true });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentUser, activeAgent, isDocsOpen, isSidebarOpen]);
+  }, [currentUser, activeAgent, routing, isSidebarOpen]);
 
   // Роутинг теперь управляется через хук useRouting
+
+  // Очищаем временные loading-сообщения и сбрасываем isLoading при переключении агента
+  const prevAgentIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Очищаем временные сообщения у предыдущего агента при переключении
+    if (prevAgentIdRef.current && prevAgentIdRef.current !== activeAgentId) {
+      chat.clearTemporaryMessages(prevAgentIdRef.current);
+      chat.resetLoading();
+    }
+    prevAgentIdRef.current = activeAgentId;
+  }, [activeAgentId, chat]);
 
   // Загружаем сообщения при переключении агента (логика теперь в useChat)
   useEffect(() => {
@@ -832,6 +846,41 @@ export default function App() {
     );
   }
 
+  if (routing.routeState.isDocumentsOpen || window.location.hash === '#/documents') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <DocumentsPage
+          onClose={() => {
+            routing.setRouteState({ isDocumentsOpen: false });
+            routing.navigateTo('#/projects');
+          }}
+          documents={projectDocuments}
+          onRemoveFile={handleRemoveFile}
+          agents={agents}
+          project={projects.find(p => p.id === activeProjectId) || null}
+          onAgentClick={(agentId) => {
+            // Переключаемся на выбранного агента
+            setActiveAgentId(agentId);
+            routing.setRouteState({ isDocumentsOpen: false });
+            routing.navigateTo('#/projects');
+          }}
+          onOpenAgentSettings={(agentId) => {
+            // Этот обработчик больше не используется напрямую,
+            // но оставляем для обратной совместимости
+          }}
+          onDocumentUpdate={(updatedFile) => {
+            // Документы теперь управляются через хук useDocuments
+            // Обновление происходит автоматически при перезагрузке
+          }}
+          onShowConfirm={showConfirm}
+          onShowAlert={showAlert}
+          currentUser={currentUser}
+          onFileUpload={() => setIsFileUploadOpen(true)}
+        />
+      </Suspense>
+    );
+  }
+
   // Render Auth or Loader
   const authOrLoader = renderAuthOrLoader();
   if (authOrLoader) return authOrLoader;
@@ -849,7 +898,10 @@ export default function App() {
         onEditProject={handleEditProject}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
-        onOpenDocs={() => setIsDocsOpen(true)}
+        onOpenDocs={() => {
+          routing.navigateTo('#/documents');
+          routing.setRouteState({ isDocumentsOpen: true });
+        }}
         onGenerateSummary={handleGenerateSummary}
         isGeneratingSummary={documents.isGeneratingSummary}
         summarySuccess={documents.summarySuccess}
@@ -877,54 +929,15 @@ export default function App() {
               console.error('[App] handleSendMessage is undefined when passing to WorkspacePage');
             })}
             onClearChat={handleClearChat}
-            onOpenAdmin={() => {
+            onOpenAdmin={(agentId) => {
               routing.navigateTo('#/admin');
-              routing.setRouteState({ adminInitialAgentId: activeAgentId || undefined, isAdminOpen: true });
+              routing.setRouteState({ adminInitialAgentId: agentId || activeAgentId || undefined, isAdminOpen: true });
             }}
             onSelectAgent={setActiveAgentId}
           />
         )}
       </main>
 
-      {isDocsOpen && (
-        <Suspense fallback={
-          <div className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
-                <Bot size={64} className="relative mx-auto animate-bounce" />
-              </div>
-              <p className="text-white/60">Загрузка документов...</p>
-            </div>
-          </div>
-        }>
-          <ProjectDocumentsModal
-            isOpen={isDocsOpen}
-            onClose={() => setIsDocsOpen(false)}
-            documents={projectDocuments}
-            onRemoveFile={handleRemoveFile}
-            agents={agents}
-            project={projects.find(p => p.id === activeProjectId) || null}
-            onAgentClick={(agentId) => {
-              // Переключаемся на выбранного агента
-              setActiveAgentId(agentId);
-              setIsDocsOpen(false);
-            }}
-            onOpenAgentSettings={(agentId) => {
-              // Этот обработчик больше не используется напрямую в модальном окне,
-              // но оставляем для обратной совместимости
-            }}
-            onDocumentUpdate={(updatedFile) => {
-              // Документы теперь управляются через хук useDocuments
-              // Обновление происходит автоматически при перезагрузке
-            }}
-            onShowConfirm={showConfirm}
-            onShowAlert={showAlert}
-            currentUser={currentUser}
-            onFileUpload={() => setIsFileUploadOpen(true)}
-          />
-        </Suspense>
-      )}
 
       {isFileUploadOpen && (
         <Suspense fallback={<ModalLoadingFallback />}>

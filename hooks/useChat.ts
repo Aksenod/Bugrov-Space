@@ -43,6 +43,21 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
       };
     }
 
+    case 'CLEAR_TEMPORARY_MESSAGES': {
+      const currentMessages = state.chatHistories[action.payload.agentId] ?? [];
+      // Фильтруем временные loading-сообщения (isStreaming: true и пустой текст)
+      const filteredMessages = currentMessages.filter(
+        (msg) => !(msg.isStreaming && msg.text.length === 0)
+      );
+      return {
+        ...state,
+        chatHistories: {
+          ...state.chatHistories,
+          [action.payload.agentId]: filteredMessages,
+        },
+      };
+    }
+
     case 'SET_LOADING': {
       return {
         ...state,
@@ -119,11 +134,15 @@ export const useChat = (
 
       try {
         const { messages: apiMessages } = await getMessagesService(agentId, activeProjectId || undefined);
+        // Фильтруем временные loading-сообщения перед сохранением
+        const mappedMessages = apiMessages.map(mapMessage).filter(
+          (msg) => !(msg.isStreaming && msg.text.length === 0)
+        );
         dispatch({
           type: 'SET_MESSAGES',
           payload: {
             agentId,
-            messages: apiMessages.map(mapMessage),
+            messages: mappedMessages,
           },
         });
       } catch (error) {
@@ -250,12 +269,31 @@ export const useChat = (
     [activeAgentId, activeProjectId, state.loadedAgents]
   );
 
+  /**
+   * Очищает временные loading-сообщения для указанного агента
+   */
+  const clearTemporaryMessages = useCallback(
+    (agentId: string): void => {
+      dispatch({ type: 'CLEAR_TEMPORARY_MESSAGES', payload: { agentId } });
+    },
+    []
+  );
+
+  /**
+   * Сбрасывает глобальное состояние загрузки
+   */
+  const resetLoading = useCallback((): void => {
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, []);
+
   return {
     messages,
     isLoading: state.isLoading,
     sendMessage,
     clearChat,
     ensureMessagesLoaded,
+    clearTemporaryMessages,
+    resetLoading,
     loadedAgents: state.loadedAgents,
     // Внутренние методы для использования в bootstrap и других местах
     chatHistories: state.chatHistories,

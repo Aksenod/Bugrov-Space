@@ -67,6 +67,8 @@ export interface UseChatReturn {
   sendMessage: (text: string) => Promise<void>;
   clearChat: () => Promise<void>;
   ensureMessagesLoaded: (agentId: string) => Promise<void>;
+  clearTemporaryMessages: (agentId: string) => void;
+  resetLoading: () => void;
   loadedAgents: Set<string>;
   // Внутренние методы для использования в bootstrap
   chatHistories: Record<string, Message[]>;
@@ -180,6 +182,7 @@ export type ChatAction =
   | { type: 'SET_MESSAGES'; payload: { agentId: string; messages: Message[] } }
   | { type: 'ADD_MESSAGE'; payload: { agentId: string; message: Message } }
   | { type: 'CLEAR_MESSAGES'; payload: { agentId: string } }
+  | { type: 'CLEAR_TEMPORARY_MESSAGES'; payload: { agentId: string } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'MARK_LOADED'; payload: string }
   | { type: 'CLEAR_LOADED'; payload: string }

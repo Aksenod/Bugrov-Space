@@ -44,16 +44,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
 
             {/* H1 - главное сообщение */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
-              Прототип<br />
-              с{' '}
+              Прототип с{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
                 продающими
-              </span>
-              <br />
+              </span>{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
                 текстами
-              </span>
-              <br />
+              </span>{' '}
               за 30 минут
             </h1>
 

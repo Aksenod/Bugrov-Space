@@ -12,6 +12,7 @@ export interface RouteState {
   isOfferOpen: boolean;
   isPrivacyOpen: boolean;
   isRequisitesOpen: boolean;
+  isDocumentsOpen: boolean;
   prototypeHash: string | null;
   adminInitialAgentId: string | undefined;
 }
@@ -41,6 +42,7 @@ export const useRouting = (
     isOfferOpen: false,
     isPrivacyOpen: false,
     isRequisitesOpen: false,
+    isDocumentsOpen: false,
     prototypeHash: null,
     adminInitialAgentId: undefined,
   });
@@ -66,6 +68,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -76,6 +79,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
         isLandingOpen: !currentUser, // Показываем лендинг только если пользователь не авторизован
@@ -91,6 +95,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -103,6 +108,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -115,6 +121,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -128,6 +135,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -140,6 +148,7 @@ export const useRouting = (
         isAdminOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -152,6 +161,7 @@ export const useRouting = (
         isAdminOpen: false,
         isOfferOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -164,6 +174,20 @@ export const useRouting = (
         isAdminOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
+        isDocumentsOpen: false,
+        prototypeHash: null,
+        adminInitialAgentId: undefined,
+      });
+    } else if (hash === '#/documents') {
+      setRouteState({
+        isDocumentsOpen: true,
+        isLandingOpen: false,
+        isUltraLandingOpen: false,
+        isCreativeLandingOpen: false,
+        isAdminOpen: false,
+        isOfferOpen: false,
+        isPrivacyOpen: false,
+        isRequisitesOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -177,6 +201,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         prototypeHash: null,
         adminInitialAgentId: undefined,
       });
@@ -191,6 +216,7 @@ export const useRouting = (
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
+        isDocumentsOpen: false,
         adminInitialAgentId: undefined,
       });
     }

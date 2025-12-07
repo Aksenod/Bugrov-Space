@@ -18,7 +18,7 @@ interface WorkspacePageProps {
   onSidebarToggle: () => void;
   onSendMessage: (text: string) => Promise<void>;
   onClearChat: () => Promise<void>;
-  onOpenAdmin: () => void;
+  onOpenAdmin: (agentId?: string | null) => void;
   onSelectAgent: (agentId: string) => void;
 }
 

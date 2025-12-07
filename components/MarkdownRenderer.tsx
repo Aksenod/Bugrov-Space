@@ -141,8 +141,128 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
     return Math.abs(hash).toString(36);
   };
 
+  // Преобразует текст с тире в markdown список для лучшей читаемости
+  const normalizeListContent = (text: string): string => {
+    const lines = text.split('\n');
+    const normalizedLines: string[] = [];
+    let inList = false;
+    let inTable = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+      
+      // Проверяем, является ли строка разделителем таблицы (--- или :---: и т.д.)
+      const isTableSeparator = /^[\s|:\-]+$/.test(trimmedLine) && trimmedLine.includes('|');
+      
+      // Проверяем, является ли строка частью таблицы (содержит разделители |)
+      const isTableRow = trimmedLine.includes('|') && trimmedLine.split('|').length >= 2;
+      
+      // Если это разделитель таблицы, мы точно в таблице
+      if (isTableSeparator) {
+        inTable = true;
+        normalizedLines.push(line);
+        continue;
+      }
+      
+      // Если это строка таблицы, проверяем контекст
+      if (isTableRow) {
+        // Проверяем, была ли предыдущая строка частью таблицы или разделителем
+        const prevLine = i > 0 ? lines[i - 1].trim() : '';
+        const prevIsTableRow = prevLine.includes('|') && prevLine.split('|').length >= 2;
+        const prevIsSeparator = /^[\s|:\-]+$/.test(prevLine) && prevLine.includes('|');
+        
+        // Если предыдущая строка была частью таблицы или разделителем, продолжаем таблицу
+        if (prevIsTableRow || prevIsSeparator || inTable) {
+          inTable = true;
+          normalizedLines.push(line);
+          continue;
+        }
+        
+        // Проверяем следующую строку - если это разделитель, начинаем таблицу
+        const nextLine = i < lines.length - 1 ? lines[i + 1].trim() : '';
+        const nextIsSeparator = /^[\s|:\-]+$/.test(nextLine) && nextLine.includes('|');
+        if (nextIsSeparator) {
+          inTable = true;
+          normalizedLines.push(line);
+          continue;
+        }
+      }
+      
+      // Если мы были в таблице и встретили строку без | (не разделитель), выходим из таблицы
+      // Пустая строка также завершает таблицу
+      if (inTable && !isTableRow) {
+        inTable = false;
+      }
+      
+      // Если мы в таблице, не обрабатываем строку как список
+      if (inTable) {
+        normalizedLines.push(line);
+        continue;
+      }
+      
+      // Обрабатываем однострочные списки (тире + пробел + текст + (пробел + тире + пробел + текст)*)
+      // Но только если строка не является частью таблицы
+      const singleLineListPattern = /[—–-]\s+[^—–-]+(?:\s+[—–-]\s+[^—–-]+)+/;
+      if (singleLineListPattern.test(trimmedLine)) {
+        const parts = trimmedLine.split(/\s+[—–-]\s+/);
+        const listItems = parts
+          .map(part => part.trim())
+          .filter(part => part.length > 0)
+          .map(part => `- ${part}`)
+          .join('\n');
+        
+        // Добавляем пустую строку перед списком, если перед ним есть текст
+        if (i > 0 && normalizedLines[normalizedLines.length - 1]?.trim() !== '') {
+          normalizedLines.push('');
+        }
+        normalizedLines.push(listItems);
+        inList = true;
+        continue;
+      }
+      
+      // Проверяем, начинается ли строка с тире (—, –, или -) и пробела
+      const isListItem = /^[—–-]\s/.test(trimmedLine);
+      
+      if (isListItem) {
+        // Если это первый элемент списка и перед ним нет пустой строки, добавляем её
+        if (!inList && i > 0 && normalizedLines[normalizedLines.length - 1]?.trim() !== '') {
+          normalizedLines.push('');
+        }
+        
+        // Преобразуем тире в markdown формат списка
+        const listContent = trimmedLine.replace(/^[—–-]\s/, '- ');
+        normalizedLines.push(listContent);
+        inList = true;
+      } else {
+        // Если мы были в списке и встретили не-элемент списка
+        if (inList && trimmedLine !== '') {
+          // Добавляем пустую строку после списка
+          normalizedLines.push('');
+          inList = false;
+        }
+        normalizedLines.push(line);
+        if (trimmedLine === '') {
+          inList = false;
+        }
+      }
+    }
+
+    return normalizedLines.join('\n');
+  };
+
+  const normalizedContent = normalizeListContent(content);
+  
+  // Временное логирование для отладки
+  if (import.meta.env.DEV && content.includes('—')) {
+    console.log('[MarkdownRenderer] Original content:', JSON.stringify(content.substring(0, 200)));
+    console.log('[MarkdownRenderer] Normalized content:', JSON.stringify(normalizedContent.substring(0, 200)));
+    console.log('[MarkdownRenderer] Contains list markers:', normalizedContent.includes('- '));
+    console.log('[MarkdownRenderer] First 10 lines of normalized:', normalizedContent.split('\n').slice(0, 10));
+  }
+
   return (
-    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
+    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass}`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, overflowX: 'visible' }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -224,7 +344,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             return <ol style={{ counterReset: 'list-counter' }}>{children}</ol>;
           },
           li({ children }) {
-            return <li className="[counter-increment:list-counter]" style={{ display: 'list-item' }}>{children}</li>;
+            return (
+              <li 
+                className="[counter-increment:list-counter]"
+                style={{ display: 'list-item' }}
+              >
+                {children}
+              </li>
+            );
           },
           a({ href, children }) {
             return (
@@ -234,7 +361,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
             );
           },
           p({ children }) {
-            return <p data-markdown-p style={{ marginTop: 0, marginBottom: 0, lineHeight: '1.3' }} className="!mt-0 !mb-0 leading-[1.3]">{children}</p>;
+            return <p data-markdown-p style={{ marginTop: 0, marginBottom: '20px', lineHeight: '1.3' }} className="!mt-0 leading-[1.3]">{children}</p>;
           },
           h1({ children }) {
             return <h1>{children}</h1>;
@@ -256,10 +383,63 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           },
           hr() {
             return <hr style={{ marginTop: '1rem', marginBottom: '1rem' }} />;
+          },
+          table({ children }) {
+            return (
+              <div className="my-4">
+                <table 
+                  className="border-collapse" 
+                  style={{ 
+                    width: 'max-content',
+                    minWidth: '100%',
+                    tableLayout: 'auto'
+                  }}
+                >
+                  {children}
+                </table>
+              </div>
+            );
+          },
+          thead({ children }) {
+            return <thead>{children}</thead>;
+          },
+          tbody({ children }) {
+            return <tbody>{children}</tbody>;
+          },
+          tr({ children }) {
+            return <tr>{children}</tr>;
+          },
+          th({ children }) {
+            return (
+              <th 
+                className="border border-white/20 px-4 py-2 text-left font-semibold text-white max-w-[160px] md:max-w-[300px]" 
+                style={{ 
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
+                  lineHeight: '1.4'
+                }}
+              >
+                {children}
+              </th>
+            );
+          },
+          td({ children }) {
+            return (
+              <td 
+                className="border border-white/10 px-4 py-2 text-white/90 max-w-[160px] md:max-w-[300px]" 
+                style={{ 
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
+                  lineHeight: '1.4'
+                }}
+              >
+                {children}
+              </td>
+            );
           }
         }}
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   );

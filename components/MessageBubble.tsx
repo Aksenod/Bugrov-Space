@@ -43,10 +43,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
       )}
 
       <div
-        className={`relative max-w-[88%] md:max-w-[75%] px-5 py-4 backdrop-blur-xl border
+        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin
           ${
             isUser
-              ? 'bg-gradient-to-br from-indigo-600/90 via-indigo-600/80 to-blue-600/80 text-white rounded-[1.5rem] rounded-tr-sm border-white/30 shadow-lg shadow-indigo-500/20' 
+              ? 'bg-gradient-to-br from-indigo-600/90 via-indigo-600/80 to-blue-600/80 text-white rounded-[1.5rem] rounded-tr-sm border-white/30 shadow-lg shadow-indigo-500/20 max-w-[88%] md:max-w-[75%]' 
               : message.isError
                 ? 'bg-red-950/70 border-red-500/40 text-red-50 rounded-[1.5rem] rounded-tl-sm shadow-md shadow-red-500/10'
                 : isGenerating
@@ -54,6 +54,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   : 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50' 
           }
         `}
+        style={{ 
+          maxWidth: isUser ? undefined : 'none',
+          overflowX: 'auto',
+          overflowY: 'visible',
+          WebkitOverflowScrolling: 'touch'
+        }}
       >
         {isGenerating ? (
           <TypingIndicator />

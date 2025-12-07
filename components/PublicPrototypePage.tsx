@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -13,6 +13,10 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadPrototype = async () => {
@@ -33,13 +37,96 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
     loadPrototype();
   }, [prototypeHash, versionNumber]);
 
+  useEffect(() => {
+    if (!htmlContent) return;
+
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      console.log('[PublicPrototypePage] Wheel event:', { 
+        deltaY: e.deltaY, 
+        clientX: e.clientX, 
+        clientY: e.clientY 
+      });
+
+      // Проверяем, что событие происходит над iframe
+      const rect = iframe.getBoundingClientRect();
+      const isOverIframe = 
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
+
+      console.log('[PublicPrototypePage] Is over iframe:', isOverIframe, {
+        rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+        mouse: { x: e.clientX, y: e.clientY }
+      });
+
+      if (!isOverIframe) {
+        return;
+      }
+
+      const scrollingDown = e.deltaY > 0;
+      const scrollingUp = e.deltaY < 0;
+
+      console.log('[PublicPrototypePage] Scrolling:', { scrollingDown, scrollingUp });
+
+      // При скролле вниз - поднимаем хедер вверх на 100% его высоты
+      if (scrollingDown) {
+        console.log('[PublicPrototypePage] Hiding header');
+        setIsHeaderHidden(true);
+      } 
+      // При скролле вверх - возвращаем хедер на место
+      else if (scrollingUp) {
+        console.log('[PublicPrototypePage] Showing header');
+        setIsHeaderHidden(false);
+      }
+
+      // Программно скроллим iframe
+      if (iframe.contentWindow) {
+        try {
+          const currentScrollY = iframe.contentWindow.scrollY || iframe.contentWindow.pageYOffset || 0;
+          const currentScrollX = iframe.contentWindow.scrollX || iframe.contentWindow.pageXOffset || 0;
+          console.log('[PublicPrototypePage] Scrolling iframe:', { 
+            currentScrollY, 
+            currentScrollX, 
+            deltaY: e.deltaY, 
+            deltaX: e.deltaX 
+          });
+          iframe.contentWindow.scrollTo({
+            left: currentScrollX + e.deltaX,
+            top: currentScrollY + e.deltaY,
+            behavior: 'auto'
+          });
+        } catch (err) {
+          console.error('[PublicPrototypePage] Error scrolling iframe:', err);
+        }
+      } else {
+        console.log('[PublicPrototypePage] No contentWindow available');
+      }
+    };
+
+    // Отслеживаем wheel на window с capture фазой
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    
+    return () => {
+      window.removeEventListener('wheel', handleWheel, { capture: true } as EventListenerOptions);
+    };
+  }, [htmlContent]);
+
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col" data-prototype-container>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10">
-        <h1 className="text-white font-medium flex flex-col md:flex-row md:items-center md:gap-2">
-          <span>Просмотр прототипа{versionNumber !== undefined ? ` (Версия ${versionNumber})` : ''}</span>
-          {username && <span className="text-white/60 md:ml-2">• {username}</span>}
+      <div 
+        ref={headerRef}
+        className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-md border-b border-white/10 transition-transform duration-300 ease-in-out relative z-10"
+        style={{
+          transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)',
+        }}
+      >
+        <h1 className="text-white font-medium">
+          Просмотр прототипа
         </h1>
         <button
           onClick={() => window.open('https://bugrov.space', '_blank')}
@@ -54,7 +141,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4">
@@ -72,6 +159,7 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
           </div>
         ) : htmlContent ? (
           <iframe
+            ref={iframeRef}
             srcDoc={htmlContent}
             className="w-full h-full border-0"
             title="Prototype Preview"

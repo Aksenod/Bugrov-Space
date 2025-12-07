@@ -1,22 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown, ChevronLeft } from 'lucide-react';
-import { UploadedFile, Agent, Project, User } from '../../types';
-import { MarkdownRenderer } from '../MarkdownRenderer';
-import { api } from '../../services/api';
-import { useOnboarding } from '../OnboardingContext';
-import { DocumentsSidebar } from './DocumentsSidebar';
-import { SyntaxHighlighterWrapper } from './SyntaxHighlighterWrapper';
-import { useDocumentSelection } from '../../hooks/documents/useDocumentSelection';
-import { useDocumentTabs } from '../../hooks/documents/useDocumentTabs';
-import { useDocumentEditor } from '../../hooks/documents/useDocumentEditor';
-import { usePrototypeGeneration } from '../../hooks/documents/usePrototypeGeneration';
-import { usePrototypeVersions } from '../../hooks/documents/usePrototypeVersions';
-import { hasRole, getAgentName, formatDateTime } from '../../utils/documentHelpers';
-import { getPrototypeContent } from '../../utils/prototypeHelpers';
-import { getDocumentDisplayName, formatDocumentDateTime } from './helpers';
+import { UploadedFile, Agent, Project, User } from '../types';
+import { MarkdownRenderer } from './MarkdownRenderer';
+import { api } from '../services/api';
+import { useOnboarding } from './OnboardingContext';
+import { DocumentsSidebar } from './ProjectDocumentsModal/DocumentsSidebar';
+import { SyntaxHighlighterWrapper } from './ProjectDocumentsModal/SyntaxHighlighterWrapper';
+import { useDocumentSelection } from '../hooks/documents/useDocumentSelection';
+import { useDocumentTabs } from '../hooks/documents/useDocumentTabs';
+import { useDocumentEditor } from '../hooks/documents/useDocumentEditor';
+import { usePrototypeGeneration } from '../hooks/documents/usePrototypeGeneration';
+import { usePrototypeVersions } from '../hooks/documents/usePrototypeVersions';
+import { hasRole, getAgentName, formatDateTime } from '../utils/documentHelpers';
+import { getPrototypeContent } from '../utils/prototypeHelpers';
+import { getDocumentDisplayName, formatDocumentDateTime } from './ProjectDocumentsModal/helpers';
 
-interface ProjectDocumentsModalProps {
-  isOpen: boolean;
+interface DocumentsPageProps {
   onClose: () => void;
   documents: UploadedFile[];
   onRemoveFile?: (fileId: string) => void;
@@ -34,8 +33,7 @@ interface ProjectDocumentsModalProps {
   currentUser?: User | null;
 }
 
-export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
-  isOpen,
+export const DocumentsPage: React.FC<DocumentsPageProps> = ({
   onClose,
   documents,
   onRemoveFile,
@@ -60,14 +58,14 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     localSelectedFile,
     setLocalSelectedFile,
     selectedFile,
-  } = useDocumentSelection({ documents, isOpen });
+  } = useDocumentSelection({ documents, isOpen: true });
 
   const {
     activeTab,
     setActiveTab,
     prototypeSubTab,
     setPrototypeSubTab,
-  } = useDocumentTabs({ selectedFile, agents, isOpen });
+  } = useDocumentTabs({ selectedFile, agents, isOpen: true });
 
   const {
     isEditing,
@@ -88,7 +86,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     isLoadingVersions,
     isVersionDropdownOpen,
     setIsVersionDropdownOpen,
-  } = usePrototypeVersions({ selectedFileId, activeTab, documents, isOpen });
+  } = usePrototypeVersions({ selectedFileId, activeTab, documents, isOpen: true });
 
   const documentCreatorAgent = selectedFile?.agentId
     ? agents.find(agent => agent.id === selectedFile.agentId)
@@ -221,8 +219,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     );
   };
 
-  if (!isOpen) return null;
-
   return (
     <div
       className="fixed inset-0 z-50 bg-gradient-to-br from-black via-black to-indigo-950/20 flex flex-col overflow-hidden"
@@ -231,7 +227,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         <DocumentsSidebar
           documents={documents}
@@ -654,5 +649,4 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     </div>
   );
 };
-
 

@@ -14,7 +14,7 @@ interface WorkspaceHeaderProps {
   activeAgentId: string | null;
   onSidebarToggle: () => void;
   onClearChat: () => Promise<void>;
-  onOpenAdmin: () => void;
+  onOpenAdmin: (agentId?: string | null) => void;
 }
 
 export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
@@ -69,7 +69,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
         {isAdmin && (
           <button
-            onClick={onOpenAdmin}
+            onClick={() => onOpenAdmin(activeAgentId)}
             className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/70 focus:ring-offset-2 focus:ring-offset-black min-w-[44px] min-h-[44px] flex items-center justify-center hover:shadow-sm hover:bg-white/15"
             title="Настройки агентов"
           >

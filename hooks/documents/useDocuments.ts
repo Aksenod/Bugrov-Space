@@ -28,6 +28,8 @@ export const useDocuments = (
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summarySuccess, setSummarySuccess] = useState(false);
   const loadedSummaryRef = useRef(new Set<string>());
+  const isLoadingRef = useRef(false);
+  const lastLoadedProjectRef = useRef<string | null>(null);
 
   /**
    * Загружает документы проекта
@@ -36,10 +38,27 @@ export const useDocuments = (
     async (): Promise<void> => {
       if (!activeAgentId || !activeProjectId) return;
 
-      // Документы проекта общие для всех агентов - загружаем с ключом 'all'
-      const PROJECT_DOCS_KEY = 'all';
+      // Документы проекта общие для всех агентов - используем ключ с projectId
+      const PROJECT_DOCS_KEY = `${activeProjectId}:all`;
+
+      // Проверяем, не загружается ли уже
+      if (isLoadingRef.current) {
+        if (import.meta.env.DEV) {
+          console.log(`[Frontend] Documents already loading, skipping...`);
+        }
+        return;
+      }
+
+      // Проверяем кеш - если уже загружено для этого проекта, пропускаем
+      if (loadedSummaryRef.current.has(PROJECT_DOCS_KEY)) {
+        if (import.meta.env.DEV) {
+          console.log(`[Frontend] Documents already loaded for project ${activeProjectId}, skipping...`);
+        }
+        return;
+      }
 
       // Помечаем как загружаемый
+      isLoadingRef.current = true;
       loadedSummaryRef.current.add(PROJECT_DOCS_KEY);
 
       try {
@@ -52,6 +71,7 @@ export const useDocuments = (
         }
         const mapped = files.map(mapFile);
         setDocuments(mapped);
+        lastLoadedProjectRef.current = activeProjectId;
       } catch (error: any) {
         // Если 404 - просто нет файлов, это нормально
         if (error?.status === 404 || error?.message?.includes('404') || error?.message?.includes('Not Found')) {
@@ -59,12 +79,15 @@ export const useDocuments = (
             console.log(`[Frontend] No project documents found (404 is normal if no files exist)`);
           }
           setDocuments([]);
+          lastLoadedProjectRef.current = activeProjectId;
           return;
         }
         // Для других ошибок убираем из кеша, чтобы можно было повторить
         loadedSummaryRef.current.delete(PROJECT_DOCS_KEY);
         console.error('[Frontend] Failed to load project documents:', error);
         throw error;
+      } finally {
+        isLoadingRef.current = false;
       }
     },
     [activeAgentId, activeProjectId]
@@ -100,7 +123,9 @@ export const useDocuments = (
         // Добавляем созданный файл в документы
         setDocuments((prev) => [uploaded, ...prev]);
         // Очищаем кеш загрузки, чтобы при следующем переключении файлы перезагрузились
-        loadedSummaryRef.current.delete('all');
+        if (activeProjectId) {
+          loadedSummaryRef.current.delete(`${activeProjectId}:all`);
+        }
         setSummarySuccess(true);
         setTimeout(() => setSummarySuccess(false), 3000);
       } catch (error: any) {
@@ -132,7 +157,9 @@ export const useDocuments = (
       });
 
       // Перезагружаем документы
-      loadedSummaryRef.current.delete('all');
+      if (activeProjectId) {
+        loadedSummaryRef.current.delete(`${activeProjectId}:all`);
+      }
       await ensureSummaryLoaded();
     },
     [activeProjectId, ensureSummaryLoaded]
@@ -155,7 +182,7 @@ export const useDocuments = (
       try {
         const uploadPromises = Array.from(files).map(async (file) => {
           const base64Content = await readFileToBase64(file);
-          return api.uploadProjectFile(activeProjectId, {
+          return uploadProjectFileService(activeProjectId, {
             name: file.name,
             mimeType: file.type || 'application/octet-stream',
             content: base64Content,
@@ -165,7 +192,9 @@ export const useDocuments = (
         await Promise.all(uploadPromises);
 
         // Перезагружаем документы
-        loadedSummaryRef.current.delete('all');
+        if (activeProjectId) {
+          loadedSummaryRef.current.delete(`${activeProjectId}:all`);
+        }
         await ensureSummaryLoaded();
       } finally {
         setIsLoading(false);
@@ -218,7 +247,9 @@ export const useDocuments = (
         }
 
         // Перезагружаем документы
-        loadedSummaryRef.current.delete('all');
+        if (activeProjectId) {
+          loadedSummaryRef.current.delete(`${activeProjectId}:all`);
+        }
         await ensureSummaryLoaded();
       } catch (error: any) {
         console.error('[Frontend] Failed to remove file:', error);
@@ -228,23 +259,33 @@ export const useDocuments = (
     [activeProjectId, documents, ensureSummaryLoaded]
   );
 
-  // Автоматически загружаем документы при переключении агента
+  // Автоматически загружаем документы при переключении агента или проекта
   useEffect(() => {
-    if (isBootstrapping || !activeAgentId) {
+    if (isBootstrapping || !activeAgentId || !activeProjectId) {
       return;
     }
 
-    // Сбрасываем кеш и загружаем документы с небольшой задержкой
+    // Проверяем, изменился ли проект - если да, сбрасываем кеш
+    const PROJECT_DOCS_KEY = `${activeProjectId}:all`;
+    const projectChanged = lastLoadedProjectRef.current !== activeProjectId;
+    
+    if (projectChanged) {
+      // Очищаем весь кеш при смене проекта
+      loadedSummaryRef.current.clear();
+      lastLoadedProjectRef.current = null;
+    }
+
+    // Загружаем документы с небольшой задержкой
     const timer = setTimeout(() => {
-      loadedSummaryRef.current.delete('all');
       if (import.meta.env.DEV) {
-        console.log(`[Frontend] useEffect: Переключение на агента ${activeAgentId}, сброс кеша и загрузка документов`);
+        console.log(`[Frontend] useEffect: Переключение на агента ${activeAgentId}, проект ${activeProjectId}, загрузка документов`);
       }
       ensureSummaryLoaded();
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [isBootstrapping, activeAgentId, ensureSummaryLoaded]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBootstrapping, activeAgentId, activeProjectId]);
 
   return {
     documents,
