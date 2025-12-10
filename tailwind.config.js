@@ -25,6 +25,7 @@ export default {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'spin-slow': 'spin 20s linear infinite',
         'gradient-x': 'gradient-x 3s ease infinite',
+        'gradient': 'gradient 3s ease infinite',
       },
       keyframes: {
         blob: {
@@ -45,6 +46,16 @@ export default {
           '50%': {
             'background-size': '200% 200%',
             'background-position': 'right center'
+          },
+        },
+        'gradient': {
+          '0%, 100%': {
+            'background-size': '200% 100%',
+            'background-position': '0% 50%'
+          },
+          '50%': {
+            'background-size': '200% 100%',
+            'background-position': '100% 50%'
           },
         }
       },

@@ -1,7 +1,12 @@
 import React from 'react';
-import { Layout, Share2, Smartphone, Plus } from 'lucide-react';
+import { Layout, Share2, Smartphone, Plus, Eye } from 'lucide-react';
+import { EXAMPLE_PROTOTYPE_URL } from '../../utils/constants';
 
 export const AgentChainsSection: React.FC = () => {
+  const handleViewExample = () => {
+    window.location.hash = EXAMPLE_PROTOTYPE_URL;
+  };
+
   const scenarios = [
     {
       icon: Layout,
@@ -102,11 +107,23 @@ export const AgentChainsSection: React.FC = () => {
                       {scenario.result}
                     </p>
                     
-                    {/* Agent count */}
-                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 ${colors.iconBg} border ${colors.iconBorder} rounded-lg`}>
-                      <span className={`text-sm font-bold ${colors.iconColor}`}>
-                        {scenario.agentCount}
-                      </span>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* Agent count */}
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 ${colors.iconBg} border ${colors.iconBorder} rounded-lg`}>
+                        <span className={`text-sm font-bold ${colors.iconColor}`}>
+                          {scenario.agentCount}
+                        </span>
+                      </div>
+                      {/* Example button - только для первого сценария */}
+                      {index === 0 && (
+                        <button
+                          onClick={handleViewExample}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-lg hover:from-indigo-500/30 hover:to-purple-500/30 transition-all text-sm font-semibold text-indigo-300 hover:text-indigo-200"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Пример
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

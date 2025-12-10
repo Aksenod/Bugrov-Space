@@ -36,3 +36,8 @@ export const CURRENT_PRICE = 1000; // Текущая бета-цена
 export const FUTURE_PRICE = 3000; // Будущая цена после бета
 export const IS_BETA_PRICING = true; // Флаг бета-цены
 
+/**
+ * Ссылка на пример проекта
+ */
+export const EXAMPLE_PROTOTYPE_URL = '#/prototype/cmivnirkd001td3tc5rc51ju4?v=1';
+

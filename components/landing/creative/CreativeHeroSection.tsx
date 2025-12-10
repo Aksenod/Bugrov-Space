@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Sparkles, Zap } from 'lucide-react';
+import { EXAMPLE_PROTOTYPE_URL } from '../../../utils/constants';
 
 interface CreativeHeroSectionProps {
     isAuthenticated?: boolean;
@@ -7,6 +8,9 @@ interface CreativeHeroSectionProps {
 }
 
 export const CreativeHeroSection: React.FC<CreativeHeroSectionProps> = ({ isAuthenticated, onOpenPayment }) => {
+    const handleViewExample = () => {
+        window.location.hash = EXAMPLE_PROTOTYPE_URL;
+    };
     return (
         <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
             {/* Dynamic Background Elements */}
@@ -45,7 +49,10 @@ export const CreativeHeroSection: React.FC<CreativeHeroSectionProps> = ({ isAuth
                         </span>
                     </button>
 
-                    <button className="px-8 py-4 rounded-full font-bold text-lg text-white border border-white/20 hover:bg-white/5 transition-colors flex items-center gap-2">
+                    <button 
+                        onClick={handleViewExample}
+                        className="px-8 py-4 rounded-full font-bold text-lg text-white border border-white/20 hover:bg-white/5 transition-colors flex items-center gap-2"
+                    >
                         <Zap className="w-5 h-5 text-yellow-400" />
                         View Demo
                     </button>

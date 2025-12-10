@@ -1,6 +1,6 @@
 import React from 'react';
-import { Zap, Users } from 'lucide-react';
-import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING } from '../../utils/constants';
+import { Zap, Users, Eye } from 'lucide-react';
+import { CURRENT_PRICE, FUTURE_PRICE, IS_BETA_PRICING, EXAMPLE_PROTOTYPE_URL } from '../../utils/constants';
 import { VKVideoEmbed } from './VKVideoEmbed';
 
 interface HeroSectionProps {
@@ -11,6 +11,10 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpenPayment }) => {
   const handleBuyClick = () => {
     onOpenPayment();
+  };
+
+  const handleViewExample = () => {
+    window.location.hash = EXAMPLE_PROTOTYPE_URL;
   };
 
   return (
@@ -48,27 +52,39 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ isAuthenticated, onOpe
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
-              {/* Primary CTA */}
-              <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-4 pt-2">
+              {/* Button group */}
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                {/* Primary CTA */}
                 <button
                   onClick={handleBuyClick}
-                  className="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
+                  className="flex-1 px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black"
                 >
-                  Подключить — {CURRENT_PRICE} ₽/мес
+                  Подключить
                 </button>
-                <div className="flex flex-col items-center gap-1">
-                  {IS_BETA_PRICING && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-white/90 font-semibold">{CURRENT_PRICE} ₽</span>
-                      <span className="text-white/40 line-through">{FUTURE_PRICE} ₽</span>
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs font-semibold border border-amber-500/30">
-                        Бета-цена
-                      </span>
-                    </div>
-                  )}
-                  <span className="text-sm text-white/60 text-center">Отмена в любой момент</span>
-                </div>
+                
+                {/* Secondary CTA */}
+                <button
+                  onClick={handleViewExample}
+                  className="flex-1 px-8 py-4 bg-transparent text-white rounded-full font-semibold text-lg border-2 border-white/30 hover:border-white/50 hover:bg-white/5 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black flex items-center justify-center gap-2"
+                >
+                  <Eye className="w-5 h-5 flex-shrink-0" />
+                  <span className="whitespace-nowrap">Посмотреть пример</span>
+                </button>
+              </div>
+              
+              {/* Pricing info */}
+              <div className="flex flex-col items-center gap-1">
+                {IS_BETA_PRICING && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-white/90 font-semibold">{CURRENT_PRICE} ₽</span>
+                    <span className="text-white/40 line-through">{FUTURE_PRICE} ₽</span>
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs font-semibold border border-amber-500/30">
+                      Бета-цена
+                    </span>
+                  </div>
+                )}
+                <span className="text-sm text-white/60 text-center">Отмена в любой момент</span>
               </div>
             </div>
 
