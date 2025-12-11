@@ -928,6 +928,7 @@ export default function App() {
             onSendMessage={handleSendMessage || (async () => {
               console.error('[App] handleSendMessage is undefined when passing to WorkspacePage');
             })}
+            onCancelMessage={chat.cancelMessage}
             onClearChat={handleClearChat}
             onOpenAdmin={(agentId) => {
               routing.navigateTo('#/admin');

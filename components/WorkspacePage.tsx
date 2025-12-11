@@ -17,6 +17,7 @@ interface WorkspacePageProps {
   activeAgentId: string | null;
   onSidebarToggle: () => void;
   onSendMessage: (text: string) => Promise<void>;
+  onCancelMessage?: () => void;
   onClearChat: () => Promise<void>;
   onOpenAdmin: (agentId?: string | null) => void;
   onSelectAgent: (agentId: string) => void;
@@ -31,6 +32,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
   activeAgentId,
   onSidebarToggle,
   onSendMessage,
+  onCancelMessage,
   onClearChat,
   onOpenAdmin,
   onSelectAgent,
@@ -56,7 +58,12 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
         onSendMessage={onSendMessage}
       />
       <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
-        <ChatInput onSend={onSendMessage} disabled={isLoading || !activeAgent} />
+        <ChatInput
+          onSend={onSendMessage}
+          disabled={isLoading || !activeAgent}
+          isLoading={isLoading}
+          onCancel={onCancelMessage}
+        />
       </div>
     </>
   );

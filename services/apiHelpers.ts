@@ -161,19 +161,27 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   // Для запросов к агентам и генерации прототипа НЕ используем AbortController - позволяем запросу продолжаться
   // даже если он превышает таймаут, так как сервер может все равно вернуть ответ
   // Для обычных запросов используем таймаут с отменой
+  // Если signal уже передан в init (например, для отмены запросов к агентам), используем его
   let controller: AbortController | null = null;
   let timeoutId: NodeJS.Timeout | null = null;
+  const providedSignal = init.signal;
 
   if (!isOpenAiRequest && !isPrototypeGeneration) {
-    controller = new AbortController();
-    timeoutId = setTimeout(() => controller!.abort(), timeout);
+    // Для обычных запросов создаем controller, если signal не передан
+    if (!providedSignal) {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => controller!.abort(), timeout);
+    }
   }
+
+  // Используем переданный signal, если он есть, иначе используем controller
+  const signalToUse = providedSignal || controller?.signal;
 
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers: getHeaders(init.headers as Record<string, string>),
-      signal: controller?.signal,
+      signal: signalToUse,
     });
 
     if (timeoutId) {
@@ -255,6 +263,13 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     }
 
     // Обработка ошибки таймаута
+    // Если это AbortError от переданного signal (отмена пользователем), пробрасываем как есть
+    if (error.name === 'AbortError' && providedSignal) {
+      // Это отмена пользователем, пробрасываем ошибку как есть
+      throw error;
+    }
+    
+    // Если это AbortError от таймаута обычного запроса
     if (error.name === 'AbortError' || (controller && controller.signal.aborted)) {
       const timeoutSeconds = Math.ceil(timeout / 1000);
       const timeoutError = new Error(`Запрос превысил время ожидания (${timeoutSeconds} секунд). Сервер может быть перегружен или недоступен.`) as Error & { status?: number; isTimeout?: boolean };

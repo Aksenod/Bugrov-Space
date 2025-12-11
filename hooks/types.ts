@@ -65,6 +65,7 @@ export interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
   sendMessage: (text: string) => Promise<void>;
+  cancelMessage: () => void;
   clearChat: () => Promise<void>;
   ensureMessagesLoaded: (agentId: string) => Promise<void>;
   clearTemporaryMessages: (agentId: string) => void;

@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SendHorizontal, Sparkles } from 'lucide-react';
+import { SendHorizontal, Sparkles, X } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
   disabled: boolean;
+  isLoading?: boolean;
+  onCancel?: () => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoading = false, onCancel }) => {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isAdjustingRef = useRef(false);
@@ -170,17 +172,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
           }}
         />
         <div className="pr-1.5 flex-shrink-0 flex items-center">
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || disabled}
-            className={`p-2.5 rounded-full transition-all duration-300 ease-out will-change-transform ${
-              !input.trim() || disabled
-                ? 'bg-white/5 text-white/20 cursor-not-allowed'
-                : 'bg-white text-black hover:bg-indigo-50 shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]'
-            }`}
-          >
-            <SendHorizontal size={18} className={!input.trim() ? "" : "ml-0.5"} />
-          </button>
+          {isLoading && onCancel ? (
+            <button
+              onClick={onCancel}
+              className="p-2.5 rounded-full transition-all duration-300 ease-out will-change-transform bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] border border-red-500/30"
+              title="Остановить генерацию"
+            >
+              <X size={18} />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || disabled}
+              className={`p-2.5 rounded-full transition-all duration-300 ease-out will-change-transform ${
+                !input.trim() || disabled
+                  ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                  : 'bg-white text-black hover:bg-indigo-50 shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]'
+              }`}
+            >
+              <SendHorizontal size={18} className={!input.trim() ? "" : "ml-0.5"} />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -16,12 +16,13 @@ export const getMessages = async (agentId: string, projectId?: string) => {
 /**
  * Отправка сообщения агенту
  */
-export const sendMessage = async (agentId: string, text: string, projectId?: string) => {
+export const sendMessage = async (agentId: string, text: string, projectId?: string, signal?: AbortSignal) => {
   return request<{ messages: ApiMessage[]; agentId?: string; templateId?: string }>(
     `/agents/${agentId}/messages`,
     {
       method: 'POST',
       body: JSON.stringify({ text, projectId }),
+      signal,
     }
   );
 };

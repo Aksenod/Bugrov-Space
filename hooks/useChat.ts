@@ -2,7 +2,7 @@
  * Хук для управления чатом (сообщениями)
  */
 
-import { useReducer, useCallback, useMemo, useRef } from 'react';
+import { useReducer, useCallback, useMemo, useRef, useEffect } from 'react';
 import { getMessages as getMessagesService, sendMessage as sendMessageService, clearMessages as clearMessagesService } from '../services/messageService';
 import { mapMessage } from '../utils/mappers';
 import { UseChatReturn, ChatState, ChatAction } from './types';
@@ -115,6 +115,19 @@ export const useChat = (
     loadedAgents: new Set<string>(),
   });
 
+  // Ref для хранения текущего AbortController
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Очистка при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
   // Вычисляем сообщения текущего агента
   const messages = useMemo((): Message[] => {
     if (!activeAgentId) return [];
@@ -166,6 +179,15 @@ export const useChat = (
         throw new Error('Не выбран активный проект');
       }
 
+      // Отменяем предыдущий запрос, если он есть
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Создаем новый AbortController для этого запроса
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       dispatch({ type: 'SET_LOADING', payload: true });
 
       const trimmedText = text.trim();
@@ -192,7 +214,13 @@ export const useChat = (
       dispatch({ type: 'ADD_MESSAGE', payload: { agentId: activeAgentId, message: loadingMessage } });
 
       try {
-        const response = await sendMessageService(activeAgentId, trimmedText, activeProjectId);
+        const response = await sendMessageService(activeAgentId, trimmedText, activeProjectId, abortController.signal);
+        
+        // Проверяем, не был ли запрос отменен
+        if (abortController.signal.aborted) {
+          return;
+        }
+
         const newMessages = response.messages.map(mapMessage);
 
         // Удаляем временные сообщения и добавляем реальные
@@ -210,6 +238,22 @@ export const useChat = (
 
         dispatch({ type: 'MARK_LOADED', payload: activeAgentId });
       } catch (error: any) {
+        // Если запрос был отменен пользователем, не показываем ошибку
+        if (error.name === 'AbortError' || abortController.signal.aborted) {
+          // Удаляем временные сообщения
+          const currentMessages = (state.chatHistories[activeAgentId] ?? []).filter(
+            (msg) => msg.id !== tempUserMessageId && msg.id !== loadingMessageId
+          );
+          dispatch({
+            type: 'SET_MESSAGES',
+            payload: {
+              agentId: activeAgentId,
+              messages: currentMessages,
+            },
+          });
+          return;
+        }
+
         console.error('Chat error', error);
 
         const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
@@ -243,6 +287,10 @@ export const useChat = (
           },
         });
       } finally {
+        // Очищаем ref только если это был текущий запрос
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
@@ -280,6 +328,24 @@ export const useChat = (
   );
 
   /**
+   * Отменяет текущий запрос к агенту
+   */
+  const cancelMessage = useCallback((): void => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Очищаем состояние загрузки
+    dispatch({ type: 'SET_LOADING', payload: false });
+
+    // Удаляем временные сообщения для текущего агента
+    if (activeAgentId) {
+      dispatch({ type: 'CLEAR_TEMPORARY_MESSAGES', payload: { agentId: activeAgentId } });
+    }
+  }, [activeAgentId]);
+
+  /**
    * Сбрасывает глобальное состояние загрузки
    */
   const resetLoading = useCallback((): void => {
@@ -290,6 +356,7 @@ export const useChat = (
     messages,
     isLoading: state.isLoading,
     sendMessage,
+    cancelMessage,
     clearChat,
     ensureMessagesLoaded,
     clearTemporaryMessages,
