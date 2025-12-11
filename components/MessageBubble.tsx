@@ -158,11 +158,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           WebkitOverflowScrolling: 'touch'
         }}
       >
-        {isCopyToastVisible && (
-          <div className="absolute -top-4 right-3 z-30 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-white/80 shadow-lg shadow-indigo-500/30 backdrop-blur-md">
-            Скопировано
-          </div>
-        )}
         {isGenerating ? (
           <TypingIndicator />
         ) : (
@@ -177,7 +172,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
               <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(129,140,248,0.9)]" />
             )}
             {(canCopy || canDelete) && (
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex items-center gap-2 relative">
+                {isCopyToastVisible && (
+                  <div className="absolute -top-8 right-0 z-30 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-white/80 shadow-lg shadow-indigo-500/30 backdrop-blur-md">
+                    Скопировано
+                  </div>
+                )}
                 {deleteCountdown !== null && (
                   <span className="text-[11px] font-semibold text-red-200">
                     {`Удаление через ${deleteCountdown}s`}
@@ -188,7 +188,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                     type="button"
                     aria-label="Скопировать сообщение"
                     onClick={handleCopy}
-                    className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 opacity-70 transition-all hover:bg-white/15 hover:text-white hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30"
+                    className="flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/10 text-white/60 opacity-70 shadow-inner shadow-black/20 transition-all hover:bg-white/10 hover:text-white hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30 active:translate-y-px"
                   >
                     <Copy size={14} />
                   </button>
