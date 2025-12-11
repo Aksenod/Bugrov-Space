@@ -571,6 +571,28 @@ export default function App() {
     }
   }, [documents, showAlert]);
 
+  const renderGlobalDialogs = () => (
+    <>
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={closeAlert}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        variant={alertDialog.variant}
+        duration={alertDialog.duration ?? 3000}
+      />
+    </>
+  );
+
   const renderAuthOrLoader = () => {
     if (authToken && bootstrap.isBootstrapping) {
       return (
@@ -766,22 +788,25 @@ export default function App() {
   // Ultra creative landing page check
   if (routing.routeState.isUltraLandingOpen || currentHash === '#/ultra') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <UltraCreativeLandingPage
-          isAuthenticated={!!currentUser}
-          username={currentUser?.username}
-          onOpenPayment={() => setIsPaymentModalOpen(true)}
-          onOpenCabinet={() => {
-            window.location.hash = '#/projects';
-          }}
-          onLogout={handleLogoutWithCleanup}
-        />
-        <PaymentModal
-          isOpen={isPaymentModalOpen}
-          onClose={() => setIsPaymentModalOpen(false)}
-          token={authToken || ''}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <UltraCreativeLandingPage
+            isAuthenticated={!!currentUser}
+            username={currentUser?.username}
+            onOpenPayment={() => setIsPaymentModalOpen(true)}
+            onOpenCabinet={() => {
+              window.location.hash = '#/projects';
+            }}
+            onLogout={handleLogoutWithCleanup}
+          />
+          <PaymentModal
+            isOpen={isPaymentModalOpen}
+            onClose={() => setIsPaymentModalOpen(false)}
+            token={authToken || ''}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
@@ -789,60 +814,72 @@ export default function App() {
 
   if (routing.routeState.isAdminOpen || window.location.hash === '#/admin') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <AdminPage
-          onClose={() => {
-            routing.setRouteState({ isAdminOpen: false, adminInitialAgentId: undefined });
-            // Устанавливаем hash в #/projects, чтобы вернуться на страницу проектов
-            if (window.location.hash === '#/admin') {
-              routing.navigateTo('#/projects');
-            }
-            // Перезагружаем агентов после закрытия AdminPage, чтобы обновить порядок
-            reloadAgents();
-          }}
-          initialAgentId={routing.routeState.adminInitialAgentId}
-          onAgentUpdated={reloadAgents}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <AdminPage
+            onClose={() => {
+              routing.setRouteState({ isAdminOpen: false, adminInitialAgentId: undefined });
+              // Устанавливаем hash в #/projects, чтобы вернуться на страницу проектов
+              if (window.location.hash === '#/admin') {
+                routing.navigateTo('#/projects');
+              }
+              // Перезагружаем агентов после закрытия AdminPage, чтобы обновить порядок
+              reloadAgents();
+            }}
+            initialAgentId={routing.routeState.adminInitialAgentId}
+            onAgentUpdated={reloadAgents}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
   if (routing.routeState.isOfferOpen || window.location.hash === '#/offer') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <OfferPage
-          onClose={() => {
-            routing.setRouteState({ isOfferOpen: false });
-            routing.navigateTo('');
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <OfferPage
+            onClose={() => {
+              routing.setRouteState({ isOfferOpen: false });
+              routing.navigateTo('');
+            }}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
   if (routing.routeState.isPrivacyOpen || window.location.hash === '#/privacy') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PrivacyPage
-          onClose={() => {
-            routing.setRouteState({ isPrivacyOpen: false });
-            routing.navigateTo('');
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <PrivacyPage
+            onClose={() => {
+              routing.setRouteState({ isPrivacyOpen: false });
+              routing.navigateTo('');
+            }}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
   if (routing.routeState.isRequisitesOpen || window.location.hash === '#/requisites') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <RequisitesPage
-          onClose={() => {
-            routing.setRouteState({ isRequisitesOpen: false });
-            routing.navigateTo('');
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <RequisitesPage
+            onClose={() => {
+              routing.setRouteState({ isRequisitesOpen: false });
+              routing.navigateTo('');
+            }}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
@@ -854,51 +891,57 @@ export default function App() {
     const versionNumber = versionParam ? parseInt(versionParam, 10) : undefined;
     
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PublicPrototypePage
-          prototypeHash={hash}
-          versionNumber={versionNumber}
-          onClose={() => {
-            routing.setRouteState({ prototypeHash: null });
-            routing.navigateTo('');
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <PublicPrototypePage
+            prototypeHash={hash}
+            versionNumber={versionNumber}
+            onClose={() => {
+              routing.setRouteState({ prototypeHash: null });
+              routing.navigateTo('');
+            }}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
   if (routing.routeState.isDocumentsOpen || window.location.hash === '#/documents') {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <DocumentsPage
-          onClose={() => {
-            routing.setRouteState({ isDocumentsOpen: false });
-            routing.navigateTo('#/projects');
-          }}
-          documents={projectDocuments}
-          onRemoveFile={handleRemoveFile}
-          agents={agents}
-          project={projects.find(p => p.id === activeProjectId) || null}
-          onAgentClick={(agentId) => {
-            // Переключаемся на выбранного агента
-            setActiveAgentId(agentId);
-            routing.setRouteState({ isDocumentsOpen: false });
-            routing.navigateTo('#/projects');
-          }}
-          onOpenAgentSettings={(agentId) => {
-            // Этот обработчик больше не используется напрямую,
-            // но оставляем для обратной совместимости
-          }}
-          onDocumentUpdate={(updatedFile) => {
-            // Документы теперь управляются через хук useDocuments
-            // Обновление происходит автоматически при перезагрузке
-          }}
-          onShowConfirm={showConfirm}
-          onShowAlert={showAlert}
-          currentUser={currentUser}
-          onFileUpload={() => setIsFileUploadOpen(true)}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <DocumentsPage
+            onClose={() => {
+              routing.setRouteState({ isDocumentsOpen: false });
+              routing.navigateTo('#/projects');
+            }}
+            documents={projectDocuments}
+            onRemoveFile={handleRemoveFile}
+            agents={agents}
+            project={projects.find(p => p.id === activeProjectId) || null}
+            onAgentClick={(agentId) => {
+              // Переключаемся на выбранного агента
+              setActiveAgentId(agentId);
+              routing.setRouteState({ isDocumentsOpen: false });
+              routing.navigateTo('#/projects');
+            }}
+            onOpenAgentSettings={(agentId) => {
+              // Этот обработчик больше не используется напрямую,
+              // но оставляем для обратной совместимости
+            }}
+            onDocumentUpdate={(updatedFile) => {
+              // Документы теперь управляются через хук useDocuments
+              // Обновление происходит автоматически при перезагрузке
+            }}
+            onShowConfirm={showConfirm}
+            onShowAlert={showAlert}
+            currentUser={currentUser}
+            onFileUpload={() => setIsFileUploadOpen(true)}
+          />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
     );
   }
 
@@ -973,23 +1016,7 @@ export default function App() {
         </Suspense>
       )}
 
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={closeConfirm}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-      />
-
-      <AlertDialog
-        isOpen={alertDialog.isOpen}
-        onClose={closeAlert}
-        title={alertDialog.title}
-        message={alertDialog.message}
-        variant={alertDialog.variant}
-        duration={alertDialog.duration ?? 3000}
-      />
+      {renderGlobalDialogs()}
 
       <CreateProjectDialog
         isOpen={isCreateProjectOpen}
