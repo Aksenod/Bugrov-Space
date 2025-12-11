@@ -188,7 +188,16 @@ export class ErrorBoundary extends Component<Props, State> {
               {/* Дополнительная информация */}
               <div className="pt-4 border-t border-white/10">
                 <p className="text-xs text-white/40">
-                  Если проблема повторяется, пожалуйста, свяжитесь с поддержкой.
+                  Если проблема повторяется, пожалуйста, свяжитесь с поддержкой в Telegram:&nbsp;
+                  <a
+                    href="https://t.me/BugrovExperience"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                  >
+                    @BugrovExperience
+                  </a>
+                  .
                 </p>
               </div>
             </div>

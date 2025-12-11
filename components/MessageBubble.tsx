@@ -1,7 +1,7 @@
 import React from 'react';
 import { Message, Role } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { User, Bot, AlertCircle, Trash2, Copy } from 'lucide-react';
+import { User, Bot, AlertCircle, Trash2, Copy, Check } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -35,8 +35,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
   const deleteIntervalRef = React.useRef<number | null>(null);
   const COUNTDOWN_START = 5;
 
+  const resetDeleteState = React.useCallback(() => {
+    if (deleteTimeoutRef.current) {
+      window.clearTimeout(deleteTimeoutRef.current);
+      deleteTimeoutRef.current = null;
+    }
+    if (deleteIntervalRef.current) {
+      window.clearInterval(deleteIntervalRef.current);
+      deleteIntervalRef.current = null;
+    }
+    setDeleteCountdown(null);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyToastTimerRef.current) {
+        window.clearTimeout(copyToastTimerRef.current);
+      }
+      if (deleteTimeoutRef.current) {
+        window.clearTimeout(deleteTimeoutRef.current);
+      }
+      if (deleteIntervalRef.current) {
+        window.clearInterval(deleteIntervalRef.current);
+      }
+    };
+  }, []);
+
   const handleCopy = React.useCallback(() => {
     if (!message.text) return;
+
+    // Отменяем удаление при копировании
+    if (deleteCountdown !== null) {
+      resetDeleteState();
+    }
 
     const text = typeof message.text === 'string' ? message.text : String(message.text);
 
@@ -58,34 +89,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
     copyToastTimerRef.current = window.setTimeout(() => {
       setIsCopyToastVisible(false);
       copyToastTimerRef.current = null;
-    }, 1600);
-  }, [message.text]);
-
-  React.useEffect(() => {
-    return () => {
-      if (copyToastTimerRef.current) {
-        window.clearTimeout(copyToastTimerRef.current);
-      }
-      if (deleteTimeoutRef.current) {
-        window.clearTimeout(deleteTimeoutRef.current);
-      }
-      if (deleteIntervalRef.current) {
-        window.clearInterval(deleteIntervalRef.current);
-      }
-    };
-  }, []);
-
-  const resetDeleteState = React.useCallback(() => {
-    if (deleteTimeoutRef.current) {
-      window.clearTimeout(deleteTimeoutRef.current);
-      deleteTimeoutRef.current = null;
-    }
-    if (deleteIntervalRef.current) {
-      window.clearInterval(deleteIntervalRef.current);
-      deleteIntervalRef.current = null;
-    }
-    setDeleteCountdown(null);
-  }, []);
+    }, 2000);
+  }, [message.text, deleteCountdown, resetDeleteState]);
 
   // Сбрасываем таймер при смене сообщения
   React.useEffect(() => {
@@ -140,7 +145,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
       )}
 
       <div
-        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin
+        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin overflow-visible
           ${
             isUser
               ? 'bg-gradient-to-br from-indigo-600/90 via-indigo-600/80 to-blue-600/80 text-white rounded-[1.5rem] rounded-tr-sm border-white/30 shadow-lg shadow-indigo-500/20 max-w-[88%] md:max-w-[75%]' 
@@ -153,7 +158,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
         `}
         style={{ 
           maxWidth: isUser ? undefined : 'none',
-          overflowX: 'auto',
+          overflowX: 'visible',
           overflowY: 'visible',
           WebkitOverflowScrolling: 'touch'
         }}
@@ -164,50 +169,54 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           message.text.length > 0 && <MarkdownRenderer content={message.text} isCompact />
         )}
 
-        {/* Timestamp */}
+        {/* Timestamp and Actions */}
         {!isGenerating && (
-          <div className={`text-xs mt-2 font-medium tracking-wide flex items-center gap-2 ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>
+          <div className={`mt-2 text-xs font-medium tracking-wide flex items-center gap-2 overflow-visible ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>
             <span>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             {message.isStreaming && message.text.length > 0 && (
               <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(129,140,248,0.9)]" />
             )}
-            {(canCopy || canDelete) && (
-              <div className="ml-auto flex items-center gap-2 relative">
-                {isCopyToastVisible && (
-                  <div className="absolute -top-8 right-0 z-30 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-white/80 shadow-lg shadow-indigo-500/30 backdrop-blur-md">
-                    Скопировано
-                  </div>
-                )}
-                {deleteCountdown !== null && (
-                  <span className="text-[11px] font-semibold text-red-200">
-                    {`Удаление через ${deleteCountdown}s`}
-                  </span>
-                )}
+            
+            {/* Status messages and action buttons */}
+            {(canCopy || canDelete || isCopyToastVisible || deleteCountdown !== null) && (
+              <div className="flex items-center gap-2 sm:gap-2.5 ml-auto overflow-visible" aria-live={deleteCountdown !== null ? 'assertive' : 'polite'} aria-atomic="true">
                 {canCopy && (
-                  <button
-                    type="button"
-                    aria-label="Скопировать сообщение"
-                    onClick={handleCopy}
-                    className="flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/10 text-white/60 opacity-70 shadow-inner shadow-black/20 transition-all hover:bg-white/10 hover:text-white hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30 active:translate-y-px"
-                  >
-                    <Copy size={14} />
-                  </button>
+                  <div className="relative overflow-visible">
+                    {isCopyToastVisible && (
+                      <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500/40 text-xs font-semibold text-green-300 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-right-2 duration-300 whitespace-nowrap z-50">
+                        <Check size={13} className="text-green-400" />
+                        <span>Скопировано</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      aria-label={isCopyToastVisible ? 'Текст скопирован' : 'Скопировать сообщение'}
+                      onClick={handleCopy}
+                      className={`flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-full border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent active:translate-y-px ${
+                        isCopyToastVisible
+                          ? 'bg-green-500/20 border-green-500/40 text-green-300 shadow-lg focus:ring-green-400/50'
+                          : 'bg-white/5 border-white/10 text-white/60 opacity-70 shadow-md hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30'
+                      }`}
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
                 )}
                 {canDelete && (
                   <button
                     type="button"
-                    aria-label="Удалить сообщение"
+                    aria-label={deleteCountdown !== null ? `Отменить удаление. Осталось ${deleteCountdown} ${deleteCountdown === 1 ? 'секунда' : deleteCountdown < 5 ? 'секунды' : 'секунд'}` : 'Удалить сообщение'}
                     onClick={handleDeleteClick}
-                    className={`relative flex items-center justify-center w-9 h-9 rounded-full transition-all focus:outline-none focus:ring-2 ${
+                    className={`relative flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-full border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent active:translate-y-px ${
                       deleteCountdown !== null
-                        ? 'bg-red-600/15 border border-red-500/40 text-red-100 shadow-inner shadow-red-900/40 hover:bg-red-600/25 focus:ring-red-400/50 active:translate-y-px'
-                        : 'bg-white/5 border border-white/10 text-white/60 opacity-70 shadow-inner shadow-black/20 hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30 active:translate-y-px'
+                        ? 'bg-red-600/25 border-red-500/50 text-red-100 shadow-lg hover:bg-red-600/35 focus:ring-red-400/50'
+                        : 'bg-white/5 border-white/10 text-white/60 opacity-70 shadow-md hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30'
                     }`}
                   >
                     <Trash2 size={14} />
                     {deleteCountdown !== null && (
-                      <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none shadow-md shadow-red-500/30">
-                        {`${deleteCountdown}s`}
+                      <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold leading-none shadow-lg animate-in zoom-in-50 duration-300">
+                        {deleteCountdown}
                       </span>
                     )}
                   </button>
