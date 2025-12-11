@@ -55,6 +55,12 @@ npm install
 cd backend && npm install
 ```
 
+## Storybook (UI kit)
+
+- Запуск локально: `npm run storybook` (порт 6006).
+- Доступ в приложении: откройте `#/admin/storybook` или нажмите кнопку `UI Kit` в шапке админки.
+- Встроенный экран в админке встраивает `/storybook` через iframe; для работы нужно, чтобы Storybook был запущен.
+
 ## Database
 
 The backend uses Prisma + PostgreSQL. Generate the client and run migrations:

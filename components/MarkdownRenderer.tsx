@@ -388,9 +388,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           },
           table({ children }) {
             return (
-              <div className="my-4 w-full max-w-full overflow-x-auto md:overflow-x-visible">
+              <div className="my-4 w-full max-w-full min-w-0 overflow-x-auto">
                 <table
-                  className="w-full min-w-full table-auto border-collapse text-left"
+                  className="w-full min-w-max table-auto border-collapse text-left"
                 >
                   {children}
                 </table>
@@ -409,12 +409,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           th({ children }) {
             return (
               <th
-                className="border border-white/20 px-4 py-2 text-left font-semibold text-white align-top whitespace-normal break-words"
+                className="border border-white/20 px-4 py-2 text-left font-semibold text-white align-top whitespace-normal break-words max-w-[260px]"
                 style={{
                   wordWrap: 'break-word',
                   overflowWrap: 'break-word',
                   lineHeight: '1.4',
-                  minWidth: '140px'
+                  minWidth: '140px',
+                  maxWidth: '260px'
                 }}
               >
                 {children}
@@ -424,12 +425,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           td({ children }) {
             return (
               <td
-                className="border border-white/10 px-4 py-2 text-white/90 align-top whitespace-normal break-words"
+                className="border border-white/10 px-4 py-2 text-white/90 align-top whitespace-normal break-words max-w-[260px]"
                 style={{
                   wordWrap: 'break-word',
                   overflowWrap: 'break-word',
                   lineHeight: '1.4',
-                  minWidth: '140px'
+                  minWidth: '140px',
+                  maxWidth: '260px'
                 }}
               >
                 {children}

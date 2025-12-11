@@ -364,189 +364,204 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                   </div>
                 )}
 
-                {/* Tabs */}
+                {/* Tabs + CTA + Version (mobile-first) */}
                 {(showDSLButtons || isAdmin) && (
-                  <div className="mb-6 flex items-center gap-4 border-b border-white/10 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setActiveTab('text')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'text'
-                          ? 'text-white border-white/40'
-                          : 'text-white/50 border-transparent hover:text-white/70'
-                          }`}
-                      >
-                        Текст
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('prototype')}
-                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'prototype'
-                          ? 'text-cyan-400 border-cyan-400/40'
-                          : 'text-white/50 border-transparent hover:text-white/70'
-                          }`}
-                      >
-                        Прототип
-                      </button>
-                    </div>
+                  <div className="mb-6 w-full">
+                    <div className="w-full rounded-xl border border-white/10 bg-white/5 p-3 space-y-2 md:p-3 md:space-y-2">
+                      <div className="flex flex-col space-y-2 md:flex-row md:items-center md:gap-2 md:space-y-0">
+                        <div className="flex gap-2 overflow-x-auto snap-x md:flex-1" role="tablist">
+                          <button
+                            role="tab"
+                            aria-selected={activeTab === 'text'}
+                            aria-controls="documents-tab-text"
+                            onClick={() => setActiveTab('text')}
+                            className={`flex-1 min-w-[108px] snap-start h-8 px-2 text-[11px] font-semibold rounded-lg border md:min-w-[128px] md:h-9 md:px-3 md:text-xs ${
+                              activeTab === 'text'
+                                ? 'bg-white/10 text-white border-white/10'
+                                : 'text-white/70 border-transparent hover:text-white'
+                            } focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60`}
+                          >
+                            Текст
+                          </button>
+                          <button
+                            role="tab"
+                            aria-selected={activeTab === 'prototype'}
+                            aria-controls="documents-tab-prototype"
+                            onClick={() => setActiveTab('prototype')}
+                            className={`flex-1 min-w-[108px] snap-start h-8 px-2 text-[11px] font-semibold rounded-lg border md:min-w-[128px] md:h-9 md:px-3 md:text-xs ${
+                              activeTab === 'prototype'
+                                ? 'bg-white/10 text-white border-white/10'
+                                : 'text-white/70 border-transparent hover:text-white'
+                            } focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60`}
+                          >
+                            Прототип
+                          </button>
+                        </div>
 
-                    {showDSLButtons && !isEditing && (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleGenerateResult();
-                        }}
-                        disabled={isGeneratingPrototype}
-                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
-                      >
-                        {isGeneratingPrototype ? (
-                          <span className="flex items-center gap-2">
-                            <span className="relative flex items-center justify-center">
-                              <span className="absolute inset-0 bg-cyan-500/20 blur-md rounded-full animate-pulse"></span>
-                              <Loader2 size={14} className="relative animate-spin text-cyan-400" />
-                            </span>
-                            <span className="flex flex-col items-start">
-                              <span className="leading-tight">Генерация прототипа...</span>
-                              <span className="text-xs text-cyan-400/70 leading-tight">В среднем до 3 минут</span>
-                            </span>
-                          </span>
-                        ) : (
-                          "Сгенерировать прототип"
-                        )}
-                      </button>
-                    )}
-
-                    {/* Sub-tabs for Prototype */}
-                    {activeTab === 'prototype' && (
-                      <div className="flex items-center gap-2 ml-auto">
-                        {showDSLButtons && isAdmin && (
-                          <>
-                            <button
-                              onClick={() => setPrototypeSubTab('preview')}
-                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'preview'
-                                ? 'bg-white/10 text-white'
-                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                                }`}
-                            >
-                              Preview
-                            </button>
-                            <button
-                              onClick={() => setPrototypeSubTab('dsl')}
-                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'dsl'
-                                ? 'bg-white/10 text-white'
-                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                                }`}
-                            >
-                              DSL
-                            </button>
-                            <button
-                              onClick={() => setPrototypeSubTab('html')}
-                              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${prototypeSubTab === 'html'
-                                ? 'bg-white/10 text-white'
-                                : 'text-white/30 hover:text-white/60 hover:bg-white/5'
-                                }`}
-                            >
-                              HTML
-                            </button>
-                          </>
-                        )}
-
-                        {/* Version dropdown */}
-                        {prototypeVersions.length > 0 && (
-                          <div className="relative version-dropdown-container">
-                            <button
-                              onClick={() => setIsVersionDropdownOpen(!isVersionDropdownOpen)}
-                              className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 flex items-center gap-1.5"
-                              title="Выбрать версию"
-                            >
-                              <span>Версия {selectedVersionNumber || '?'}</span>
-                              <ChevronDown size={14} className={isVersionDropdownOpen ? 'rotate-180' : ''} />
-                            </button>
-                            {isVersionDropdownOpen && (
-                              <div className="absolute right-0 top-full mt-1 bg-black/95 backdrop-blur-md border border-white/10 rounded-lg shadow-xl z-50 min-w-[200px] max-h-[200px] overflow-y-auto version-dropdown-container">
-                                {prototypeVersions.map((version) => (
-                                  <div
-                                    key={version.id}
-                                    className={`flex items-center justify-between group ${
-                                      selectedVersionNumber === version.versionNumber
-                                        ? 'bg-cyan-500/20'
-                                        : ''
-                                    }`}
-                                  >
-                                    <button
-                                      onClick={() => {
-                                        setSelectedVersionNumber(version.versionNumber);
-                                        setIsVersionDropdownOpen(false);
-                                      }}
-                                      className={`flex-1 text-left px-3 py-2 text-xs transition-colors ${
-                                        selectedVersionNumber === version.versionNumber
-                                          ? 'text-cyan-400'
-                                          : 'text-white/70 hover:text-white hover:bg-white/5'
-                                      }`}
-                                    >
-                                      Версия {version.versionNumber}
-                                    </button>
-                                    {prototypeVersions.length > 1 && onShowConfirm && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setIsVersionDropdownOpen(false);
-                                          if (onShowConfirm) {
-                                            onShowConfirm(
-                                              'Удалить версию',
-                                              `Вы уверены, что хотите удалить версию ${version.versionNumber}? Это действие нельзя отменить.`,
-                                              async () => {
-                                                try {
-                                                  await api.deletePrototypeVersion(selectedFileId!, version.versionNumber);
-                                                  const { versions } = await api.getPrototypeVersions(selectedFileId!);
-                                                  setPrototypeVersions(versions);
-                                                  if (selectedVersionNumber === version.versionNumber) {
-                                                    if (versions.length > 0) {
-                                                      setSelectedVersionNumber(versions[0].versionNumber);
-                                                    } else {
-                                                      setSelectedVersionNumber(null);
-                                                    }
-                                                  }
-                                                  if (onDocumentUpdate && selectedFile) {
-                                                    const updatedFile = documents.find(d => d.id === selectedFileId);
-                                                    if (updatedFile) {
-                                                      onDocumentUpdate(updatedFile);
-                                                    }
-                                                  }
-                                                  if (onShowAlert) {
-                                                    onShowAlert('Версия успешно удалена', 'Успех', 'success');
-                                                  }
-                                                } catch (error: any) {
-                                                  console.error('Failed to delete version:', error);
-                                                  if (onShowAlert) {
-                                                    onShowAlert(`Не удалось удалить версию: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
-                                                  }
-                                                }
-                                              },
-                                              'danger'
-                                            );
-                                          }
-                                        }}
-                                        className="px-2 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="Удалить версию"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <button
-                          onClick={handleOpenInNewTab}
-                          className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5"
-                          title="Открыть в новом окне"
-                        >
-                          <ExternalLink size={14} />
-                          <span>Открыть</span>
-                        </button>
                       </div>
-                    )}
+
+                      {activeTab === 'prototype' && (
+                        <div className="flex flex-col gap-2 md:gap-3">
+                          {showDSLButtons && isAdmin && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setPrototypeSubTab('preview')}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                  prototypeSubTab === 'preview'
+                                    ? 'bg-white/10 text-white'
+                                    : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+                                }`}
+                              >
+                                Preview
+                              </button>
+                              <button
+                                onClick={() => setPrototypeSubTab('dsl')}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                  prototypeSubTab === 'dsl'
+                                    ? 'bg-white/10 text-white'
+                                    : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+                                }`}
+                              >
+                                DSL
+                              </button>
+                              <button
+                                onClick={() => setPrototypeSubTab('html')}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                  prototypeSubTab === 'html'
+                                    ? 'bg-white/10 text-white'
+                                    : 'text-white/40 hover:text-white/80 hover:bg-white/5'
+                                }`}
+                              >
+                                HTML
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 w-full flex-wrap">
+                            {prototypeVersions.length > 0 ? (
+                              <div className="relative version-dropdown-container">
+                                <button
+                                  onClick={() => setIsVersionDropdownOpen(!isVersionDropdownOpen)}
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/8 h-8 px-3 text-[11px] font-semibold text-white/80 hover:bg-white/12 hover:text-white active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 md:h-9 md:text-xs"
+                                  title="Выбрать версию"
+                                >
+                              <span>Ver {selectedVersionNumber || '?'}</span>
+                                  <ChevronDown size={14} className={isVersionDropdownOpen ? 'rotate-180' : ''} />
+                                </button>
+                                {isVersionDropdownOpen && (
+                                  <div className="absolute left-0 top-full mt-1 bg-black/95 backdrop-blur-md border border-white/10 rounded-lg shadow-xl z-50 min-w-[200px] max-h-[200px] overflow-y-auto version-dropdown-container">
+                                    {prototypeVersions.map((version) => (
+                                      <div
+                                        key={version.id}
+                                        className={`flex items-center justify-between group ${
+                                          selectedVersionNumber === version.versionNumber
+                                            ? 'bg-cyan-500/20'
+                                            : ''
+                                        }`}
+                                      >
+                                        <button
+                                          onClick={() => {
+                                            setSelectedVersionNumber(version.versionNumber);
+                                            setIsVersionDropdownOpen(false);
+                                          }}
+                                          className={`flex-1 text-left px-3 py-2 text-xs transition-colors ${
+                                            selectedVersionNumber === version.versionNumber
+                                              ? 'text-cyan-400'
+                                              : 'text-white/70 hover:text-white hover:bg-white/5'
+                                          }`}
+                                        >
+                                          Ver {version.versionNumber}
+                                        </button>
+                                        {prototypeVersions.length > 1 && onShowConfirm && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setIsVersionDropdownOpen(false);
+                                              if (onShowConfirm) {
+                                                onShowConfirm(
+                                                  'Удалить версию',
+                                                  `Вы уверены, что хотите удалить версию ${version.versionNumber}? Это действие нельзя отменить.`,
+                                                  async () => {
+                                                    try {
+                                                      await api.deletePrototypeVersion(selectedFileId!, version.versionNumber);
+                                                      const { versions } = await api.getPrototypeVersions(selectedFileId!);
+                                                      setPrototypeVersions(versions);
+                                                      if (selectedVersionNumber === version.versionNumber) {
+                                                        if (versions.length > 0) {
+                                                          setSelectedVersionNumber(versions[0].versionNumber);
+                                                        } else {
+                                                          setSelectedVersionNumber(null);
+                                                        }
+                                                      }
+                                                      if (onDocumentUpdate && selectedFile) {
+                                                        const updatedFile = documents.find(d => d.id === selectedFileId);
+                                                        if (updatedFile) {
+                                                          onDocumentUpdate(updatedFile);
+                                                        }
+                                                      }
+                                                      if (onShowAlert) {
+                                                        onShowAlert('Версия успешно удалена', 'Успех', 'success');
+                                                      }
+                                                    } catch (error: any) {
+                                                      console.error('Failed to delete version:', error);
+                                                      if (onShowAlert) {
+                                                        onShowAlert(`Не удалось удалить версию: ${error?.message || 'Неизвестная ошибка'}`, 'Ошибка', 'error');
+                                                      }
+                                                    }
+                                                  },
+                                                  'danger'
+                                                );
+                                              }
+                                            }}
+                                            className="px-2 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Удалить версию"
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-white/5 border border-white/10 px-2.5 py-1 text-xs text-white/70">
+                                Ver нет
+                              </span>
+                            )}
+
+                            {showDSLButtons && !isEditing && (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleGenerateResult();
+                                }}
+                                disabled={isGeneratingPrototype}
+                                className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 rounded-md h-9 px-3 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-500/90 shadow-[0_10px_30px_-12px_rgba(99,102,241,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:opacity-60 disabled:cursor-not-allowed md:h-9 md:px-3 md:text-xs"
+                              >
+                                {isGeneratingPrototype ? (
+                                  <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Генерация...
+                                  </>
+                                ) : (
+                                  <>⚡ Сгенерировать</>
+                                )}
+                              </button>
+                            )}
+
+                            <button
+                              onClick={handleOpenInNewTab}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/8 h-9 px-3 text-xs font-semibold text-white/80 hover:bg-white/12 hover:text-white active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 transition-colors md:h-9 md:px-3 md:text-xs"
+                              title="Открыть в новом окне"
+                            >
+                              <ExternalLink size={14} />
+                              <span className="sr-only md:inline">Открыть</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

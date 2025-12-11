@@ -9,6 +9,7 @@ export interface RouteState {
   isCreativeLandingOpen: boolean;
   isUltraLandingOpen: boolean;
   isAdminOpen: boolean;
+  isAdminStorybookOpen: boolean;
   isOfferOpen: boolean;
   isPrivacyOpen: boolean;
   isRequisitesOpen: boolean;
@@ -39,6 +40,7 @@ export const useRouting = (
     isCreativeLandingOpen: false,
     isUltraLandingOpen: false,
     isAdminOpen: false,
+    isAdminStorybookOpen: false,
     isOfferOpen: false,
     isPrivacyOpen: false,
     isRequisitesOpen: false,
@@ -65,6 +67,7 @@ export const useRouting = (
         isCreativeLandingOpen: false,
         isUltraLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
@@ -76,6 +79,7 @@ export const useRouting = (
       // Если hash пустой и пользователь авторизован, не показываем лендинг
       setRouteState({
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
@@ -92,6 +96,7 @@ export const useRouting = (
         isLandingOpen: false,
         isUltraLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
@@ -105,6 +110,7 @@ export const useRouting = (
         isLandingOpen: false,
         isCreativeLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
@@ -115,6 +121,21 @@ export const useRouting = (
     } else if (hash === '#/admin') {
       setRouteState({
         isAdminOpen: true,
+        isAdminStorybookOpen: false,
+        isLandingOpen: false,
+        isCreativeLandingOpen: false,
+        isUltraLandingOpen: false,
+        isOfferOpen: false,
+        isPrivacyOpen: false,
+        isRequisitesOpen: false,
+        isDocumentsOpen: false,
+        prototypeHash: null,
+        adminInitialAgentId: undefined,
+      });
+    } else if (hash === '#/admin/storybook') {
+      setRouteState({
+        isAdminStorybookOpen: true,
+        isAdminOpen: false,
         isLandingOpen: false,
         isCreativeLandingOpen: false,
         isUltraLandingOpen: false,
@@ -129,6 +150,7 @@ export const useRouting = (
       // Закрываем все специальные страницы и показываем основное приложение
       setRouteState({
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isLandingOpen: false,
         isCreativeLandingOpen: false,
         isUltraLandingOpen: false,
@@ -146,6 +168,7 @@ export const useRouting = (
         isUltraLandingOpen: false,
         isCreativeLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
         isDocumentsOpen: false,
@@ -159,6 +182,7 @@ export const useRouting = (
         isUltraLandingOpen: false,
         isCreativeLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isRequisitesOpen: false,
         isDocumentsOpen: false,
@@ -172,6 +196,7 @@ export const useRouting = (
         isUltraLandingOpen: false,
         isCreativeLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isDocumentsOpen: false,
@@ -185,6 +210,7 @@ export const useRouting = (
         isUltraLandingOpen: false,
         isCreativeLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
@@ -198,6 +224,7 @@ export const useRouting = (
         isUltraLandingOpen: false,
         isCreativeLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,
@@ -213,6 +240,7 @@ export const useRouting = (
         isCreativeLandingOpen: false,
         isUltraLandingOpen: false,
         isAdminOpen: false,
+        isAdminStorybookOpen: false,
         isOfferOpen: false,
         isPrivacyOpen: false,
         isRequisitesOpen: false,

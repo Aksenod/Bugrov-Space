@@ -144,7 +144,7 @@ export const DocumentsSidebar: React.FC<DocumentsSidebarProps> = ({
           >
             <button
               onClick={onFileUpload}
-              className="w-full px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30"
+              className="w-full px-4 py-2.5 border border-white/15 bg-white/8 hover:bg-white/12 text-white/80 hover:text-white rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm font-medium"
             >
               <Upload size={16} />
               Загрузить

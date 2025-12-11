@@ -1,0 +1,45 @@
+import{r as o,j as t}from"./iframe-D0Nje-x_.js";import{S}from"./sparkles-C__5GnET.js";import{X as T}from"./x-BDm1Lc4K.js";import{c as k}from"./createLucideIcon-Cg4GjVm3.js";import"./preload-helper-PPVm8Dsz.js";const _=[["path",{d:"M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z",key:"117uat"}],["path",{d:"M6 12h16",key:"s4cdu5"}]],I=k("send-horizontal",_),c=({onSend:n,disabled:r,isLoading:i=!1,onCancel:d})=>{const[a,f]=o.useState(""),s=o.useRef(null),x=o.useRef(!1);o.useEffect(()=>{s.current&&(s.current.style.height="48px",s.current.style.minHeight="48px",s.current.style.maxHeight="48px",s.current.style.overflowY="hidden")},[]);const b=()=>{if(x.current)return;const e=s.current;if(!e)return;if(!a.trim()){e.style.height="48px",e.style.minHeight="48px",e.style.maxHeight="48px",e.style.overflowY="hidden";return}x.current=!0;const l=parseInt(e.style.height)||48,j=e.style.overflowY,y=e.style.minHeight,v=e.style.maxHeight;e.style.overflowY="hidden",e.style.minHeight="auto",e.style.maxHeight="150px",e.style.height="auto";const H=e.scrollHeight,p=Math.min(H,150);Math.abs(p-l)>1?(e.style.height=`${p}px`,p>=150?e.style.overflowY="auto":e.style.overflowY="hidden"):(e.style.height=`${l}px`,e.style.overflowY=j||"hidden"),y&&(e.style.minHeight=y),v&&(e.style.maxHeight=v),x.current=!1};o.useEffect(()=>{a.trim()?requestAnimationFrame(()=>{b()}):s.current&&(s.current.style.height="48px",s.current.style.overflowY="hidden",s.current.style.minHeight="48px",s.current.style.maxHeight="48px")},[a]);const w=()=>{a.trim()&&!r&&(n(a.trim()),f(""),s.current&&(s.current.style.height="48px",s.current.style.minHeight="48px",s.current.style.maxHeight="48px",s.current.style.overflowY="hidden"))},N=e=>{e.key==="Enter"&&!e.shiftKey&&(e.preventDefault(),w())};return t.jsxs("div",{className:"w-full max-w-3xl mx-auto relative group",children:[t.jsx("div",{className:"absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[1.5rem] blur opacity-20 group-hover:opacity-40 transition-all duration-500 ease-out group-focus-within:opacity-60 group-focus-within:blur-md"}),t.jsxs("div",{className:"relative flex items-center bg-gradient-to-br from-black/70 via-black/60 to-black/70 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl shadow-indigo-500/10 transition-all group-focus-within:border-white/20 group-focus-within:shadow-indigo-500/30 group-focus-within:shadow-lg",children:[t.jsx("div",{className:"pl-3 flex-shrink-0 text-white/40 flex items-center",children:t.jsx(S,{size:18,className:`transition-colors duration-300 ${a.trim()?"text-indigo-400":""}`})}),t.jsx("textarea",{ref:s,value:a,onChange:e=>f(e.target.value),onKeyDown:N,onFocus:e=>{if(!a.trim())e.currentTarget.style.height="48px",e.currentTarget.style.minHeight="48px",e.currentTarget.style.maxHeight="48px",e.currentTarget.style.overflowY="hidden";else{const l=e.currentTarget.style.height||"48px";requestAnimationFrame(()=>{e.currentTarget.style.height!==l&&(e.currentTarget.style.height=l)})}},onBlur:e=>{if(e.currentTarget){const l=e.currentTarget.style.height;requestAnimationFrame(()=>{e.currentTarget&&e.currentTarget.style.height!==l&&(e.currentTarget.style.height=l)})}},placeholder:r?"Подключение...":"Напишите мне ...",disabled:r,className:"w-full bg-transparent text-white placeholder-white/30 text-base px-3 max-h-[150px] min-h-[48px] focus:outline-none focus:ring-0 resize-none no-scrollbar font-medium",rows:1,style:{height:"48px",overflowY:"hidden",paddingTop:"12px",paddingBottom:"12px",lineHeight:"24px",boxSizing:"border-box"}}),t.jsx("div",{className:"pr-1.5 flex-shrink-0 flex items-center",children:i&&d?t.jsx("button",{onClick:d,className:"p-2.5 rounded-full transition-all duration-300 ease-out will-change-transform bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] border border-red-500/30",title:"Остановить генерацию",children:t.jsx(T,{size:18})}):t.jsx("button",{onClick:w,disabled:!a.trim()||r,className:`p-2.5 rounded-full transition-all duration-300 ease-out will-change-transform ${!a.trim()||r?"bg-white/5 text-white/20 cursor-not-allowed":"bg-white text-black hover:bg-indigo-50 shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"}`,children:t.jsx(I,{size:18,className:a.trim()?"ml-0.5":""})})})]})]})};c.__docgenInfo={description:"",methods:[],displayName:"ChatInput",props:{onSend:{required:!0,tsType:{name:"signature",type:"function",raw:"(text: string) => void",signature:{arguments:[{type:{name:"string"},name:"text"}],return:{name:"void"}}},description:""},disabled:{required:!0,tsType:{name:"boolean"},description:""},isLoading:{required:!1,tsType:{name:"boolean"},description:"",defaultValue:{value:"false",computed:!1}},onCancel:{required:!1,tsType:{name:"signature",type:"function",raw:"() => void",signature:{arguments:[],return:{name:"void"}}},description:""}}};const q={title:"UI/ChatInput",component:c,tags:["autodocs"],parameters:{layout:"centered",backgrounds:{default:"dark",values:[{name:"dark",value:"#000000"}]}}},u={render:()=>{const[n,r]=o.useState([]);return t.jsxs("div",{className:"w-full max-w-3xl space-y-4",children:[t.jsx(c,{onSend:i=>{r([...n,i]),console.log("Sent:",i)},disabled:!1}),n.length>0&&t.jsxs("div",{className:"mt-4 p-4 bg-white/5 rounded-lg",children:[t.jsx("p",{className:"text-sm text-white/60 mb-2",children:"Отправленные сообщения:"}),t.jsx("ul",{className:"space-y-1",children:n.map((i,d)=>t.jsxs("li",{className:"text-white/80 text-sm",children:["• ",i]},d))})]})]})}},m={render:()=>t.jsx("div",{className:"w-full max-w-3xl",children:t.jsx(c,{onSend:()=>{},disabled:!0})})},h={render:()=>{const[n,r]=o.useState(!1);return t.jsxs("div",{className:"w-full max-w-3xl space-y-4",children:[t.jsx(c,{onSend:()=>{r(!0),setTimeout(()=>r(!1),3e3)},disabled:!1,isLoading:n,onCancel:()=>r(!1)}),t.jsx("p",{className:"text-sm text-white/60",children:"Нажмите отправить, чтобы увидеть состояние загрузки"})]})}},g={render:()=>{const[n,r]=o.useState([]);return t.jsxs("div",{className:"w-full max-w-3xl space-y-4",children:[t.jsx(c,{onSend:i=>{r([...n,i])},disabled:!1}),t.jsxs("div",{className:"p-4 bg-white/5 rounded-lg",children:[t.jsx("p",{className:"text-sm text-white/60 mb-2",children:"Попробуйте ввести длинный текст - поле автоматически расширится:"}),t.jsx("p",{className:"text-xs text-white/40",children:"Введите несколько строк текста, чтобы увидеть авто-высоту"})]})]})}};u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const [messages, setMessages] = useState<string[]>([]);
+    return <div className="w-full max-w-3xl space-y-4">
+        <ChatInput onSend={text => {
+        setMessages([...messages, text]);
+        console.log('Sent:', text);
+      }} disabled={false} />
+        {messages.length > 0 && <div className="mt-4 p-4 bg-white/5 rounded-lg">
+            <p className="text-sm text-white/60 mb-2">Отправленные сообщения:</p>
+            <ul className="space-y-1">
+              {messages.map((msg, i) => <li key={i} className="text-white/80 text-sm">• {msg}</li>)}
+            </ul>
+          </div>}
+      </div>;
+  }
+}`,...u.parameters?.docs?.source}}};m.parameters={...m.parameters,docs:{...m.parameters?.docs,source:{originalSource:`{
+  render: () => <div className="w-full max-w-3xl">
+      <ChatInput onSend={() => {}} disabled={true} />
+    </div>
+}`,...m.parameters?.docs?.source}}};h.parameters={...h.parameters,docs:{...h.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const [isLoading, setIsLoading] = useState(false);
+    return <div className="w-full max-w-3xl space-y-4">
+        <ChatInput onSend={() => {
+        setIsLoading(true);
+        setTimeout(() => setIsLoading(false), 3000);
+      }} disabled={false} isLoading={isLoading} onCancel={() => setIsLoading(false)} />
+        <p className="text-sm text-white/60">Нажмите отправить, чтобы увидеть состояние загрузки</p>
+      </div>;
+  }
+}`,...h.parameters?.docs?.source}}};g.parameters={...g.parameters,docs:{...g.parameters?.docs,source:{originalSource:`{
+  render: () => {
+    const [messages, setMessages] = useState<string[]>([]);
+    return <div className="w-full max-w-3xl space-y-4">
+        <ChatInput onSend={text => {
+        setMessages([...messages, text]);
+      }} disabled={false} />
+        <div className="p-4 bg-white/5 rounded-lg">
+          <p className="text-sm text-white/60 mb-2">Попробуйте ввести длинный текст - поле автоматически расширится:</p>
+          <p className="text-xs text-white/40">Введите несколько строк текста, чтобы увидеть авто-высоту</p>
+        </div>
+      </div>;
+  }
+}`,...g.parameters?.docs?.source}}};const D=["Default","Disabled","Loading","LongText"];export{u as Default,m as Disabled,h as Loading,g as LongText,D as __namedExportsOrder,q as default};

@@ -4,6 +4,7 @@ export interface AdminPageProps {
   onClose: () => void;
   initialAgentId?: string;
   onAgentUpdated?: () => void;
+  onOpenStorybook?: () => void;
 }
 
 export interface SortableAgentItemProps {

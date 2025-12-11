@@ -30,7 +30,12 @@ import {
   useGlobalPrompt,
 } from '../hooks/admin';
 
-export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, onAgentUpdated }) => {
+export const AdminPage: React.FC<AdminPageProps> = ({
+  onClose,
+  onOpenStorybook,
+  initialAgentId,
+  onAgentUpdated,
+}) => {
   const [activeTab, setActiveTab] = useState<TabType>('agents');
 
   // Project Types state
@@ -708,13 +713,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onClose, initialAgentId, o
         <div className="mb-4 sm:mb-6 shrink-0">
           <div className="flex justify-between items-center mb-3 sm:mb-4">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">Админ-панель</h1>
-            <button
-              onClick={onClose}
-              className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
-            >
-              <X size={16} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Назад</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenStorybook?.()}
+                className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              >
+                <Layout size={16} className="sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">UI Kit</span>
+                <span className="sm:hidden">UI</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/20 hover:text-white transition-colors flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
+              >
+                <X size={16} className="sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Назад</span>
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}

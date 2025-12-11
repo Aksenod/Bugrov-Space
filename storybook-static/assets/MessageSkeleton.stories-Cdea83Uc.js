@@ -1,0 +1,9 @@
+import{R as r,j as e}from"./iframe-D0Nje-x_.js";import"./preload-helper-PPVm8Dsz.js";const t=()=>e.jsxs("div",{className:"flex items-center gap-1.5 py-1",children:[e.jsx("span",{className:"w-2 h-2 bg-indigo-400 rounded-full animate-pulse",style:{animationDelay:"0ms",animationDuration:"1.4s"}}),e.jsx("span",{className:"w-2 h-2 bg-indigo-400 rounded-full animate-pulse",style:{animationDelay:"200ms",animationDuration:"1.4s"}}),e.jsx("span",{className:"w-2 h-2 bg-indigo-400 rounded-full animate-pulse",style:{animationDelay:"400ms",animationDuration:"1.4s"}})]}),s=r.memo(()=>e.jsxs("div",{className:"flex w-full mb-6 justify-start group animate-in fade-in slide-in-from-bottom-2 duration-500",children:[e.jsx("div",{className:"flex-shrink-0 mr-3 mt-1",children:e.jsx("div",{className:"w-8 h-8 rounded-full bg-neutral-700/50 animate-pulse shadow-indigo-500/30"})}),e.jsx("div",{className:"relative max-w-[88%] md:max-w-[75%] px-5 py-4 bg-neutral-800/50 rounded-[1.5rem] rounded-tl-sm border border-white/10 border-indigo-500/20",children:e.jsx(t,{})})]}));s.__docgenInfo={description:"",methods:[],displayName:"MessageSkeleton"};const l={title:"UI/MessageSkeleton",component:s,tags:["autodocs"],parameters:{layout:"padded",backgrounds:{default:"dark",values:[{name:"dark",value:"#000000"}]}}},a={render:()=>e.jsx(s,{})},n={render:()=>e.jsxs("div",{className:"space-y-4",children:[e.jsx(s,{}),e.jsx(s,{}),e.jsx(s,{})]})};a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  render: () => <MessageSkeleton />
+}`,...a.parameters?.docs?.source}}};n.parameters={...n.parameters,docs:{...n.parameters?.docs,source:{originalSource:`{
+  render: () => <div className="space-y-4">
+      <MessageSkeleton />
+      <MessageSkeleton />
+      <MessageSkeleton />
+    </div>
+}`,...n.parameters?.docs?.source}}};const d=["Default","Multiple"];export{a as Default,n as Multiple,d as __namedExportsOrder,l as default};

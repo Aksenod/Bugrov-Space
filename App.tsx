@@ -31,6 +31,7 @@ import { ADMIN_USERNAMES } from './utils';
 // Lazy loading для страниц (загружаются по требованию)
 const AuthPage = React.lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
 const AdminPage = React.lazy(() => import('./components/AdminPage').then(m => ({ default: m.AdminPage })));
+const AdminStorybookPage = React.lazy(() => import('./components/AdminStorybookPage').then(m => ({ default: m.AdminStorybookPage })));
 const OfferPage = React.lazy(() => import('./components/OfferPage').then(m => ({ default: m.OfferPage })));
 const PrivacyPage = React.lazy(() => import('./components/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const RequisitesPage = React.lazy(() => import('./components/RequisitesPage').then(m => ({ default: m.RequisitesPage })));
@@ -106,6 +107,15 @@ export default function App() {
 
   // Используем хук для роутинга
   const routing = useRouting(currentUser);
+  const handleOpenAdminStorybook = useCallback(() => {
+    routing.setRouteState({ isAdminStorybookOpen: true, isAdminOpen: false });
+    routing.navigateTo('#/admin/storybook');
+  }, [routing]);
+
+  const handleCloseAdminStorybook = useCallback(() => {
+    routing.setRouteState({ isAdminStorybookOpen: false, isAdminOpen: true });
+    routing.navigateTo('#/admin');
+  }, [routing]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
@@ -812,6 +822,17 @@ export default function App() {
 
   // Auth check moved down to allow public access to legal pages
 
+  if (routing.routeState.isAdminStorybookOpen || window.location.hash === '#/admin/storybook') {
+    return (
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <AdminStorybookPage onClose={handleCloseAdminStorybook} />
+        </Suspense>
+        {renderGlobalDialogs()}
+      </>
+    );
+  }
+
   if (routing.routeState.isAdminOpen || window.location.hash === '#/admin') {
     return (
       <>
@@ -828,6 +849,7 @@ export default function App() {
             }}
             initialAgentId={routing.routeState.adminInitialAgentId}
             onAgentUpdated={reloadAgents}
+          onOpenStorybook={handleOpenAdminStorybook}
           />
         </Suspense>
         {renderGlobalDialogs()}
@@ -940,6 +962,16 @@ export default function App() {
             onFileUpload={() => setIsFileUploadOpen(true)}
           />
         </Suspense>
+        {isFileUploadOpen && (
+          <Suspense fallback={<ModalLoadingFallback />}>
+            <FileUploadModal
+              isOpen={isFileUploadOpen}
+              onClose={() => setIsFileUploadOpen(false)}
+              onUpload={handleFileUpload}
+              isUploading={documents.isLoading}
+            />
+          </Suspense>
+        )}
         {renderGlobalDialogs()}
       </>
     );

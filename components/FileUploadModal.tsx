@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, FileText, AlertCircle, Loader2 } from 'lucide-react';
 
 const FILE_SIZE_LIMIT = 2 * 1024 * 1024; // 2MB
@@ -31,6 +32,9 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  // Render modal outside of parent stacking context to avoid z-index issues
+  if (typeof document === 'undefined') return null;
 
   const validateFiles = (files: FileList): boolean => {
     setError(null);
@@ -106,8 +110,8 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950/30 rounded-3xl shadow-2xl border border-white/10 max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-white/10 flex items-center justify-between">
@@ -213,4 +217,6 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
