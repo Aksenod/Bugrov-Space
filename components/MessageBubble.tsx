@@ -1,10 +1,11 @@
 import React from 'react';
 import { Message, Role } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { User, Bot, AlertCircle } from 'lucide-react';
+import { User, Bot, AlertCircle, Trash2, Copy } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
+  onDelete?: (messageId: string) => void;
 }
 
 /**
@@ -20,9 +21,49 @@ const TypingIndicator: React.FC = () => {
   );
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, onDelete }) => {
   const isUser = message.role === Role.USER;
   const isGenerating = !isUser && message.isStreaming && message.text.length === 0;
+  const isTemporary = message.id.startsWith('temp-') || message.id.startsWith('loading-');
+  const isTransientError = message.id.startsWith('error-');
+  const canDelete = !!onDelete && !isGenerating && !isTemporary && !isTransientError;
+  const canCopy = !isGenerating && message.text.length > 0;
+  const [isCopyToastVisible, setIsCopyToastVisible] = React.useState(false);
+  const copyToastTimerRef = React.useRef<number | null>(null);
+
+  const handleCopy = React.useCallback(() => {
+    if (!message.text) return;
+
+    const text = typeof message.text === 'string' ? message.text : String(message.text);
+
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(console.error);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    setIsCopyToastVisible(true);
+    if (copyToastTimerRef.current) {
+      window.clearTimeout(copyToastTimerRef.current);
+    }
+    copyToastTimerRef.current = window.setTimeout(() => {
+      setIsCopyToastVisible(false);
+      copyToastTimerRef.current = null;
+    }, 1600);
+  }, [message.text]);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyToastTimerRef.current) {
+        window.clearTimeout(copyToastTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className={`relative z-20 flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-500`}>
@@ -61,6 +102,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           WebkitOverflowScrolling: 'touch'
         }}
       >
+        {isCopyToastVisible && (
+          <div className="absolute -top-4 right-3 z-30 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-white/80 shadow-lg shadow-indigo-500/30 backdrop-blur-md">
+            Скопировано
+          </div>
+        )}
         {isGenerating ? (
           <TypingIndicator />
         ) : (
@@ -69,10 +115,34 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
 
         {/* Timestamp */}
         {!isGenerating && (
-          <div className={`text-xs mt-2 font-medium tracking-wide flex items-center gap-1 ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <div className={`text-xs mt-2 font-medium tracking-wide flex items-center gap-2 ${isUser ? 'justify-end text-white/70' : 'justify-start text-white/50'}`}>
+            <span>{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             {message.isStreaming && message.text.length > 0 && (
               <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(129,140,248,0.9)]" />
+            )}
+            {(canCopy || canDelete) && (
+              <div className="ml-auto flex items-center gap-2">
+                {canCopy && (
+                  <button
+                    type="button"
+                    aria-label="Скопировать сообщение"
+                    onClick={handleCopy}
+                    className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 opacity-70 transition-all hover:bg-white/15 hover:text-white hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  >
+                    <Copy size={14} />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    type="button"
+                    aria-label="Удалить сообщение"
+                    onClick={() => onDelete?.(message.id)}
+                    className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 opacity-70 transition-all hover:bg-white/15 hover:text-white hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

@@ -118,3 +118,20 @@ export const clearMessages = async (agentId: string): Promise<void> => {
   logger.debug({ agentId }, 'Messages cleared');
 };
 
+/**
+ * Удалить конкретное сообщение агента
+ */
+export const deleteMessageById = async (messageId: string): Promise<void> => {
+  await withRetry(
+    () => prisma.message.deleteMany({
+      where: {
+        id: messageId,
+      },
+    }),
+    3,
+    `deleteMessageById - message ${messageId}`
+  );
+
+  logger.debug({ messageId }, 'Message deleted');
+};
+

@@ -4,7 +4,7 @@ import { prisma } from '../../db/prisma';
 import { withRetry } from '../../utils/prismaRetry';
 import { logger } from '../../utils/logger';
 import { getOrCreateAgentFromTemplate } from '../../services/agents/agentTemplateService';
-import { loadMessages, sendMessage, clearMessages } from '../../services/agents/messageService';
+import { loadMessages, sendMessage, clearMessages, deleteMessageById } from '../../services/agents/messageService';
 import { prepareFilesForAgent } from '../../services/agents/fileService';
 import { AuthenticatedRequest } from '../../types/express';
 
@@ -263,6 +263,54 @@ export const deleteMessages = async (req: Request, res: Response) => {
   await clearMessages(agent.id);
 
   logger.debug({ agentId: agent.id }, 'Messages deleted successfully');
+  res.status(204).send();
+};
+
+/**
+ * Удалить конкретное сообщение агента
+ */
+export const deleteMessage = async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.userId!;
+  const { agentId, messageId } = req.params;
+  const projectId = req.query.projectId as string | undefined;
+
+  logger.info({
+    agentId,
+    messageId,
+    userId,
+    projectId,
+    hasProjectId: !!projectId,
+  }, 'DELETE /agents/:agentId/messages/:messageId - request received');
+
+  // Ищем сообщение по id и проверяем владельца агента, чтобы избежать 404 из-за расхождения agentId/templateId
+  const message = await withRetry(
+    () => prisma.message.findFirst({
+      where: { id: messageId },
+      include: { agent: true },
+    }),
+    3,
+    `DELETE /agents/${agentId}/messages/${messageId} - find message`
+  );
+
+  if (!message) {
+    logger.warn({ agentId: agent.id, messageId }, 'Message not found for deletion');
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  if (!message.agent || message.agent.userId !== userId) {
+    logger.warn({ agentId: message.agentId, messageId, userId }, 'Attempt to delete message of another user');
+    return res.status(403).json({ error: 'Access denied. Message belongs to different user.' });
+  }
+
+  if (projectId && message.agent.projectId !== projectId) {
+    logger.warn({ agentId: message.agentId, messageId, userId, projectId, messageProjectId: message.agent.projectId }, 'ProjectId mismatch on delete message');
+    return res.status(404).json({ error: 'Message not found in this project' });
+  }
+
+  await deleteMessageById(messageId);
+
+  logger.debug({ agentId: message.agentId, messageId }, 'Message deleted successfully');
   res.status(204).send();
 };
 

@@ -35,3 +35,11 @@ export const clearMessages = async (agentId: string, projectId?: string) => {
   return request<void>(`/agents/${agentId}/messages${query}`, { method: 'DELETE' });
 };
 
+/**
+ * Удаление конкретного сообщения агента
+ */
+export const deleteMessage = async (agentId: string, messageId: string, projectId?: string) => {
+  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+  return request<void>(`/agents/${agentId}/messages/${messageId}${query}`, { method: 'DELETE' });
+};
+

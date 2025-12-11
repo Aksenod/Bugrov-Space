@@ -361,6 +361,27 @@ export default function App() {
     }
   }, [handleSendMessage]);
 
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    if (!messageId) return;
+
+    if (!chat || typeof chat.deleteMessage !== 'function') {
+      console.error('[App] chat.deleteMessage is not a function:', {
+        chat,
+        deleteMessage: (chat as any)?.deleteMessage,
+      });
+      showAlert('Ошибка: функция удаления сообщений недоступна', 'Ошибка', 'error', 5000);
+      return;
+    }
+
+    try {
+      await chat.deleteMessage(messageId);
+      showAlert('Сообщение удалено', undefined, 'success', 2000);
+    } catch (error: any) {
+      console.error('[App] Failed to delete message:', error);
+      showAlert(error?.message || 'Не удалось удалить сообщение', 'Ошибка', 'error', 4000);
+    }
+  }, [chat, showAlert]);
+
   const handleClearChat = useCallback(async () => {
     if (!activeAgent || !activeAgentId) return;
     showConfirm(
@@ -928,6 +949,7 @@ export default function App() {
             onSendMessage={handleSendMessage || (async () => {
               console.error('[App] handleSendMessage is undefined when passing to WorkspacePage');
             })}
+            onDeleteMessage={handleDeleteMessage}
             onCancelMessage={chat.cancelMessage}
             onClearChat={handleClearChat}
             onOpenAdmin={(agentId) => {

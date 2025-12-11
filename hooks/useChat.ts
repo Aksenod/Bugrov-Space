@@ -3,7 +3,7 @@
  */
 
 import { useReducer, useCallback, useMemo, useRef, useEffect } from 'react';
-import { getMessages as getMessagesService, sendMessage as sendMessageService, clearMessages as clearMessagesService } from '../services/messageService';
+import { getMessages as getMessagesService, sendMessage as sendMessageService, clearMessages as clearMessagesService, deleteMessage as deleteMessageService } from '../services/messageService';
 import { mapMessage } from '../utils/mappers';
 import { UseChatReturn, ChatState, ChatAction } from './types';
 import { Message, Role } from '../types';
@@ -40,6 +40,17 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
       return {
         ...state,
         chatHistories: updated,
+      };
+    }
+
+    case 'DELETE_MESSAGE': {
+      const currentMessages = state.chatHistories[action.payload.agentId] ?? [];
+      return {
+        ...state,
+        chatHistories: {
+          ...state.chatHistories,
+          [action.payload.agentId]: currentMessages.filter((msg) => msg.id !== action.payload.messageId),
+        },
       };
     }
 
@@ -318,6 +329,24 @@ export const useChat = (
   );
 
   /**
+   * Удаляет конкретное сообщение агента
+   */
+  const deleteMessage = useCallback(
+    async (messageId: string): Promise<void> => {
+      if (!activeAgentId || !messageId) return;
+
+      try {
+        await deleteMessageService(activeAgentId, messageId, activeProjectId || undefined);
+        dispatch({ type: 'DELETE_MESSAGE', payload: { agentId: activeAgentId, messageId } });
+      } catch (error: any) {
+        console.error('Failed to delete message', error);
+        throw error;
+      }
+    },
+    [activeAgentId, activeProjectId]
+  );
+
+  /**
    * Очищает временные loading-сообщения для указанного агента
    */
   const clearTemporaryMessages = useCallback(
@@ -356,6 +385,7 @@ export const useChat = (
     messages,
     isLoading: state.isLoading,
     sendMessage,
+    deleteMessage,
     cancelMessage,
     clearChat,
     ensureMessagesLoaded,

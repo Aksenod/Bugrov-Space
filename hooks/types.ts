@@ -65,6 +65,7 @@ export interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
   sendMessage: (text: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
   cancelMessage: () => void;
   clearChat: () => Promise<void>;
   ensureMessagesLoaded: (agentId: string) => Promise<void>;
@@ -183,6 +184,7 @@ export type ChatAction =
   | { type: 'SET_MESSAGES'; payload: { agentId: string; messages: Message[] } }
   | { type: 'ADD_MESSAGE'; payload: { agentId: string; message: Message } }
   | { type: 'CLEAR_MESSAGES'; payload: { agentId: string } }
+  | { type: 'DELETE_MESSAGE'; payload: { agentId: string; messageId: string } }
   | { type: 'CLEAR_TEMPORARY_MESSAGES'; payload: { agentId: string } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'MARK_LOADED'; payload: string }
