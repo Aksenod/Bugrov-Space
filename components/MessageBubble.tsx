@@ -30,6 +30,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
   const canCopy = !isGenerating && message.text.length > 0;
   const [isCopyToastVisible, setIsCopyToastVisible] = React.useState(false);
   const copyToastTimerRef = React.useRef<number | null>(null);
+  const [deleteCountdown, setDeleteCountdown] = React.useState<number | null>(null);
+  const deleteTimeoutRef = React.useRef<number | null>(null);
+  const deleteIntervalRef = React.useRef<number | null>(null);
+  const COUNTDOWN_START = 5;
 
   const handleCopy = React.useCallback(() => {
     if (!message.text) return;
@@ -62,8 +66,60 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
       if (copyToastTimerRef.current) {
         window.clearTimeout(copyToastTimerRef.current);
       }
+      if (deleteTimeoutRef.current) {
+        window.clearTimeout(deleteTimeoutRef.current);
+      }
+      if (deleteIntervalRef.current) {
+        window.clearInterval(deleteIntervalRef.current);
+      }
     };
   }, []);
+
+  const resetDeleteState = React.useCallback(() => {
+    if (deleteTimeoutRef.current) {
+      window.clearTimeout(deleteTimeoutRef.current);
+      deleteTimeoutRef.current = null;
+    }
+    if (deleteIntervalRef.current) {
+      window.clearInterval(deleteIntervalRef.current);
+      deleteIntervalRef.current = null;
+    }
+    setDeleteCountdown(null);
+  }, []);
+
+  // Сбрасываем таймер при смене сообщения
+  React.useEffect(() => {
+    resetDeleteState();
+  }, [message.id, resetDeleteState]);
+
+  const handleDeleteClick = React.useCallback(() => {
+    if (!canDelete) return;
+
+    // Повторный клик отменяет удаление
+    if (deleteCountdown !== null) {
+      resetDeleteState();
+      return;
+    }
+
+    setDeleteCountdown(COUNTDOWN_START);
+
+    deleteIntervalRef.current = window.setInterval(() => {
+      setDeleteCountdown((prev) => {
+        if (prev === null) return null;
+        const next = prev - 1;
+        if (next <= 0 && deleteIntervalRef.current) {
+          window.clearInterval(deleteIntervalRef.current);
+          deleteIntervalRef.current = null;
+        }
+        return Math.max(next, 0);
+      });
+    }, 1000);
+
+    deleteTimeoutRef.current = window.setTimeout(() => {
+      resetDeleteState();
+      onDelete?.(message.id);
+    }, COUNTDOWN_START * 1000);
+  }, [canDelete, deleteCountdown, onDelete, message.id, resetDeleteState]);
 
   return (
     <div className={`relative z-20 flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-500`}>
@@ -136,10 +192,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                   <button
                     type="button"
                     aria-label="Удалить сообщение"
-                    onClick={() => onDelete?.(message.id)}
-                    className="p-1.5 rounded-full bg-white/5 border border-white/10 text-white/60 opacity-70 transition-all hover:bg-white/15 hover:text-white hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/30"
+                    onClick={handleDeleteClick}
+                    className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 ${
+                      deleteCountdown !== null
+                        ? 'bg-red-600/20 border border-red-500/50 text-red-100 hover:bg-red-600/30 focus:ring-red-400/50'
+                        : 'bg-white/5 border border-white/10 text-white/60 opacity-70 hover:bg-white/15 hover:text-white hover:opacity-100 focus:ring-white/30'
+                    }`}
                   >
-                    <Trash2 size={14} />
+                    <div className="flex items-center gap-1">
+                      <Trash2 size={14} />
+                      <span className="text-[11px] font-semibold">
+                        {deleteCountdown !== null ? `${deleteCountdown}s` : ''}
+                      </span>
+                    </div>
                   </button>
                 )}
               </div>
