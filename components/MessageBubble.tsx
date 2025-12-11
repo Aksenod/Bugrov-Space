@@ -200,8 +200,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                     onClick={handleDeleteClick}
                     className={`relative flex items-center justify-center w-9 h-9 rounded-full transition-all focus:outline-none focus:ring-2 ${
                       deleteCountdown !== null
-                        ? 'bg-red-600/20 border border-red-500/50 text-red-100 hover:bg-red-600/30 focus:ring-red-400/50'
-                        : 'bg-white/5 border border-white/10 text-white/60 opacity-70 hover:bg-white/15 hover:text-white hover:opacity-100 focus:ring-white/30'
+                        ? 'bg-red-600/15 border border-red-500/40 text-red-100 shadow-inner shadow-red-900/40 hover:bg-red-600/25 focus:ring-red-400/50 active:translate-y-px'
+                        : 'bg-white/5 border border-white/10 text-white/60 opacity-70 shadow-inner shadow-black/20 hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30 active:translate-y-px'
                     }`}
                   >
                     <Trash2 size={14} />
