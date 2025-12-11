@@ -193,7 +193,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                     type="button"
                     aria-label="Удалить сообщение"
                     onClick={handleDeleteClick}
-                    className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 ${
+                    className={`flex items-center gap-1 px-2 py-1.5 rounded-full transition-all focus:outline-none focus:ring-2 ${
                       deleteCountdown !== null
                         ? 'bg-red-600/20 border border-red-500/50 text-red-100 hover:bg-red-600/30 focus:ring-red-400/50'
                         : 'bg-white/5 border border-white/10 text-white/60 opacity-70 hover:bg-white/15 hover:text-white hover:opacity-100 focus:ring-white/30'
