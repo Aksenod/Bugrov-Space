@@ -2,7 +2,6 @@ import React from 'react';
 import { Message, Role } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { User, Bot, AlertCircle, Trash2, Copy, Check } from 'lucide-react';
-import { IconCircleButton } from './IconCircleButton';
 
 interface MessageBubbleProps {
   message: Message;
@@ -190,28 +189,32 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                         <span>Скопировано</span>
                       </div>
                     )}
-                    <IconCircleButton
+                    <button
+                      type="button"
                       aria-label={isCopyToastVisible ? 'Текст скопирован' : 'Скопировать сообщение'}
                       onClick={handleCopy}
-                      size="lg"
-                      variant={isCopyToastVisible ? 'primary' : 'subtle'}
-                      className={`sm:w-9 sm:h-9 ${isCopyToastVisible ? 'text-green-700' : 'opacity-80 hover:opacity-100'} focus:ring-offset-transparent`}
+                      className={`flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-full border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent active:translate-y-px ${
+                        isCopyToastVisible
+                          ? 'bg-green-500/20 border-green-500/40 text-green-300 shadow-lg focus:ring-green-400/50'
+                          : 'bg-white/5 border-white/10 text-white/60 opacity-70 shadow-md hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30'
+                      }`}
                     >
                       <Copy size={14} />
-                    </IconCircleButton>
+                    </button>
                   </div>
                 )}
                 {canDelete && (
-                  <IconCircleButton
+                  <button
+                    type="button"
                     aria-label={
-                      deleteCountdown !== null
-                        ? `Отменить удаление. Осталось ${deleteCountdown} ${deleteCountdown === 1 ? 'секунда' : deleteCountdown < 5 ? 'секунды' : 'секунд'}`
-                        : 'Удалить сообщение'
+                      deleteCountdown !== null ? `Отменить удаление. Осталось ${deleteCountdown} ${deleteCountdown === 1 ? 'секунда' : deleteCountdown < 5 ? 'секунды' : 'секунд'}` : 'Удалить сообщение'
                     }
                     onClick={handleDeleteClick}
-                    size="lg"
-                    variant={deleteCountdown !== null ? 'danger' : 'subtle'}
-                    className="relative sm:w-9 sm:h-9 opacity-80 hover:opacity-100 focus:ring-offset-transparent"
+                    className={`relative flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-full border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent active:translate-y-px ${
+                      deleteCountdown !== null
+                        ? 'bg-red-600/25 border-red-500/50 text-red-100 shadow-lg hover:bg-red-600/35 focus:ring-red-400/50'
+                        : 'bg-white/5 border-white/10 text-white/60 opacity-70 shadow-md hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30'
+                    }`}
                   >
                     <Trash2 size={14} />
                     {deleteCountdown !== null && (
@@ -219,7 +222,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                         {deleteCountdown}
                       </span>
                     )}
-                  </IconCircleButton>
+                  </button>
                 )}
               </div>
             )}
