@@ -5,10 +5,18 @@ echo "🔨 Building project for production..."
 # Устанавливаем продакшн URL API при сборке
 VITE_API_URL=https://bugrov-space.onrender.com/api npm run build
 
+echo "📚 Building Storybook static..."
+npm run build-storybook -- --output-dir storybook-static
+
 echo "📦 Copying GitHub Pages files..."
 cp CNAME dist/CNAME
 cp 404.html dist/404.html
 echo '' > dist/.nojekyll
+
+echo "📂 Embedding Storybook into dist/storybook..."
+rm -rf dist/storybook
+mkdir -p dist/storybook
+cp -R storybook-static/* dist/storybook/
 
 echo "✅ Verifying required files..."
 if [ ! -f "dist/index.html" ]; then
