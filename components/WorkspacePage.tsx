@@ -22,6 +22,9 @@ interface WorkspacePageProps {
   onClearChat: () => Promise<void>;
   onOpenAdmin: (agentId?: string | null) => void;
   onSelectAgent: (agentId: string) => void;
+  onSaveChat?: () => void;
+  isGeneratingSummary?: boolean;
+  summarySuccess?: boolean;
 }
 
 export const WorkspacePage: React.FC<WorkspacePageProps> = ({
@@ -38,6 +41,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
   onClearChat,
   onOpenAdmin,
   onSelectAgent,
+  onSaveChat,
+  isGeneratingSummary,
+  summarySuccess,
 }) => {
   if (!activeAgent) {
     return null;
@@ -59,6 +65,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({
         activeAgent={activeAgent}
         onSendMessage={onSendMessage}
         onDeleteMessage={onDeleteMessage}
+        onSaveChat={onSaveChat}
+        isGeneratingSummary={isGeneratingSummary}
+        summarySuccess={summarySuccess}
       />
       <div className="flex-shrink-0 p-4 sm:p-6 bg-gradient-to-t from-black via-black/80 to-transparent z-20">
         <ChatInput

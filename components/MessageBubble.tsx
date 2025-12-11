@@ -1,11 +1,14 @@
 import React from 'react';
 import { Message, Role } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { User, Bot, AlertCircle, Trash2, Copy, Check } from 'lucide-react';
+import { User, Bot, AlertCircle, Trash2, Copy, Check, Save, Loader2, CheckCircle } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
   onDelete?: (messageId: string) => void;
+  onSaveChat?: () => void;
+  isGeneratingSummary?: boolean;
+  summarySuccess?: boolean;
 }
 
 /**
@@ -21,13 +24,14 @@ const TypingIndicator: React.FC = () => {
   );
 };
 
-export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, onDelete }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, onDelete, onSaveChat, isGeneratingSummary, summarySuccess }) => {
   const isUser = message.role === Role.USER;
   const isGenerating = !isUser && message.isStreaming && message.text.length === 0;
   const isTemporary = message.id.startsWith('temp-') || message.id.startsWith('loading-');
   const isTransientError = message.id.startsWith('error-');
   const canDelete = !!onDelete && !isGenerating && !isTemporary && !isTransientError;
   const canCopy = !isGenerating && message.text.length > 0;
+  const canSave = !isUser && !!onSaveChat && !isGenerating && message.text.length > 0;
   const [isCopyToastVisible, setIsCopyToastVisible] = React.useState(false);
   const copyToastTimerRef = React.useRef<number | null>(null);
   const [deleteCountdown, setDeleteCountdown] = React.useState<number | null>(null);
@@ -145,15 +149,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
       )}
 
       <div
-        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin min-w-0 w-full max-w-[96%] sm:max-w-[90%]
+        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin min-w-0 w-auto max-w-[90vw] sm:max-w-[80vw] md:max-w-[70vw] lg:max-w-[60vw]
           ${
             isUser
-              ? 'bg-gradient-to-br from-indigo-600/90 via-indigo-600/80 to-blue-600/80 text-white rounded-[1.5rem] rounded-tr-sm border-white/30 shadow-lg shadow-indigo-500/20 max-w-[88%] md:max-w-[75%]' 
+              ? 'bg-gradient-to-br from-indigo-600/90 via-indigo-600/80 to-blue-600/80 text-white rounded-[1.5rem] rounded-tr-sm border-white/30 shadow-lg shadow-indigo-500/20' 
               : message.isError
-                ? 'bg-red-950/70 border-red-500/40 text-red-50 rounded-[1.5rem] rounded-tl-sm shadow-md shadow-red-500/10 sm:max-w-[85%]'
+                ? 'bg-red-950/70 border-red-500/40 text-red-50 rounded-[1.5rem] rounded-tl-sm shadow-md shadow-red-500/10'
                 : isGenerating
-                  ? 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50 border-indigo-500/30 sm:max-w-[85%]'
-                  : 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50 sm:max-w-[85%]' 
+                  ? 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50 border-indigo-500/30'
+                  : 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50' 
           }
         `}
         style={{ 
@@ -164,7 +168,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
           <TypingIndicator />
         ) : (
           message.text.length > 0 && (
-            <div className="w-full overflow-x-auto scrollbar-thin">
+            <div className="w-full overflow-x-auto md:overflow-visible scrollbar-thin">
               <MarkdownRenderer content={message.text} isCompact />
             </div>
           )
@@ -179,7 +183,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
             )}
             
             {/* Status messages and action buttons */}
-            {(canCopy || canDelete || isCopyToastVisible || deleteCountdown !== null) && (
+            {(canCopy || canDelete || canSave || isCopyToastVisible || deleteCountdown !== null || isGeneratingSummary || summarySuccess) && (
               <div className="flex items-center gap-2 sm:gap-2.5 ml-auto overflow-visible" aria-live={deleteCountdown !== null ? 'assertive' : 'polite'} aria-atomic="true">
                 {canCopy && (
                   <div className="relative overflow-visible">
@@ -202,6 +206,39 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
                       <Copy size={14} />
                     </button>
                   </div>
+                )}
+                {canSave && (
+                  <button
+                    type="button"
+                    aria-label={
+                      summarySuccess
+                        ? 'Диалог сохранен в документы'
+                        : isGeneratingSummary
+                          ? 'Идет сохранение диалога'
+                          : 'Сохранить диалог в документы'
+                    }
+                    onClick={() => {
+                      if (isGeneratingSummary) return;
+                      onSaveChat?.();
+                    }}
+                    disabled={isGeneratingSummary}
+                    className={`flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-full border transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent active:translate-y-px ${
+                      summarySuccess
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200 shadow-lg focus:ring-emerald-400/50'
+                        : isGeneratingSummary
+                          ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-200 shadow-md focus:ring-indigo-400/50 cursor-wait'
+                          : 'bg-white/5 border-white/10 text-white/60 opacity-70 shadow-md hover:bg-white/10 hover:text-white hover:opacity-100 focus:ring-white/30'
+                    }`}
+                    title="Save Chat to Documents"
+                  >
+                    {summarySuccess ? (
+                      <CheckCircle size={14} />
+                    ) : isGeneratingSummary ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                  </button>
                 )}
                 {canDelete && (
                   <button

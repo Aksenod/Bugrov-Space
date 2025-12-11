@@ -1000,6 +1000,9 @@ export default function App() {
               routing.setRouteState({ adminInitialAgentId: agentId || activeAgentId || undefined, isAdminOpen: true });
             }}
             onSelectAgent={setActiveAgentId}
+            onSaveChat={handleGenerateSummary}
+            isGeneratingSummary={documents.isGeneratingSummary}
+            summarySuccess={documents.summarySuccess}
           />
         )}
       </main>

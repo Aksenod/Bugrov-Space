@@ -14,9 +14,21 @@ interface ChatAreaProps {
   activeAgent: Agent | undefined;
   onSendMessage: (text: string) => Promise<void>;
   onDeleteMessage?: (messageId: string) => Promise<void>;
+  onSaveChat?: () => void;
+  isGeneratingSummary?: boolean;
+  summarySuccess?: boolean;
 }
 
-export const ChatArea: React.FC<ChatAreaProps> = ({ messages, isLoading, activeAgent, onSendMessage, onDeleteMessage }) => {
+export const ChatArea: React.FC<ChatAreaProps> = ({
+  messages,
+  isLoading,
+  activeAgent,
+  onSendMessage,
+  onDeleteMessage,
+  onSaveChat,
+  isGeneratingSummary,
+  summarySuccess,
+}) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Логирование для диагностики onSendMessage
@@ -38,7 +50,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ messages, isLoading, activeA
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin relative bg-gradient-to-b from-transparent via-transparent to-black/20">
       {messages.length === 0 && <EmptyChatState activeAgent={activeAgent} onSendMessage={onSendMessage} />}
-      <MessagesList messages={messages} isLoading={isLoading} onDeleteMessage={onDeleteMessage} />
+      <MessagesList
+        messages={messages}
+        isLoading={isLoading}
+        onDeleteMessage={onDeleteMessage}
+        onSaveChat={onSaveChat}
+        isGeneratingSummary={isGeneratingSummary}
+        summarySuccess={summarySuccess}
+      />
       <div ref={messagesEndRef} />
     </div>
   );

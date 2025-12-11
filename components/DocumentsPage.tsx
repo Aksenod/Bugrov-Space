@@ -551,7 +551,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                 )}
 
                 <div
-                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto overflow-x-hidden flex-1 p-4 sm:p-6 md:p-8 min-w-0"
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto overflow-x-auto md:overflow-x-visible flex-1 p-4 sm:p-6 md:p-8 min-w-0 max-w-full"
                   style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}
                 >
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (

@@ -11,9 +11,19 @@ interface MessagesListProps {
   messages: Message[];
   isLoading: boolean;
   onDeleteMessage?: (messageId: string) => void;
+  onSaveChat?: () => void;
+  isGeneratingSummary?: boolean;
+  summarySuccess?: boolean;
 }
 
-export const MessagesList: React.FC<MessagesListProps> = ({ messages, isLoading, onDeleteMessage }) => {
+export const MessagesList: React.FC<MessagesListProps> = ({
+  messages,
+  isLoading,
+  onDeleteMessage,
+  onSaveChat,
+  isGeneratingSummary,
+  summarySuccess,
+}) => {
   // Уникальные сообщения (убираем дубликаты)
   // Теперь не фильтруем пустые streaming сообщения - они будут показываться как индикатор генерации
   const uniqueMessages = useMemo(() => {
@@ -32,7 +42,14 @@ export const MessagesList: React.FC<MessagesListProps> = ({ messages, isLoading,
   return (
     <>
       {uniqueMessages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} onDelete={onDeleteMessage} />
+        <MessageBubble
+          key={msg.id}
+          message={msg}
+          onDelete={onDeleteMessage}
+          onSaveChat={onSaveChat}
+          isGeneratingSummary={isGeneratingSummary}
+          summarySuccess={summarySuccess}
+        />
       ))}
       {/* Показываем MessageSkeleton только если isLoading и нет streaming сообщения (чтобы избежать дублирования) */}
       {isLoading && !hasStreamingMessage && <MessageSkeleton />}
