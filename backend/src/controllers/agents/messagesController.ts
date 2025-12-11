@@ -294,7 +294,7 @@ export const deleteMessage = async (req: Request, res: Response) => {
   );
 
   if (!message) {
-    logger.warn({ agentId: agent.id, messageId }, 'Message not found for deletion');
+    logger.warn({ agentId, messageId }, 'Message not found for deletion');
     return res.status(404).json({ error: 'Message not found' });
   }
 
