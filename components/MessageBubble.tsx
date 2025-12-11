@@ -145,28 +145,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
       )}
 
       <div
-        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin overflow-visible
+        className={`relative px-5 py-4 backdrop-blur-xl border scrollbar-thin min-w-0 w-full max-w-[96%] sm:max-w-[90%]
           ${
             isUser
               ? 'bg-gradient-to-br from-indigo-600/90 via-indigo-600/80 to-blue-600/80 text-white rounded-[1.5rem] rounded-tr-sm border-white/30 shadow-lg shadow-indigo-500/20 max-w-[88%] md:max-w-[75%]' 
               : message.isError
-                ? 'bg-red-950/70 border-red-500/40 text-red-50 rounded-[1.5rem] rounded-tl-sm shadow-md shadow-red-500/10'
+                ? 'bg-red-950/70 border-red-500/40 text-red-50 rounded-[1.5rem] rounded-tl-sm shadow-md shadow-red-500/10 sm:max-w-[85%]'
                 : isGenerating
-                  ? 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50 border-indigo-500/30'
-                  : 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50' 
+                  ? 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50 border-indigo-500/30 sm:max-w-[85%]'
+                  : 'bg-neutral-800/90 text-gray-50 rounded-[1.5rem] rounded-tl-sm border-white/20 shadow-lg shadow-black/50 sm:max-w-[85%]' 
           }
         `}
         style={{ 
-          maxWidth: isUser ? undefined : 'none',
-          overflowX: 'visible',
-          overflowY: 'visible',
           WebkitOverflowScrolling: 'touch'
         }}
       >
         {isGenerating ? (
           <TypingIndicator />
         ) : (
-          message.text.length > 0 && <MarkdownRenderer content={message.text} isCompact />
+          message.text.length > 0 && (
+            <div className="w-full overflow-x-auto scrollbar-thin">
+              <MarkdownRenderer content={message.text} isCompact />
+            </div>
+          )
         )}
 
         {/* Timestamp and Actions */}
