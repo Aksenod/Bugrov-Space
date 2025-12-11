@@ -178,6 +178,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
             )}
             {(canCopy || canDelete) && (
               <div className="ml-auto flex items-center gap-2">
+                {deleteCountdown !== null && (
+                  <span className="text-[11px] font-semibold text-red-200">
+                    {`Удаление через ${deleteCountdown}s`}
+                  </span>
+                )}
                 {canCopy && (
                   <button
                     type="button"
