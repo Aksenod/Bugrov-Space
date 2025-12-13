@@ -71,6 +71,7 @@ export interface User {
 export interface ProjectType {
   id: string;
   name: string;
+  isAdminOnly?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

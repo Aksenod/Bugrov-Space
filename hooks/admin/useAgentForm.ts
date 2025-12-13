@@ -28,7 +28,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
   // Инициализация формы при открытии диалога
   useEffect(() => {
     if (editingAgent && isDialogOpen) {
-      setAgentName(editingAgent.name);
+      setAgentName(editingAgent.name || '');
       setAgentDescription(editingAgent.description || '');
       setAgentSystemInstruction(editingAgent.systemInstruction || '');
       setAgentSummaryInstruction(editingAgent.summaryInstruction || '');
@@ -39,6 +39,18 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
       const projectTypeIds = editingAgent.projectTypes?.map(pt => pt.id) || [];
       setSelectedProjectTypeIds(projectTypeIds);
       initialProjectTypeIdsRef.current = [...projectTypeIds];
+    } else if (!editingAgent && isDialogOpen) {
+      // Сброс формы при создании нового агента
+      setAgentName('');
+      setAgentDescription('');
+      setAgentSystemInstruction('');
+      setAgentSummaryInstruction('');
+      setAgentModel(LLMModel.GPT5_MINI);
+      setAgentRole('');
+      setAgentIsHiddenFromSidebar(false);
+      setAgentQuickMessages([]);
+      setSelectedProjectTypeIds([]);
+      initialProjectTypeIdsRef.current = [];
     }
   }, [editingAgent, isDialogOpen]);
 

@@ -262,7 +262,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
   }
 
   return (
-    <div className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass} min-w-0 w-full`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}>
+    <div 
+      ref={(el) => {
+        // #region agent log
+        if (el) {
+          const computed = window.getComputedStyle(el);
+          const parentEl = el.parentElement;
+          const parentComputed = parentEl ? window.getComputedStyle(parentEl) : null;
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:265',message:'MarkdownRenderer root mounted',data:{rootWidth:computed.width,rootMinWidth:computed.minWidth,rootMaxWidth:computed.maxWidth,rootOverflowX:computed.overflowX,parentWidth:parentComputed?.width,parentMinWidth:parentComputed?.minWidth,parentOverflowX:parentComputed?.overflowX,parentOverflowY:parentComputed?.overflowY,parentDisplay:parentComputed?.display},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
+        }
+        // #endregion
+      }}
+      className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass} w-full`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, minWidth: 0 }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -388,9 +399,37 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           },
           table({ children }) {
             return (
-              <div className="my-4 w-full max-w-full min-w-0 overflow-x-auto">
+              <div 
+                ref={(el) => {
+                  // #region agent log
+                  if (el) {
+                    const computed = window.getComputedStyle(el);
+                    const parentComputed = el.parentElement ? window.getComputedStyle(el.parentElement) : null;
+                    const tableEl = el.querySelector('table');
+                    const tableComputed = tableEl ? window.getComputedStyle(tableEl) : null;
+                    fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:391',message:'Table wrapper mounted',data:{wrapperWidth:computed.width,wrapperMaxWidth:computed.maxWidth,wrapperOverflowX:computed.overflowX,wrapperOverflowY:computed.overflowY,parentWidth:parentComputed?.width,parentMinWidth:parentComputed?.minWidth,parentOverflowX:parentComputed?.overflowX,tableWidth:tableComputed?.width,tableMinWidth:tableComputed?.minWidth,tableScrollWidth:tableEl?.scrollWidth,tableClientWidth:tableEl?.clientWidth,wrapperScrollWidth:el.scrollWidth,wrapperClientWidth:el.clientWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'fix4',hypothesisId:'F,G'})}).catch(()=>{});
+                  }
+                  // #endregion
+                }}
+                className="my-4 overflow-x-auto" 
+                style={{ 
+                  width: '100%',
+                  maxWidth: '100%',
+                  minWidth: 0,
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'thin',
+                  overflowY: 'visible',
+                  display: 'block'
+                }}
+              >
                 <table
-                  className="w-full min-w-max table-auto border-collapse text-left"
+                  className="table-auto border-collapse text-left"
+                  style={{ 
+                    width: 'max-content',
+                    minWidth: 'max-content',
+                    tableLayout: 'auto',
+                    display: 'table'
+                  }}
                 >
                   {children}
                 </table>
@@ -409,13 +448,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           th({ children }) {
             return (
               <th
-                className="border border-white/20 px-4 py-2 text-left font-semibold text-white align-top whitespace-normal break-words max-w-[260px]"
+                className="border border-white/20 px-4 py-2 text-left font-semibold text-white align-top whitespace-nowrap"
                 style={{
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word',
                   lineHeight: '1.4',
-                  minWidth: '140px',
-                  maxWidth: '260px'
+                  minWidth: '140px'
                 }}
               >
                 {children}
@@ -425,13 +461,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           td({ children }) {
             return (
               <td
-                className="border border-white/10 px-4 py-2 text-white/90 align-top whitespace-normal break-words max-w-[260px]"
+                ref={(el) => {
+                  // #region agent log
+                  if (el) {
+                    const computed = window.getComputedStyle(el);
+                    fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:439',message:'Table cell rendered',data:{cellWidth:computed.width,cellMinWidth:computed.minWidth,cellMaxWidth:computed.maxWidth,cellScrollWidth:el.scrollWidth,cellClientWidth:el.clientWidth,textContent:el.textContent?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'fix4',hypothesisId:'G'})}).catch(()=>{});
+                  }
+                  // #endregion
+                }}
+                className="border border-white/10 px-4 py-2 text-white/90 align-top whitespace-nowrap"
                 style={{
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word',
                   lineHeight: '1.4',
-                  minWidth: '140px',
-                  maxWidth: '260px'
+                  minWidth: '140px'
                 }}
               >
                 {children}

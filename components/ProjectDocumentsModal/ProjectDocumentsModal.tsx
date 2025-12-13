@@ -556,7 +556,15 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 )}
 
                 <div
-                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto overflow-x-hidden flex-1 p-4 sm:p-6 md:p-8 min-w-0"
+                  ref={(el) => {
+                    // #region agent log
+                    if (el) {
+                      const computed = window.getComputedStyle(el);
+                      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProjectDocumentsModal.tsx:559',message:'Content container mounted',data:{containerWidth:computed.width,containerMinWidth:computed.minWidth,containerMaxWidth:computed.maxWidth,containerOverflowX:computed.overflowX,containerOverflowY:computed.overflowY,containerDisplay:computed.display,containerFlexDirection:computed.flexDirection,containerClientWidth:el.clientWidth,containerScrollWidth:el.scrollWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    }
+                    // #endregion
+                  }}
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto flex-1 p-4 sm:p-6 md:p-8 min-w-0 max-w-full"
                   style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}
                 >
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
@@ -600,7 +608,16 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       }
 
                       return (
-                        <div className="prose prose-invert prose-lg max-w-none break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 min-w-0">
+                        <div 
+                          ref={(el) => {
+                            // #region agent log
+                            if (el) {
+                              const computed = window.getComputedStyle(el);
+                              fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ProjectDocumentsModal.tsx:611',message:'Prose wrapper mounted',data:{proseWidth:computed.width,proseMinWidth:computed.minWidth,proseMaxWidth:computed.maxWidth,proseOverflowX:computed.overflowX,proseDisplay:computed.display},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B,E'})}).catch(()=>{});
+                            }
+                            // #endregion
+                          }}
+                          className="prose prose-invert prose-lg max-w-none break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 w-full" style={{ overflowX: 'visible', minWidth: 0 }}>
                           <MarkdownRenderer content={decodeContent(content)} />
                         </div>
                       );

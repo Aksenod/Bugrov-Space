@@ -301,62 +301,56 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl shadow-lg shadow-indigo-500/10 hover:bg-indigo-500/15 hover:border-indigo-500/40 transition-all duration-200">
                         {activeTab === 'text' && !selectedFile.type.includes('image') && (
                           isEditing ? (
                             <>
                               <button
                                 onClick={handleCancelEdit}
                                 disabled={isSaving}
-                                className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                                className="p-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all disabled:opacity-50"
                                 title="Отменить"
                                 aria-label="Отменить редактирование"
                               >
-                                <span className="text-xs font-semibold hidden sm:inline">Отменить</span>
-                                <X size={16} />
+                                <X size={18} />
                               </button>
                               <button
                                 onClick={handleSaveEdit}
                                 disabled={isSaving}
-                                className="px-3 py-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
+                                className="p-2.5 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-lg transition-all disabled:opacity-50"
                                 title="Сохранить"
                                 aria-label="Сохранить изменения"
                               >
-                                {isSaving && <Loader2 size={14} className="animate-spin" />}
-                                <span className="text-xs font-semibold hidden sm:inline">Сохранить</span>
-                                <Save size={16} />
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                               </button>
                             </>
                           ) : (
                             <button
                               onClick={handleEdit}
-                              className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
+                              className="p-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                               title="Редактировать"
                               aria-label="Редактировать документ"
                             >
-                              <span className="text-xs font-semibold hidden sm:inline">Редактировать</span>
-                              <Edit size={16} />
+                              <Edit size={18} />
                             </button>
                           )
                         )}
                         <button
                           onClick={(e) => handleDownload(selectedFile, e)}
-                          className="px-3 py-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all flex items-center gap-2"
+                          className="p-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                           title="Скачать"
                           aria-label="Скачать документ"
                         >
-                          <span className="text-xs font-semibold hidden sm:inline">Скачать</span>
-                          <Download size={16} />
+                          <Download size={18} />
                         </button>
                         {onRemoveFile && (
                           <button
                             onClick={(e) => handleDelete(selectedFile.id, e)}
-                            className="px-3 py-2 text-white/80 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all flex items-center gap-2"
+                            className="p-2.5 text-white/80 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                             title="Удалить"
                             aria-label="Удалить документ"
                           >
-                            <span className="text-xs font-semibold hidden sm:inline">Удалить</span>
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         )}
                       </div>
@@ -566,7 +560,15 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                 )}
 
                 <div
-                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto overflow-x-auto md:overflow-x-visible flex-1 p-4 sm:p-6 md:p-8 min-w-0 max-w-full"
+                  ref={(el) => {
+                    // #region agent log
+                    if (el) {
+                      const computed = window.getComputedStyle(el);
+                      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DocumentsPage.tsx:563',message:'Content container mounted',data:{containerWidth:computed.width,containerMinWidth:computed.minWidth,containerMaxWidth:computed.maxWidth,containerOverflowX:computed.overflowX,containerOverflowY:computed.overflowY,containerDisplay:computed.display,containerFlexDirection:computed.flexDirection,containerClientWidth:el.clientWidth,containerScrollWidth:el.scrollWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    }
+                    // #endregion
+                  }}
+                  className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto flex-1 p-4 sm:p-6 md:p-8 min-w-0 max-w-full"
                   style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}
                 >
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
@@ -610,7 +612,16 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                       }
 
                       return (
-                        <div className="prose prose-invert prose-lg max-w-none break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 min-w-0">
+                        <div 
+                          ref={(el) => {
+                            // #region agent log
+                            if (el) {
+                              const computed = window.getComputedStyle(el);
+                              fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DocumentsPage.tsx:607',message:'Prose wrapper mounted',data:{proseWidth:computed.width,proseMinWidth:computed.minWidth,proseMaxWidth:computed.maxWidth,proseOverflowX:computed.overflowX,proseDisplay:computed.display},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B,E'})}).catch(()=>{});
+                            }
+                            // #endregion
+                          }}
+                          className="prose prose-invert prose-lg max-w-none break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 w-full" style={{ overflowX: 'visible', minWidth: 0 }}>
                           <MarkdownRenderer content={decodeContent(content)} />
                         </div>
                       );

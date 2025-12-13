@@ -301,6 +301,7 @@ export interface ApiProjectType {
   id: string;
   name: string;
   description?: string;
+  isAdminOnly?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -543,17 +544,17 @@ export const api = {
     return request<{ projectTypes: ApiProjectType[] }>('/project-types');
   },
 
-  async createProjectType(name: string) {
+  async createProjectType(name: string, isAdminOnly?: boolean) {
     return request<{ projectType: ApiProjectType }>('/project-types', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, isAdminOnly: isAdminOnly ?? false }),
     });
   },
 
-  async updateProjectType(id: string, name: string) {
+  async updateProjectType(id: string, name: string, isAdminOnly?: boolean) {
     return request<{ projectType: ApiProjectType }>(`/project-types/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, isAdminOnly }),
     });
   },
 

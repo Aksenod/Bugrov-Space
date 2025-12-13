@@ -43,8 +43,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeIsAdminOnly, setNewTypeIsAdminOnly] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingIsAdminOnly, setEditingIsAdminOnly] = useState(false);
   const [projectTypeAgents, setProjectTypeAgents] = useState<Map<string, ApiProjectTypeAgent[]>>(new Map());
   const [loadingAgentsForType, setLoadingAgentsForType] = useState<Set<string>>(new Set());
   const [reorderingTypeId, setReorderingTypeId] = useState<string | null>(null);
@@ -298,7 +300,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
           // Открываем диалог с загруженным агентом
           setEditingAgent(agentWithProjectTypes);
-          setAgentName(agent.name);
+          setAgentName(agent.name || '');
           setAgentDescription(agent.description || '');
           setAgentSystemInstruction(agent.systemInstruction || '');
           setAgentSummaryInstruction(agent.summaryInstruction || '');
@@ -480,8 +482,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (!newTypeName.trim()) return;
     setIsCreating(true);
     try {
-      const { projectType } = await api.createProjectType(newTypeName.trim());
+      const { projectType } = await api.createProjectType(newTypeName.trim(), newTypeIsAdminOnly);
       setNewTypeName('');
+      setNewTypeIsAdminOnly(false);
       await loadProjectTypes();
       // Загружаем агентов для нового типа проекта
       await loadAgentsForType(projectType.id);
@@ -495,14 +498,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleStartEdit = (type: ApiProjectType) => {
     setEditingId(type.id);
     setEditingName(type.name);
+    setEditingIsAdminOnly(type.isAdminOnly ?? false);
   };
 
   const handleSaveEdit = async (id: string) => {
     if (!editingName.trim()) return;
     try {
-      await api.updateProjectType(id, editingName.trim());
+      await api.updateProjectType(id, editingName.trim(), editingIsAdminOnly);
       setEditingId(null);
       setEditingName('');
+      setEditingIsAdminOnly(false);
       await loadProjectTypes();
     } catch (error) {
       console.error('Failed to update project type', error);
@@ -561,7 +566,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   };
 
   const handleSaveAgent = async () => {
-    if (!editingAgent || !agentName?.trim()) return;
+    if (!editingAgent || !(agentName || '').trim()) return;
 
     // Очищаем таймер автосохранения
     clearSaveTimeout();
@@ -570,12 +575,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     try {
       // Обновление агента
       await api.updateAgentTemplate(editingAgent.id, {
-        name: agentName?.trim() || '',
-        description: agentDescription?.trim() || '',
-        systemInstruction: agentSystemInstruction?.trim() || '',
-        summaryInstruction: agentSummaryInstruction?.trim() || '',
+        name: (agentName || '').trim() || '',
+        description: (agentDescription || '').trim() || '',
+        systemInstruction: (agentSystemInstruction || '').trim() || '',
+        summaryInstruction: (agentSummaryInstruction || '').trim() || '',
         model: agentModel,
-        role: agentRole?.trim() || undefined,
+        role: (agentRole || '').trim() || undefined,
         isHiddenFromSidebar: agentIsHiddenFromSidebar,
         quickMessages: agentQuickMessages || [],
       });
@@ -776,10 +781,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               isCreating={isCreating}
               newTypeName={newTypeName}
               setNewTypeName={setNewTypeName}
+              newTypeIsAdminOnly={newTypeIsAdminOnly}
+              setNewTypeIsAdminOnly={setNewTypeIsAdminOnly}
               editingId={editingId}
               editingName={editingName}
-              setEditingId={setEditingId}
               setEditingName={setEditingName}
+              editingIsAdminOnly={editingIsAdminOnly}
+              setEditingIsAdminOnly={setEditingIsAdminOnly}
+              setEditingId={setEditingId}
               reorderingTypeId={reorderingTypeId}
               collapsedTypes={collapsedTypes}
               onCreate={handleCreate}
@@ -866,10 +875,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         !currentQuickMessages.every((msg, i) => msg === originalQuickMessages[i]);
 
                       const hasChanges =
-                        agentName.trim() !== (editingAgent.name || '') ||
-                        agentDescription.trim() !== (editingAgent.description || '') ||
-                        agentSystemInstruction.trim() !== (editingAgent.systemInstruction || '') ||
-                        agentSummaryInstruction.trim() !== (editingAgent.summaryInstruction || '') ||
+                        (agentName || '').trim() !== (editingAgent.name || '') ||
+                        (agentDescription || '').trim() !== (editingAgent.description || '') ||
+                        (agentSystemInstruction || '').trim() !== (editingAgent.systemInstruction || '') ||
+                        (agentSummaryInstruction || '').trim() !== (editingAgent.summaryInstruction || '') ||
                         agentModel !== resolveModel(editingAgent.model) ||
                         agentRole !== (editingAgent.role || '') ||
                         agentIsHiddenFromSidebar !== (editingAgent.isHiddenFromSidebar || false) ||
@@ -947,7 +956,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       type="text"
                       value={agentName}
                       onChange={(e) => setAgentName(e.target.value)}
-                      className={`w-full bg-black/40 border rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 pl-8 sm:pl-10 pr-14 sm:pr-20 text-xs sm:text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${!agentName.trim()
+                      className={`w-full bg-black/40 border rounded-lg sm:rounded-xl px-2.5 sm:px-4 py-2 sm:py-3 pl-8 sm:pl-10 pr-14 sm:pr-20 text-xs sm:text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all shadow-inner ${!(agentName || '').trim()
                         ? 'border-red-500/30 focus:border-red-500/50'
                         : 'border-white/10'
                         }`}
@@ -956,10 +965,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     />
                     <Edit3 size={12} className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-indigo-400 transition-colors sm:w-3.5 sm:h-3.5" />
                     <div className="absolute right-1.5 sm:right-3 top-1/2 -translate-y-1/2 text-[9px] sm:text-[10px] text-white/30">
-                      {agentName.length}/100
+                      {(agentName || '').length}/100
                     </div>
                   </div>
-                  {!agentName.trim() && (
+                  {!(agentName || '').trim() && (
                     <p className="mt-1 text-[9px] sm:text-[10px] text-red-400">Имя агента обязательно</p>
                   )}
                 </section>
@@ -984,7 +993,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   />
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-[9px] sm:text-[10px] text-white/30">Опционально</span>
-                    <span className="text-[9px] sm:text-[10px] text-white/30">{agentDescription.length}/500</span>
+                    <span className="text-[9px] sm:text-[10px] text-white/30">{(agentDescription || '').length}/500</span>
                   </div>
                 </section>
               </div>
@@ -1013,7 +1022,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   <textarea
                     value={agentSystemInstruction}
                     onChange={(e) => setAgentSystemInstruction(e.target.value)}
-                    className={`w-full h-32 sm:h-40 bg-black/40 border rounded-lg sm:rounded-xl p-2 sm:p-3 text-xs text-white/90 focus:ring-2 focus:ring-amber-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed font-mono ${!agentSystemInstruction.trim()
+                    className={`w-full h-32 sm:h-40 bg-black/40 border rounded-lg sm:rounded-xl p-2 sm:p-3 text-xs text-white/90 focus:ring-2 focus:ring-amber-500/50 focus:border-transparent placeholder-white/20 resize-none transition-all shadow-inner leading-relaxed font-mono ${!(agentSystemInstruction || '').trim()
                       ? 'border-red-500/30 focus:border-red-500/50'
                       : 'border-white/10'
                       }`}
@@ -1021,12 +1030,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     maxLength={5000}
                   />
                   <div className="flex justify-between items-center mt-1">
-                    {!agentSystemInstruction.trim() ? (
+                    {!(agentSystemInstruction || '').trim() ? (
                       <span className="text-[9px] sm:text-[10px] text-red-400">Системная инструкция обязательна</span>
                     ) : (
                       <span className="text-[9px] sm:text-[10px] text-white/30">Рекомендуется: 200-1000 символов</span>
                     )}
-                    <span className="text-[9px] sm:text-[10px] text-white/30">{agentSystemInstruction.length}/5000</span>
+                    <span className="text-[9px] sm:text-[10px] text-white/30">{(agentSystemInstruction || '').length}/5000</span>
                   </div>
                 </section>
 
@@ -1053,7 +1062,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   />
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-[9px] sm:text-[10px] text-white/30">Опционально</span>
-                    <span className="text-[9px] sm:text-[10px] text-white/30">{agentSummaryInstruction.length}/2000</span>
+                    <span className="text-[9px] sm:text-[10px] text-white/30">{(agentSummaryInstruction || '').length}/2000</span>
                   </div>
                 </section>
               </div>
@@ -1724,7 +1733,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               </button>
               <button
                 onClick={handleSaveAgent}
-                disabled={isSavingAgent || !agentName.trim()}
+                disabled={isSavingAgent || !(agentName || '').trim()}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 sm:gap-2"
               >
                 {isSavingAgent ? (

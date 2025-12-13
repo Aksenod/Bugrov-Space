@@ -127,7 +127,8 @@ app.use(
   }),
 );
 
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '30mb' })); // Увеличено для поддержки аудио файлов в base64
+app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
 // Применяем rate limiting ко всем API запросам
 app.use('/api', apiRateLimiter);

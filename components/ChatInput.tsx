@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SendHorizontal, Sparkles, X } from 'lucide-react';
+import { SendHorizontal, Sparkles, X, Mic } from 'lucide-react';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { VoiceInputModal } from './VoiceInputModal';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -12,6 +14,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isAdjustingRef = useRef(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [voiceModalData, setVoiceModalData] = useState<{ originalText: string; correctedText: string } | null>(null);
 
   // Устанавливаем начальную высоту при монтировании
   useEffect(() => {
@@ -116,13 +120,95 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
     }
   };
 
+  // Обработка результатов голосового ввода
+  const handleVoiceTextReady = (originalText: string, correctedText: string) => {
+    setVoiceModalData({ originalText, correctedText });
+    setShowVoiceModal(true);
+  };
+
+  const handleVoiceError = (error: string) => {
+    // Ошибки обрабатываются внутри хука, здесь можно добавить дополнительную обработку
+    console.error('Voice input error:', error);
+  };
+
+  const { 
+    isRecording, 
+    isProcessing: isVoiceProcessing, 
+    error: voiceError,
+    recordingDuration,
+    startRecording, 
+    stopRecording,
+    cancelRecording 
+  } = useVoiceInput(handleVoiceTextReady, handleVoiceError);
+
+  // Обработка использования исправленного текста
+  const handleUseCorrectedText = () => {
+    if (voiceModalData) {
+      setInput(voiceModalData.correctedText);
+      setVoiceModalData(null);
+      // Фокусируем textarea после вставки текста
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          // Прокручиваем в конец текста
+          const length = voiceModalData.correctedText.length;
+          textareaRef.current.setSelectionRange(length, length);
+        }
+      }, 0);
+    }
+  };
+
+  // Обработка использования оригинального текста
+  const handleUseOriginalText = () => {
+    if (voiceModalData) {
+      setInput(voiceModalData.originalText);
+      setVoiceModalData(null);
+      // Фокусируем textarea после вставки текста
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          // Прокручиваем в конец текста
+          const length = voiceModalData.originalText.length;
+          textareaRef.current.setSelectionRange(length, length);
+        }
+      }, 0);
+    }
+  };
+
+  // Переключение записи
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto relative group">
       {/* Glow Effect behind input */}
       <div className={`absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[1.5rem] blur opacity-20 group-hover:opacity-40 transition-all duration-500 ease-out group-focus-within:opacity-60 group-focus-within:blur-md`}></div>
 
       <div className="relative flex items-center bg-gradient-to-br from-black/70 via-black/60 to-black/70 backdrop-blur-xl border border-white/10 rounded-[1.5rem] shadow-2xl shadow-indigo-500/10 transition-all group-focus-within:border-white/20 group-focus-within:shadow-indigo-500/30 group-focus-within:shadow-lg">
-        <div className="pl-3 flex-shrink-0 text-white/40 flex items-center">
+        {/* Кнопка микрофона */}
+        <button
+          onClick={handleMicClick}
+          disabled={disabled || isLoading || isVoiceProcessing}
+          className={`pl-3 pr-2 flex-shrink-0 transition-all duration-300 ${
+            isRecording
+              ? 'text-red-400 animate-pulse'
+              : disabled || isLoading || isVoiceProcessing
+              ? 'text-white/20 cursor-not-allowed'
+              : 'text-white/40 hover:text-white/60'
+          }`}
+          title={isRecording ? `Запись... ${recordingDuration}с` : 'Голосовой ввод'}
+        >
+          <Mic 
+            size={18} 
+            className={isRecording ? 'animate-pulse' : ''}
+          />
+        </button>
+        <div className="pl-1 flex-shrink-0 text-white/40 flex items-center">
             <Sparkles size={18} className={`transition-colors duration-300 ${input.trim() ? 'text-indigo-400' : ''}`} />
         </div>
         <textarea
@@ -183,9 +269,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
           ) : (
             <button
               onClick={handleSend}
-              disabled={!input.trim() || disabled}
+              disabled={!input.trim() || disabled || isVoiceProcessing}
               className={`p-2.5 rounded-full transition-all duration-300 ease-out will-change-transform ${
-                !input.trim() || disabled
+                !input.trim() || disabled || isVoiceProcessing
                   ? 'bg-white/5 text-white/20 cursor-not-allowed'
                   : 'bg-white text-black hover:bg-indigo-50 shadow-[0_0_15px_rgba(255,255,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]'
               }`}
@@ -195,6 +281,31 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
           )}
         </div>
       </div>
+
+      {/* Модальное окно для голосового ввода */}
+      {showVoiceModal && voiceModalData && (
+        <VoiceInputModal
+          isOpen={showVoiceModal}
+          onClose={() => {
+            setShowVoiceModal(false);
+            setVoiceModalData(null);
+          }}
+          originalText={voiceModalData.originalText}
+          correctedText={voiceModalData.correctedText}
+          onUseCorrected={handleUseCorrectedText}
+          onUseOriginal={handleUseOriginalText}
+        />
+      )}
+
+      {/* Индикатор обработки голосового ввода */}
+      {isVoiceProcessing && (
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-xl backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-indigo-300">
+            <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+            <span>Обработка голосового ввода...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

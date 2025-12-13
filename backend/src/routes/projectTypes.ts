@@ -7,11 +7,16 @@ import { withRetry } from '../utils/prismaRetry';
 import { syncProjectTypeAgents } from '../services/projectTypeSync';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { adminMiddleware } from '../middleware/adminMiddleware';
+import { AuthenticatedRequest } from '../types/express';
+import { verifyToken } from '../utils/token';
 
 const router = Router();
 
+const ADMIN_USERNAMES = new Set(['admin', 'aksenod']);
+
 const projectTypeSchema = z.object({
   name: z.string().min(1, 'Название типа проекта обязательно').max(50, 'Название типа проекта не может быть длиннее 50 символов'),
+  isAdminOnly: z.boolean().optional().default(false),
 });
 
 const reorderAgentsSchema = z.object({
@@ -21,17 +26,70 @@ const reorderAgentsSchema = z.object({
   })).min(1),
 });
 
-// GET / - получить все типы проектов (публичный эндпоинт)
+// Вспомогательная функция для проверки, является ли пользователь администратором
+async function isUserAdmin(userId: string | undefined): Promise<boolean> {
+  if (!userId) {
+    return false;
+  }
+
+  try {
+    const user = await withRetry(
+      () =>
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            username: true,
+            role: true,
+          },
+        }),
+      2,
+      'isUserAdmin.findUser',
+    );
+
+    if (!user) {
+      return false;
+    }
+
+    const role = user.role?.trim().toLowerCase();
+    return role === 'admin' || (user.username && ADMIN_USERNAMES.has(user.username));
+  } catch (error) {
+    logger.error({ error, userId }, 'Error checking if user is admin');
+    return false;
+  }
+}
+
+// GET / - получить типы проектов с фильтрацией по isAdminOnly
+// Публичный эндпоинт, но если пользователь аутентифицирован и является администратором,
+// возвращаются все типы, иначе только публичные (isAdminOnly = false)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
+  // Опциональная проверка авторизации: если токен есть, проверяем роль
+  const header = req.headers.authorization;
+  let userId: string | undefined;
+  
+  if (header) {
+    try {
+      const token = header.replace('Bearer ', '');
+      const payload = verifyToken(token);
+      userId = payload.userId;
+    } catch {
+      // Невалидный токен - продолжаем как неавторизованный пользователь
+    }
+  }
+
+  const isAdmin = await isUserAdmin(userId);
+
+  const where = isAdmin ? {} : { isAdminOnly: false };
+
   const projectTypes = await withRetry(
     () => prisma.projectType.findMany({
+      where,
       orderBy: { name: 'asc' },
     }),
     3,
     'GET /project-types'
   );
 
-  logger.debug({ projectTypesCount: projectTypes.length }, 'Project types fetched');
+  logger.debug({ projectTypesCount: projectTypes.length, isAdmin, userId }, 'Project types fetched');
   res.json({ projectTypes });
 }));
 
@@ -67,7 +125,7 @@ router.post('/', authMiddleware, adminMiddleware, asyncHandler(async (req: Reque
     return res.status(400).json({ error: `Validation error: ${errorMessages}` });
   }
 
-  const { name } = parsed.data;
+  const { name, isAdminOnly } = parsed.data;
 
   // Проверяем, что тип проекта с таким именем не существует
   const existing = await withRetry(
@@ -84,7 +142,7 @@ router.post('/', authMiddleware, adminMiddleware, asyncHandler(async (req: Reque
 
   const projectType = await withRetry(
     () => prisma.projectType.create({
-      data: { name },
+      data: { name, isAdminOnly: isAdminOnly ?? false },
     }),
     3,
     'POST /project-types - create'
@@ -109,7 +167,7 @@ router.put('/:id', authMiddleware, adminMiddleware, asyncHandler(async (req: Req
     return res.status(400).json({ error: `Validation error: ${errorMessages}` });
   }
 
-  const { name } = parsed.data;
+  const { name, isAdminOnly } = parsed.data;
 
   // Проверяем, что тип проекта существует
   const existing = await withRetry(
@@ -142,7 +200,10 @@ router.put('/:id', authMiddleware, adminMiddleware, asyncHandler(async (req: Req
   const updated = await withRetry(
     () => prisma.projectType.update({
       where: { id },
-      data: { name },
+      data: { 
+        name,
+        isAdminOnly: isAdminOnly !== undefined ? isAdminOnly : existing.isAdminOnly,
+      },
     }),
     3,
     `PUT /project-types/${id} - update`
