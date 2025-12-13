@@ -56,6 +56,13 @@ export const useAgentDialog = ({ onAgentUpdated, projectTypes }: UseAgentDialogP
           model: LLMModel.GPT5_MINI,
           isHiddenFromSidebar: false,
         });
+        
+        // Проверяем, что агент создан с ID
+        if (!newAgent?.id) {
+          console.error('Created agent does not have an ID:', newAgent);
+          throw new Error('Агент создан без ID. Пожалуйста, попробуйте еще раз.');
+        }
+        
         setEditingAgent(newAgent);
         setAgentFiles([]);
       } catch (error: any) {

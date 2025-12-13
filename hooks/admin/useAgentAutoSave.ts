@@ -40,6 +40,11 @@ export const useAgentAutoSave = ({
 
   const autoSaveAgent = async () => {
     if (!editingAgent || !agentName?.trim()) return;
+    
+    // Не сохраняем, если у агента нет ID (новый агент еще не создан на сервере)
+    if (!editingAgent.id) {
+      return;
+    }
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);

@@ -567,6 +567,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   const handleSaveAgent = async () => {
     if (!editingAgent || !(agentName || '').trim()) return;
+    
+    // Проверяем, что у агента есть ID
+    if (!editingAgent.id) {
+      showAlert('Агент еще не создан. Пожалуйста, подождите...', 'Ошибка', 'error', 3000);
+      return;
+    }
 
     // Очищаем таймер автосохранения
     clearSaveTimeout();
@@ -1721,31 +1727,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
               </section>
 
-            </div>
-
-            {/* Dialog Footer */}
-            <div className="p-3 sm:p-4 md:p-6 border-t border-white/10 bg-black/20 backdrop-blur-xl shrink-0 flex gap-2 sm:gap-3">
-              <button
-                onClick={handleCloseAgentDialog}
-                className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-white/5 hover:bg-white/10 text-white rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm transition-all"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleSaveAgent}
-                disabled={isSavingAgent || !(agentName || '').trim()}
-                className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg sm:rounded-xl font-semibold text-xs sm:text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 sm:gap-2"
-              >
-                {isSavingAgent ? (
-                  <>
-                    <Loader2 size={14} className="sm:w-4 sm:h-4 animate-spin" />
-                    <span className="hidden sm:inline">Сохранение...</span>
-                    <span className="sm:hidden">Сохранение</span>
-                  </>
-                ) : (
-                  'Сохранить'
-                )}
-              </button>
             </div>
           </div>
         </div>
