@@ -569,7 +569,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                     // #endregion
                   }}
                   className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto flex-1 p-4 sm:p-6 md:p-8 min-w-0 max-w-full"
-                  style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%' }}
+                  style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%', overflowX: 'visible' }}
                 >
                   {selectedFile && selectedFile.type.includes('image') && activeTab === 'text' ? (
                     <img src={`data:${selectedFile.type};base64,${selectedFile.data}`} alt="Preview" className="max-w-full h-auto rounded-2xl shadow-2xl" />

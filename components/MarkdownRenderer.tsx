@@ -403,11 +403,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
                 ref={(el) => {
                   // #region agent log
                   if (el) {
-                    const computed = window.getComputedStyle(el);
-                    const parentComputed = el.parentElement ? window.getComputedStyle(el.parentElement) : null;
-                    const tableEl = el.querySelector('table');
-                    const tableComputed = tableEl ? window.getComputedStyle(tableEl) : null;
-                    fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:391',message:'Table wrapper mounted',data:{wrapperWidth:computed.width,wrapperMaxWidth:computed.maxWidth,wrapperOverflowX:computed.overflowX,wrapperOverflowY:computed.overflowY,parentWidth:parentComputed?.width,parentMinWidth:parentComputed?.minWidth,parentOverflowX:parentComputed?.overflowX,tableWidth:tableComputed?.width,tableMinWidth:tableComputed?.minWidth,tableScrollWidth:tableEl?.scrollWidth,tableClientWidth:tableEl?.clientWidth,wrapperScrollWidth:el.scrollWidth,wrapperClientWidth:el.clientWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'fix4',hypothesisId:'F,G'})}).catch(()=>{});
+                    setTimeout(() => {
+                      const computed = window.getComputedStyle(el);
+                      const parentComputed = el.parentElement ? window.getComputedStyle(el.parentElement) : null;
+                      const tableEl = el.querySelector('table');
+                      const tableComputed = tableEl ? window.getComputedStyle(tableEl) : null;
+                      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:400',message:'Table wrapper after render',data:{wrapperWidth:computed.width,wrapperMaxWidth:computed.maxWidth,wrapperOverflowX:computed.overflowX,wrapperOverflowY:computed.overflowY,parentWidth:parentComputed?.width,parentMinWidth:parentComputed?.minWidth,parentOverflowX:parentComputed?.overflowX,tableWidth:tableComputed?.width,tableMinWidth:tableComputed?.minWidth,tableScrollWidth:tableEl?.scrollWidth,tableClientWidth:tableEl?.clientWidth,wrapperScrollWidth:el.scrollWidth,wrapperClientWidth:el.clientWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'fix5',hypothesisId:'F,G'})}).catch(()=>{});
+                    }, 100);
                   }
                   // #endregion
                 }}
