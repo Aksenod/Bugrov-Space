@@ -98,7 +98,7 @@ export async function transcribeAudio(
       let errorDetail = statusText;
 
       try {
-        const errorData = await response.json();
+        const errorData = await response.json() as { error?: { message?: string; code?: string } } | null;
         errorDetail = errorData?.error?.message ?? errorData?.error?.code ?? JSON.stringify(errorData);
       } catch (parseError) {
         try {

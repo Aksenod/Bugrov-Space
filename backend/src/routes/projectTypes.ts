@@ -51,7 +51,7 @@ async function isUserAdmin(userId: string | undefined): Promise<boolean> {
     }
 
     const role = user.role?.trim().toLowerCase();
-    return role === 'admin' || (user.username && ADMIN_USERNAMES.has(user.username));
+    return role === 'admin' || (user.username !== null && ADMIN_USERNAMES.has(user.username));
   } catch (error) {
     logger.error({ error, userId }, 'Error checking if user is admin');
     return false;

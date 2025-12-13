@@ -69,7 +69,7 @@ export async function correctText(text: string, model: string = DEFAULT_MODEL): 
       let errorDetail = statusText;
 
       try {
-        const errorData = await response.json();
+        const errorData = await response.json() as { error?: { message?: string; code?: string } } | null;
         errorDetail = errorData?.error?.message ?? errorData?.error?.code ?? JSON.stringify(errorData);
       } catch (parseError) {
         try {
