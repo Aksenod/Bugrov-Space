@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SendHorizontal, Sparkles, X, Mic } from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
-import { VoiceInputModal } from './VoiceInputModal';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -14,8 +13,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isAdjustingRef = useRef(false);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
-  const [voiceModalData, setVoiceModalData] = useState<{ originalText: string; correctedText: string } | null>(null);
 
   // Устанавливаем начальную высоту при монтировании
   useEffect(() => {
@@ -120,10 +117,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
     }
   };
 
-  // Обработка результатов голосового ввода
+  // Обработка результатов голосового ввода - сразу вставляем исправленный текст
   const handleVoiceTextReady = (originalText: string, correctedText: string) => {
-    setVoiceModalData({ originalText, correctedText });
-    setShowVoiceModal(true);
+    // Вставляем исправленный текст сразу в инпут
+    setInput(correctedText);
+    
+    // Фокусируем textarea после вставки текста
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        // Прокручиваем в конец текста
+        const length = correctedText.length;
+        textareaRef.current.setSelectionRange(length, length);
+      }
+      // Вызываем adjustHeight для обновления высоты textarea
+      // Используем requestAnimationFrame для гарантии, что состояние input обновилось
+      requestAnimationFrame(() => {
+        adjustHeight();
+      });
+    }, 0);
   };
 
   const handleVoiceError = (error: string) => {
@@ -140,40 +152,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
     stopRecording,
     cancelRecording 
   } = useVoiceInput(handleVoiceTextReady, handleVoiceError);
-
-  // Обработка использования исправленного текста
-  const handleUseCorrectedText = () => {
-    if (voiceModalData) {
-      setInput(voiceModalData.correctedText);
-      setVoiceModalData(null);
-      // Фокусируем textarea после вставки текста
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          // Прокручиваем в конец текста
-          const length = voiceModalData.correctedText.length;
-          textareaRef.current.setSelectionRange(length, length);
-        }
-      }, 0);
-    }
-  };
-
-  // Обработка использования оригинального текста
-  const handleUseOriginalText = () => {
-    if (voiceModalData) {
-      setInput(voiceModalData.originalText);
-      setVoiceModalData(null);
-      // Фокусируем textarea после вставки текста
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          // Прокручиваем в конец текста
-          const length = voiceModalData.originalText.length;
-          textareaRef.current.setSelectionRange(length, length);
-        }
-      }, 0);
-    }
-  };
 
   // Переключение записи
   const handleMicClick = () => {
@@ -282,27 +260,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
         </div>
       </div>
 
-      {/* Модальное окно для голосового ввода */}
-      {showVoiceModal && voiceModalData && (
-        <VoiceInputModal
-          isOpen={showVoiceModal}
-          onClose={() => {
-            setShowVoiceModal(false);
-            setVoiceModalData(null);
-          }}
-          originalText={voiceModalData.originalText}
-          correctedText={voiceModalData.correctedText}
-          onUseCorrected={handleUseCorrectedText}
-          onUseOriginal={handleUseOriginalText}
-        />
-      )}
-
       {/* Индикатор обработки голосового ввода */}
       {isVoiceProcessing && (
-        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-xl backdrop-blur-sm">
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-xl backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-2 text-sm text-indigo-300">
             <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-            <span>Обработка голосового ввода...</span>
+            <span>Расшифровка...</span>
           </div>
         </div>
       )}
