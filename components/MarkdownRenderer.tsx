@@ -425,10 +425,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
                 }}
               >
                 <table
-                  className="table-auto border-collapse text-left"
+                  className="border-collapse text-left w-full"
                   style={{ 
-                    width: 'max-content',
-                    minWidth: 'max-content',
+                    width: '100%',
                     tableLayout: 'auto',
                     display: 'table'
                   }}
@@ -450,10 +449,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           th({ children }) {
             return (
               <th
-                className="border border-white/20 px-4 py-2 text-left font-semibold text-white align-top whitespace-nowrap"
+                className="border border-white/20 px-4 py-2 text-left font-semibold text-white align-top break-words min-w-[240px] sm:min-w-0"
                 style={{
                   lineHeight: '1.4',
-                  minWidth: '140px'
+                  maxWidth: '260px',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
                 }}
               >
                 {children}
@@ -471,10 +472,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
                   }
                   // #endregion
                 }}
-                className="border border-white/10 px-4 py-2 text-white/90 align-top whitespace-nowrap"
+                className="border border-white/10 px-4 py-2 text-white/90 align-top break-words min-w-[240px] sm:min-w-0"
                 style={{
                   lineHeight: '1.4',
-                  minWidth: '140px'
+                  maxWidth: '260px',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word'
                 }}
               >
                 {children}
