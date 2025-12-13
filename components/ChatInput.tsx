@@ -71,6 +71,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
     }
   };
 
+  // Обработчик фокуса - предотвращаем перенос курсора на вторую строку на мобильных
+  const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    const textarea = e.target;
+    
+    // Если текст пустой, устанавливаем курсор в начало
+    if (!input.trim()) {
+      // Используем setTimeout для гарантии, что браузер завершил обработку фокуса
+      setTimeout(() => {
+        textarea.setSelectionRange(0, 0);
+        // Принудительно устанавливаем высоту 48px для пустого textarea
+        textarea.style.height = '48px';
+        textarea.style.overflowY = 'hidden';
+      }, 0);
+    } else {
+      // Если есть текст, устанавливаем курсор в конец, но на той же строке
+      setTimeout(() => {
+        const length = input.length;
+        textarea.setSelectionRange(length, length);
+      }, 0);
+    }
+  };
+
   // Обработка результатов голосового ввода - сразу вставляем исправленный текст
   const handleVoiceTextReady = (originalText: string, correctedText: string) => {
     setInput(correctedText);
@@ -126,8 +148,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
           placeholder={disabled ? "Подключение..." : "Напишите мне ..."}
           disabled={disabled}
+          rows={1}
           className="flex-1 self-start bg-transparent text-white placeholder-white/30 text-base px-3 py-3 focus:outline-none focus:ring-0 resize-none no-scrollbar font-medium"
           style={{ 
             height: '48px',
