@@ -11,7 +11,7 @@ import {
 } from '../../services/admin/adminAgentService';
 import { validateAgentTemplate, formatValidationErrors, agentTemplateSchema } from '../../utils/admin/validation';
 import { handleTableNotFoundError, handleValidationError } from '../../utils/admin/errorHandlers';
-import { generateAgentDescription } from '../../services/openaiService';
+import { generateAgentDescription as generateDescriptionFromAI } from '../../services/openaiService';
 
 /**
  * Получить всех агентов-шаблонов
@@ -199,7 +199,7 @@ export const generateAgentDescription = async (req: Request, res: Response, next
       });
     }
 
-    const description = await generateAgentDescription(agent.name, agent.systemInstruction);
+    const description = await generateDescriptionFromAI(agent.name, agent.systemInstruction);
 
     logger.info({ agentId: id }, 'Agent description generated');
     res.json({ description });
