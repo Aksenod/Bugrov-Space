@@ -29,6 +29,7 @@ export function useVoiceInput(
   const streamRef = useRef<MediaStream | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const stateCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const dataRequestIntervalRef = useRef<NodeJS.Timeout | null>(null); // Интервал для периодического requestData()
   const isProcessingRef = useRef<boolean>(false); // Защита от повторных вызовов onstop
   const recordingStartTimeRef = useRef<number | null>(null); // Время начала записи
 
@@ -374,15 +375,33 @@ export function useVoiceInput(
         return originalStop();
       };
 
-      // Начинаем запись С timeslice для предотвращения автоматической остановки
-      // Timeslice гарантирует, что MediaRecorder будет регулярно получать данные
-      // и не остановится автоматически из-за отсутствия данных
-      const TIMESLICE_MS = 250; // Интервал получения данных (250мс)
-      mediaRecorder.start(TIMESLICE_MS);
+      // Начинаем запись БЕЗ timeslice - используем периодический requestData() вместо этого
+      // Timeslice может вызывать проблемы в некоторых браузерах
+      mediaRecorder.start();
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:212',message:'Recording started WITH timeslice',data:{timeslice:TIMESLICE_MS,recorderState:mediaRecorder.state,streamActive:stream.active,tracksActive:stream.getTracks().every(t=>t.readyState==='live'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:212',message:'Recording started WITHOUT timeslice',data:{timeslice:'none',recorderState:mediaRecorder.state,streamActive:stream.active,tracksActive:stream.getTracks().every(t=>t.readyState==='live'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'})}).catch(()=>{});
       // #endregion
       setIsRecording(true);
+      
+      // Периодически запрашиваем данные для предотвращения автоматической остановки
+      const DATA_REQUEST_INTERVAL_MS = 250;
+      dataRequestIntervalRef.current = setInterval(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          try {
+            mediaRecorderRef.current.requestData();
+          } catch (e) {
+            if (import.meta.env.DEV) {
+              console.warn('[VoiceInput] Failed to request data:', e);
+            }
+          }
+        } else {
+          // Если запись остановилась, очищаем интервал
+          if (dataRequestIntervalRef.current) {
+            clearInterval(dataRequestIntervalRef.current);
+            dataRequestIntervalRef.current = null;
+          }
+        }
+      }, DATA_REQUEST_INTERVAL_MS) as unknown as NodeJS.Timeout;
       
       // Периодически проверяем состояние записи и перезапускаем, если она остановилась неожиданно
       stateCheckIntervalRef.current = setInterval(() => {
@@ -397,7 +416,7 @@ export function useVoiceInput(
           // Запись остановилась неожиданно - перезапускаем
           if (currentStream && currentStream.active && currentStream.getTracks().every(t => t.readyState === 'live')) {
             try {
-              currentRecorder.start(TIMESLICE_MS);
+              currentRecorder.start(); // Без timeslice
               // #region agent log
               fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:225',message:'Recording restarted',data:{recorderState:currentRecorder.state,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
               // #endregion
@@ -409,11 +428,19 @@ export function useVoiceInput(
                 clearInterval(stateCheckIntervalRef.current);
                 stateCheckIntervalRef.current = null;
               }
+              if (dataRequestIntervalRef.current) {
+                clearInterval(dataRequestIntervalRef.current);
+                dataRequestIntervalRef.current = null;
+              }
             }
           } else {
             if (stateCheckIntervalRef.current) {
               clearInterval(stateCheckIntervalRef.current);
               stateCheckIntervalRef.current = null;
+            }
+            if (dataRequestIntervalRef.current) {
+              clearInterval(dataRequestIntervalRef.current);
+              dataRequestIntervalRef.current = null;
             }
           }
         } else if (!isRecording) {
@@ -421,11 +448,15 @@ export function useVoiceInput(
             clearInterval(stateCheckIntervalRef.current);
             stateCheckIntervalRef.current = null;
           }
+          if (dataRequestIntervalRef.current) {
+            clearInterval(dataRequestIntervalRef.current);
+            dataRequestIntervalRef.current = null;
+          }
         }
       }, 100) as unknown as NodeJS.Timeout; // Проверяем каждые 100мс
       
       if (import.meta.env.DEV) {
-        console.log('[VoiceInput] Recording started with timeslice', TIMESLICE_MS, 'ms');
+        console.log('[VoiceInput] Recording started WITHOUT timeslice, using periodic requestData()');
       }
 
       if (import.meta.env.DEV) {
@@ -540,6 +571,10 @@ export function useVoiceInput(
         clearInterval(stateCheckIntervalRef.current);
         stateCheckIntervalRef.current = null;
       }
+      if (dataRequestIntervalRef.current) {
+        clearInterval(dataRequestIntervalRef.current);
+        dataRequestIntervalRef.current = null;
+      }
 
       // Останавливаем поток после задержки, чтобы дать время на обработку данных
       // Но создаем новый поток при следующей записи (браузер не покажет диалог, если разрешение уже дано)
@@ -573,6 +608,10 @@ export function useVoiceInput(
         clearInterval(stateCheckIntervalRef.current);
         stateCheckIntervalRef.current = null;
       }
+      if (dataRequestIntervalRef.current) {
+        clearInterval(dataRequestIntervalRef.current);
+        dataRequestIntervalRef.current = null;
+      }
 
       // Останавливаем поток
       if (streamRef.current) {
@@ -587,9 +626,12 @@ export function useVoiceInput(
    */
   useEffect(() => {
     return () => {
-      // Останавливаем таймер
+      // Останавливаем таймеры
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
+      }
+      if (dataRequestIntervalRef.current) {
+        clearInterval(dataRequestIntervalRef.current);
       }
 
       // Останавливаем запись если она активна
