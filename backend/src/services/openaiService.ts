@@ -28,6 +28,7 @@ type AgentWithFiles = {
   summaryInstruction: string | null;
   model: string | null;
   role?: string | null; // Роль агента (например, 'search', 'copywriter', 'dsl', 'layout')
+  disableGlobalPrompt?: boolean; // Отключить глобальный промпт для этого агента
   files: AgentFile[];
 };
 
@@ -91,14 +92,17 @@ function processFileContent(file: AgentFile): string | null {
 }
 
 async function buildSystemPrompt(agent: AgentWithFiles, projectInfo?: ProjectInfo) {
-  const [globalPrompt] = await Promise.all([getGlobalPromptText()]);
-  const globalPromptText = globalPrompt.trim();
   const agentInstruction = (agent.systemInstruction || '').trim();
 
   const introParts = [`Ты выступаешь как агент "${agent.name}".`];
 
-  if (globalPromptText) {
-    introParts.push(`Глобальная инструкция (общая для всех агентов):\n${globalPromptText}`);
+  // Добавляем глобальный промпт только если он не отключен для этого агента
+  if (!agent.disableGlobalPrompt) {
+    const [globalPrompt] = await Promise.all([getGlobalPromptText()]);
+    const globalPromptText = globalPrompt.trim();
+    if (globalPromptText) {
+      introParts.push(`Глобальная инструкция (общая для всех агентов):\n${globalPromptText}`);
+    }
   }
 
   if (agentInstruction) {

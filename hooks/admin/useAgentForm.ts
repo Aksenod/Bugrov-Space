@@ -18,6 +18,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
   const [agentModel, setAgentModel] = useState<LLMModel>(LLMModel.GPT5_MINI);
   const [agentRole, setAgentRole] = useState('');
   const [agentIsHiddenFromSidebar, setAgentIsHiddenFromSidebar] = useState(false);
+  const [agentDisableGlobalPrompt, setAgentDisableGlobalPrompt] = useState(false);
   const [agentQuickMessages, setAgentQuickMessages] = useState<string[]>([]);
   const [selectedProjectTypeIds, setSelectedProjectTypeIds] = useState<string[]>([]);
   const [isProjectTypesDropdownOpen, setIsProjectTypesDropdownOpen] = useState(false);
@@ -35,6 +36,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
       setAgentModel(resolveModel(editingAgent.model));
       setAgentRole(editingAgent.role || '');
       setAgentIsHiddenFromSidebar(editingAgent.isHiddenFromSidebar || false);
+      setAgentDisableGlobalPrompt(editingAgent.disableGlobalPrompt || false);
       setAgentQuickMessages(editingAgent.quickMessages || []);
       const projectTypeIds = editingAgent.projectTypes?.map(pt => pt.id) || [];
       setSelectedProjectTypeIds(projectTypeIds);
@@ -48,6 +50,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
       setAgentModel(LLMModel.GPT5_MINI);
       setAgentRole('');
       setAgentIsHiddenFromSidebar(false);
+      setAgentDisableGlobalPrompt(false);
       setAgentQuickMessages([]);
       setSelectedProjectTypeIds([]);
       initialProjectTypeIdsRef.current = [];
@@ -70,6 +73,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
           setAgentModel(draft.model || LLMModel.GPT5_MINI);
           setAgentRole(draft.role || '');
           setAgentIsHiddenFromSidebar(draft.isHiddenFromSidebar || false);
+          setAgentDisableGlobalPrompt(draft.disableGlobalPrompt || false);
           setAgentQuickMessages(draft.quickMessages || []);
           const projectTypeIds = draft.selectedProjectTypeIds || [];
           setSelectedProjectTypeIds(projectTypeIds);
@@ -94,6 +98,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
       model: agentModel,
       role: agentRole,
       isHiddenFromSidebar: agentIsHiddenFromSidebar,
+      disableGlobalPrompt: agentDisableGlobalPrompt,
       quickMessages: agentQuickMessages,
       selectedProjectTypeIds,
     };
@@ -110,7 +115,7 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
     if (editingAgent && isDialogOpen) {
       saveDraftToStorage();
     }
-  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, agentQuickMessages, selectedProjectTypeIds, editingAgent?.id, isDialogOpen]);
+  }, [agentName, agentDescription, agentSystemInstruction, agentSummaryInstruction, agentModel, agentRole, agentIsHiddenFromSidebar, agentDisableGlobalPrompt, agentQuickMessages, selectedProjectTypeIds, editingAgent?.id, isDialogOpen]);
 
   const toggleProjectType = (projectTypeId: string) => {
     setSelectedProjectTypeIds(prev =>
@@ -136,6 +141,8 @@ export const useAgentForm = ({ editingAgent, isDialogOpen }: UseAgentFormProps) 
     setAgentRole,
     agentIsHiddenFromSidebar,
     setAgentIsHiddenFromSidebar,
+    agentDisableGlobalPrompt,
+    setAgentDisableGlobalPrompt,
     agentQuickMessages,
     setAgentQuickMessages,
     selectedProjectTypeIds,

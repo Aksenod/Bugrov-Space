@@ -156,6 +156,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setAgentRole,
     agentIsHiddenFromSidebar,
     setAgentIsHiddenFromSidebar,
+    agentDisableGlobalPrompt,
+    setAgentDisableGlobalPrompt,
     agentQuickMessages,
     setAgentQuickMessages,
     selectedProjectTypeIds,
@@ -309,6 +311,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           setAgentModel(resolveModel(agent.model));
           setAgentRole(agent.role || '');
           setAgentIsHiddenFromSidebar(agent.isHiddenFromSidebar || false);
+          setAgentDisableGlobalPrompt(agent.disableGlobalPrompt || false);
           setAgentQuickMessages(agent.quickMessages || []);
           const projectTypeIds = projectTypes.map(pt => pt.id);
           setSelectedProjectTypeIds(projectTypeIds);
@@ -518,6 +521,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     agentModel,
     agentRole,
     agentIsHiddenFromSidebar,
+    agentDisableGlobalPrompt,
     agentQuickMessages,
     selectedProjectTypeIds,
     initialProjectTypeIdsRef,
@@ -569,6 +573,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         model: agentModel,
         role: (agentRole || '').trim() || undefined,
         isHiddenFromSidebar: agentIsHiddenFromSidebar,
+        disableGlobalPrompt: agentDisableGlobalPrompt,
         quickMessages: agentQuickMessages || [],
       });
       // Обновляем привязки к типам проектов (даже если массив пустой, чтобы очистить старые связи)
@@ -900,6 +905,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         agentModel !== resolveModel(editingAgent.model) ||
                         agentRole !== (editingAgent.role || '') ||
                         agentIsHiddenFromSidebar !== (editingAgent.isHiddenFromSidebar || false) ||
+                        agentDisableGlobalPrompt !== (editingAgent.disableGlobalPrompt || false) ||
                         quickMessagesChanged;
 
                       if (isSavingAgent) {
@@ -1755,6 +1761,33 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   >
                     <span
                       className={`inline-block h-3.5 w-3.5 sm:h-4 sm:w-4 transform rounded-full bg-white transition-transform ${agentIsHiddenFromSidebar ? 'translate-x-5 sm:translate-x-6' : 'translate-x-0.5 sm:translate-x-1'
+                        }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Disable Global Prompt Toggle */}
+                <div className="flex items-center justify-between p-2.5 sm:p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="p-1 sm:p-1.5 bg-amber-500/20 rounded-lg">
+                      <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs sm:text-sm font-bold text-amber-300">
+                        Отключить глобальный промпт
+                      </label>
+                      <p className="text-[9px] sm:text-[10px] text-amber-300/60 mt-0.5">
+                        Агент не будет использовать глобальную инструкцию
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setAgentDisableGlobalPrompt(!agentDisableGlobalPrompt)}
+                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${agentDisableGlobalPrompt ? 'bg-amber-500' : 'bg-white/10'
+                      }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 sm:h-4 sm:w-4 transform rounded-full bg-white transition-transform ${agentDisableGlobalPrompt ? 'translate-x-5 sm:translate-x-6' : 'translate-x-0.5 sm:translate-x-1'
                         }`}
                     />
                   </button>

@@ -58,6 +58,7 @@ export interface Agent {
   order: number;
   projectTypeAgentId?: string;
   isHiddenFromSidebar?: boolean; // Hide agent from sidebar
+  disableGlobalPrompt?: boolean; // Disable global prompt for this agent
   quickMessages?: string[]; // Quick message hints for the agent
 }
 
@@ -99,6 +100,7 @@ export interface ProjectTypeAgent {
   role?: string;
   order: number;
   isHiddenFromSidebar?: boolean;
+  disableGlobalPrompt?: boolean;
   quickMessages?: string[]; // Quick message hints for the agent
   createdAt?: string;
   updatedAt?: string;
