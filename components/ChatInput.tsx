@@ -215,8 +215,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
         </div>
       </div>
 
-      {/* Индикатор обработки голосового ввода */}
-      {isVoiceProcessing && (
+      {/* Индикатор обработки голосового ввода - показываем только когда запись остановлена и идет обработка */}
+      {isVoiceProcessing && !isRecording && (
         <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-indigo-500/20 border border-indigo-500/30 rounded-xl backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-2 text-sm text-indigo-300">
             <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />

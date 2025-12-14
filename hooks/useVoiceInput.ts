@@ -78,6 +78,9 @@ export function useVoiceInput(
           mimeType = 'audio/ogg';
         }
       }
+      
+      // Нормализуем MIME тип, убирая codecs (например, audio/webm;codecs=opus -> audio/webm)
+      const normalizedMimeType = mimeType.split(';')[0];
 
       // Создаем новый MediaRecorder для каждой записи
       const mediaRecorder = new MediaRecorder(stream, {
@@ -115,11 +118,10 @@ export function useVoiceInput(
         }
 
         // Даем время для получения всех данных через ondataavailable
-        // Увеличиваем задержку для надежности
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         try {
-          setIsProcessing(true);
+          // НЕ устанавливаем isProcessing здесь - установим только после проверки валидности данных
 
           if (import.meta.env.DEV) {
             console.log('[VoiceInput] Processing stopped, chunks:', audioChunksRef.current.length);
@@ -146,8 +148,8 @@ export function useVoiceInput(
             console.log('[VoiceInput] Valid chunks:', validChunks.length, 'out of', audioChunksRef.current.length);
           }
           
-          // Создаем Blob только из валидных чанков
-          const audioBlob = new Blob(validChunks, { type: mimeType });
+          // Создаем Blob только из валидных чанков с нормализованным MIME типом
+          const audioBlob = new Blob(validChunks, { type: normalizedMimeType });
 
           if (import.meta.env.DEV) {
             console.log('[VoiceInput] Blob created:', {
@@ -159,10 +161,17 @@ export function useVoiceInput(
             });
           }
 
-          // Проверяем размер Blob
+          // Проверяем размер Blob (минимум 1KB для валидного аудио)
+          const MIN_AUDIO_SIZE = 1024; // 1KB
           if (audioBlob.size === 0) {
             throw new Error('Записанное аудио пусто. Попробуйте еще раз.');
           }
+          if (audioBlob.size < MIN_AUDIO_SIZE) {
+            throw new Error(`Записанное аудио слишком короткое (${audioBlob.size} байт). Убедитесь, что вы говорили во время записи (минимум 1-2 секунды) и попробуйте еще раз.`);
+          }
+
+          // Теперь устанавливаем isProcessing, так как данные валидны и начинаем транскрибацию
+          setIsProcessing(true);
 
           // Транскрибируем аудио
           const transcribedText = await transcribeAudio(audioBlob);
@@ -198,14 +207,13 @@ export function useVoiceInput(
         setIsProcessing(false);
       };
 
-      // Начинаем запись БЕЗ timeslice
-      // Данные будут собраны при вызове requestData() и stop()
-      // Это более надежный способ для большинства браузеров
-      mediaRecorder.start();
+      // Начинаем запись с timeslice для регулярного сбора данных
+      // Используем интервал 250мс для надежного сбора данных
+      mediaRecorder.start(250);
       setIsRecording(true);
       
       if (import.meta.env.DEV) {
-        console.log('[VoiceInput] Recording started, will collect data on stop');
+        console.log('[VoiceInput] Recording started with timeslice (250ms)');
       }
 
       if (import.meta.env.DEV) {
