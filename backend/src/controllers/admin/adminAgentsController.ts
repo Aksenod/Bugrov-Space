@@ -188,14 +188,14 @@ export const generateAgentDescription = async (req: Request, res: Response, next
   try {
     const { id } = req.params;
 
-    const agent = await getAgentTemplate(id);
+    const agent = await getAgentTemplate(id) as { name?: string; systemInstruction?: string } | null;
     if (!agent) {
       return res.status(404).json({ error: 'Агент не найден' });
     }
 
     if (!agent.name || !agent.systemInstruction) {
-      return res.status(400).json({ 
-        error: 'Для генерации описания необходимо указать название и системную инструкцию агента' 
+      return res.status(400).json({
+        error: 'Для генерации описания необходимо указать название и системную инструкцию агента'
       });
     }
 
