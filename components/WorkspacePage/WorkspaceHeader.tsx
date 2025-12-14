@@ -28,15 +28,18 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
   const resolvedModel = (activeAgent?.model as LLMModel) || LLMModel.GPT5_MINI;
   const isMiniModel = resolvedModel === LLMModel.GPT4O_MINI;
   const isUltraModel = resolvedModel === LLMModel.GPT51;
+  const isAdvancedModel = resolvedModel === LLMModel.GPT52;
   const isGPT5Mini = false;
-  const modelBadgeClass = isUltraModel
-    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-    : isGPT5Mini
-      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-      : isMiniModel
-        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-        : 'bg-pink-500/10 border-pink-500/30 text-pink-400';
-  const ModelBadgeIcon = isUltraModel ? Brain : isMiniModel ? Zap : Cpu;
+  const modelBadgeClass = isAdvancedModel
+    ? 'bg-violet-500/10 border-violet-500/30 text-violet-300'
+    : isUltraModel
+      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+      : isGPT5Mini
+        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+        : isMiniModel
+          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+          : 'bg-pink-500/10 border-pink-500/30 text-pink-400';
+  const ModelBadgeIcon = isAdvancedModel ? Brain : isUltraModel ? Brain : isMiniModel ? Zap : Cpu;
   const modelBadgeLabel =
     MODELS.find((m) => m.id === resolvedModel)?.name ?? 'GPT-5.1';
 
@@ -57,7 +60,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
             </h2>
 
             <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all duration-300 shadow-sm flex-shrink-0 ${modelBadgeClass}`}>
-              <ModelBadgeIcon size={12} className={isUltraModel ? 'text-emerald-300' : isGPT5Mini ? 'text-emerald-400' : isMiniModel ? 'text-amber-400' : 'text-pink-400'} />
+              <ModelBadgeIcon size={12} className={isAdvancedModel ? 'text-violet-300' : isUltraModel ? 'text-emerald-300' : isGPT5Mini ? 'text-emerald-400' : isMiniModel ? 'text-amber-400' : 'text-pink-400'} />
               <span className="text-[10px] font-bold uppercase tracking-wider">
                 {modelBadgeLabel}
               </span>

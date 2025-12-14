@@ -180,6 +180,9 @@ function normalizeModelName(model: string | null | undefined): string {
 
   // Маппинг различных вариантов написания моделей
   const modelMap: Record<string, string> = {
+    'gpt-5.2': 'gpt-5.2',
+    'gpt5.2': 'gpt-5.2',
+    'gpt 5.2': 'gpt-5.2',
     'gpt-5.1': 'gpt-5.1',
     'gpt5.1': 'gpt-5.1',
     'gpt 5.1': 'gpt-5.1',

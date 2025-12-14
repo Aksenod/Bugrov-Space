@@ -647,6 +647,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (modelId === LLMModel.GPT4O_MINI) {
       return <Zap size={14} className="text-amber-400" />;
     }
+    if (modelId === LLMModel.GPT52) {
+      return <Brain size={14} className="text-violet-400" />;
+    }
     if (modelId === LLMModel.GPT51) {
       return <Brain size={14} className="text-emerald-300" />;
     }
