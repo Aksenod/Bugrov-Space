@@ -41,11 +41,28 @@ function blobToBase64(blob: Blob): Promise<string> {
  */
 export async function transcribeAudio(audioBlob: Blob): Promise<string> {
   try {
+    // Валидация размера Blob перед конвертацией
+    if (audioBlob.size === 0) {
+      throw new Error('Аудио файл пуст');
+    }
+    
     // Конвертируем Blob в base64
     const base64Audio = await blobToBase64(audioBlob);
     
-    // Определяем MIME тип
-    const mimeType = audioBlob.type || 'audio/webm';
+    // Валидация base64 строки
+    if (!base64Audio || base64Audio.length === 0) {
+      throw new Error('Не удалось конвертировать аудио в base64');
+    }
+    
+    // Проверяем минимальный размер base64 (примерно соответствует 1KB исходных данных)
+    const MIN_BASE64_SIZE = 1365; // Примерно 1KB в base64 (1024 * 4/3)
+    if (base64Audio.length < MIN_BASE64_SIZE) {
+      throw new Error('Аудио файл слишком короткий для обработки');
+    }
+    
+    // Определяем и нормализуем MIME тип (убираем codecs)
+    const rawMimeType = audioBlob.type || 'audio/webm';
+    const mimeType = rawMimeType.split(';')[0]; // Убираем codecs, например: audio/webm;codecs=opus -> audio/webm
     
     // Определяем имя файла
     const extension = mimeType.split('/')[1] || 'webm';
