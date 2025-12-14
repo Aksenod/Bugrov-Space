@@ -84,7 +84,7 @@ export const useAgentAutoSave = ({
             ]);
             await Promise.all(Array.from(allAffectedTypes).map(typeId => loadAgentsForType(typeId)));
           } catch (error: any) {
-            console.warn('Failed to attach project types', error);
+            // Failed to attach project types - non-critical
           }
         }
         
@@ -102,7 +102,7 @@ export const useAgentAutoSave = ({
             const { projectTypes: types } = await api.getAgentProjectTypes(editingAgent.id);
             projectTypes = types;
           } catch (error) {
-            console.warn('Failed to load project types for agent after auto-save', error);
+            // Failed to load project types for agent after auto-save - non-critical
           }
           
           const agentWithProjectTypes = {
@@ -121,13 +121,10 @@ export const useAgentAutoSave = ({
             saveTimeoutRef.current = null;
           }
         } catch (error) {
-          console.warn('Failed to reload agent after auto-save', error);
+          // Failed to reload agent after auto-save - non-critical
         }
       } catch (error: any) {
-        console.error('Auto-save failed', error);
-        if (error?.status && error.status !== 404 && error.status !== 401) {
-          console.warn('Auto-save failed with non-404 error:', error);
-        }
+        // Auto-save failed - non-critical, user can save manually
       }
     }, 1000);
   };

@@ -56,6 +56,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [agents, setAgents] = useState<ApiProjectTypeAgent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
   const [isSavingAgent, setIsSavingAgent] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
 
   // Users state
   const [users, setUsers] = useState<ApiAdminUser[]>([]);
@@ -269,7 +270,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             const { projectTypes: types } = await api.getAgentProjectTypes(initialAgentId);
             projectTypes = types;
           } catch (error) {
-            console.warn('Failed to load project types for agent', error);
+            // Failed to load project types for agent - non-critical
           }
 
           // Проверяем, что компонент все еще смонтирован
@@ -427,38 +428,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const loadUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      console.log('[AdminPage] Loading users...');
       const response = await api.getUsers();
-      console.log('[AdminPage] Users API response:', response);
-      console.log('[AdminPage] Response type:', typeof response);
-      console.log('[AdminPage] Response keys:', response ? Object.keys(response) : 'null');
-
       const usersList = response?.users || [];
-      console.log('[AdminPage] Users list:', usersList);
-      console.log('[AdminPage] Users count:', usersList.length);
-
-      if (usersList.length === 0) {
-        console.warn('[AdminPage] WARNING: Received empty users list from API');
-      } else {
-        console.log('[AdminPage] Users data:', usersList.map(u => ({
-          id: u.id,
-          username: u.username,
-          createdAt: u.createdAt,
-          projectsCount: u.projectsCount,
-          isPaid: u.isPaid,
-          subscriptionExpiresAt: u.subscriptionExpiresAt
-        })));
-      }
 
       setUsers(usersList);
       setTotalUsers(response?.totalUsers ?? 0);
       setTotalProjects(response?.totalProjects ?? 0);
     } catch (error: any) {
-      console.error('[AdminPage] Failed to load users', error);
-      console.error('[AdminPage] Error details:', {
-        status: error?.status,
-        statusText: error?.statusText,
-        message: error?.message,
+      console.error('[AdminPage] Failed to load users', {
         name: error?.name,
         stack: error?.stack
       });
@@ -620,6 +597,34 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     }
   };
 
+  const handleGenerateDescription = async () => {
+    if (!editingAgent?.id) {
+      showAlert('Агент еще не создан. Пожалуйста, подождите...', 'Ошибка', 'error', 3000);
+      return;
+    }
+
+    if (!(agentName || '').trim()) {
+      showAlert('Для генерации описания необходимо указать название агента', 'Ошибка', 'error', 3000);
+      return;
+    }
+
+    if (!(agentSystemInstruction || '').trim()) {
+      showAlert('Для генерации описания необходимо указать системную инструкцию агента', 'Ошибка', 'error', 3000);
+      return;
+    }
+
+    setIsGeneratingDescription(true);
+    try {
+      const { description } = await api.generateAgentDescription(editingAgent.id);
+      setAgentDescription(description);
+      showAlert('Описание успешно сгенерировано', undefined, 'success', 2000);
+    } catch (error: any) {
+      console.error('Failed to generate description', error);
+      showAlert(error?.message || 'Не удалось сгенерировать описание', 'Ошибка', 'error', 5000);
+    } finally {
+      setIsGeneratingDescription(false);
+    }
+  };
 
   const handleDeleteAgent = async (id: string, name: string) => {
     showConfirm(
@@ -985,15 +990,37 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
                 {/* Description */}
                 <section>
-                  <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1.5 sm:mb-2">
-                    Описание
-                    <div className="group relative">
-                      <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
-                      <div className="absolute left-0 top-full mt-2 w-40 sm:w-48 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
-                        Краткое описание назначения и функций агента
+                  <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                    <label className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-white/50 uppercase tracking-widest">
+                      Описание
+                      <div className="group relative">
+                        <Info size={9} className="sm:w-2.5 sm:h-2.5 text-white/30 hover:text-white/60 cursor-help" />
+                        <div className="absolute left-0 top-full mt-2 w-40 sm:w-48 p-1.5 sm:p-2 bg-black/95 border border-white/10 rounded-lg text-[9px] sm:text-[10px] text-white/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+                          Краткое описание назначения и функций агента
+                        </div>
                       </div>
-                    </div>
-                  </label>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateDescription}
+                      disabled={isGeneratingDescription || !editingAgent?.id || !(agentName || '').trim() || !(agentSystemInstruction || '').trim()}
+                      className="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-[9px] sm:text-[10px] font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-500/20"
+                    >
+                      {isGeneratingDescription ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span className="hidden sm:inline">Генерация...</span>
+                          <span className="sm:hidden">...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={12} />
+                          <span className="hidden sm:inline">Сгенерировать описание</span>
+                          <span className="sm:hidden">Сгенерировать</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                   <textarea
                     value={agentDescription}
                     onChange={(e) => setAgentDescription(e.target.value)}

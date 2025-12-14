@@ -186,9 +186,10 @@ router.get('/project-types', asyncHandler(async (req: Request, res: Response) =>
     logger.info('Public project types request');
 
     try {
-        // Загружаем все типы проектов
+        // Загружаем только публичные типы проектов (исключаем isAdminOnly: true)
         const projectTypes = await withRetry(
             () => prisma.projectType.findMany({
+                where: { isAdminOnly: false },
                 orderBy: { name: 'asc' },
                 select: {
                     id: true,
