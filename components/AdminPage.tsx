@@ -137,6 +137,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     handleOpenAgentDialog,
     handleCloseAgentDialog,
     onAgentUpdatedRef,
+    updateEditingAgent,
   } = useAgentDialog({ onAgentUpdated, projectTypes });
 
   const {
@@ -546,6 +547,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     onAgentUpdatedRef,
     loadAgents,
     loadAgentsForType,
+    onEditingAgentUpdated: updateEditingAgent,
   });
 
   // Обновляем handleOpenAgentDialog для загрузки агентов после создания
@@ -566,7 +568,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   };
 
   const handleSaveAgent = async () => {
-    if (!editingAgent || !(agentName || '').trim()) return;
+    if (!editingAgent || !(agentName || '').trim()) {
+      return;
+    }
     
     // Проверяем, что у агента есть ID
     if (!editingAgent.id) {

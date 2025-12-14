@@ -240,7 +240,7 @@ export const AdminAgentsTab: React.FC<AdminAgentsTabProps> = ({
           </div>
 
           <button
-            onClick={onCreateAgent}
+            onClick={() => onCreateAgent()}
             className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1 sm:gap-2"
           >
             <Plus size={14} className="sm:w-4 sm:h-4" />

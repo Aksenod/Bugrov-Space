@@ -18,6 +18,7 @@ interface UseAgentAutoSaveProps {
   onAgentUpdatedRef: React.MutableRefObject<(() => void) | undefined>;
   loadAgents: () => Promise<void>;
   loadAgentsForType: (typeId: string) => Promise<void>;
+  onEditingAgentUpdated?: (agent: ApiProjectTypeAgent) => void;
 }
 
 export const useAgentAutoSave = ({
@@ -35,11 +36,14 @@ export const useAgentAutoSave = ({
   onAgentUpdatedRef,
   loadAgents,
   loadAgentsForType,
+  onEditingAgentUpdated,
 }: UseAgentAutoSaveProps) => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const autoSaveAgent = async () => {
-    if (!editingAgent || !agentName?.trim()) return;
+    if (!editingAgent || !agentName?.trim()) {
+      return;
+    }
     
     // Не сохраняем, если у агента нет ID (новый агент еще не создан на сервере)
     if (!editingAgent.id) {
@@ -88,6 +92,37 @@ export const useAgentAutoSave = ({
         if (onAgentUpdatedRef.current) {
           onAgentUpdatedRef.current();
         }
+        
+        // Перезагружаем агента, чтобы обновить editingAgent с актуальными данными
+        try {
+          const { agent: updatedAgent } = await api.getAgent(editingAgent.id);
+          // Загружаем типы проектов для обновленного агента
+          let projectTypes: Array<{ id: string; name: string; order?: number }> = [];
+          try {
+            const { projectTypes: types } = await api.getAgentProjectTypes(editingAgent.id);
+            projectTypes = types;
+          } catch (error) {
+            console.warn('Failed to load project types for agent after auto-save', error);
+          }
+          
+          const agentWithProjectTypes = {
+            ...updatedAgent,
+            projectTypes,
+          };
+          
+          // Обновляем editingAgent через callback
+          if (onEditingAgentUpdated) {
+            onEditingAgentUpdated(agentWithProjectTypes);
+          }
+          
+          // Очищаем таймер после успешного сохранения
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+          }
+        } catch (error) {
+          console.warn('Failed to reload agent after auto-save', error);
+        }
       } catch (error: any) {
         console.error('Auto-save failed', error);
         if (error?.status && error.status !== 404 && error.status !== 401) {
@@ -99,7 +134,8 @@ export const useAgentAutoSave = ({
 
   // Автосохранение при изменении полей
   useEffect(() => {
-    if (editingAgent) {
+    // Автосохранение работает только если агент создан (имеет ID)
+    if (editingAgent && editingAgent.id) {
       autoSaveAgent();
     }
     return () => {

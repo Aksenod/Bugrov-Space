@@ -23,7 +23,8 @@ export const useAgentDialog = ({ onAgentUpdated, projectTypes }: UseAgentDialogP
   }, [onAgentUpdated]);
 
   const handleOpenAgentDialog = async (agent?: ApiProjectTypeAgent) => {
-    if (agent) {
+    // Проверяем, что переданный аргумент действительно агент, а не событие
+    if (agent && typeof agent === 'object' && 'id' in agent && 'name' in agent) {
       setEditingAgent(agent);
       // Загружаем файлы агента-шаблона только если есть ID
       if (agent.id) {
@@ -63,7 +64,12 @@ export const useAgentDialog = ({ onAgentUpdated, projectTypes }: UseAgentDialogP
           throw new Error('Агент создан без ID. Пожалуйста, попробуйте еще раз.');
         }
         
-        setEditingAgent(newAgent);
+        // Убеждаемся, что агент имеет все необходимые поля перед установкой
+        const agentWithId = {
+          ...newAgent,
+          id: newAgent.id, // Явно проверяем наличие ID
+        };
+        setEditingAgent(agentWithId);
         setAgentFiles([]);
       } catch (error: any) {
         console.error('Failed to create agent', error);
@@ -81,6 +87,10 @@ export const useAgentDialog = ({ onAgentUpdated, projectTypes }: UseAgentDialogP
     setAgentFiles([]);
   };
 
+  const updateEditingAgent = (agent: ApiProjectTypeAgent) => {
+    setEditingAgent(agent);
+  };
+
   return {
     isAgentDialogOpen,
     editingAgent,
@@ -89,6 +99,7 @@ export const useAgentDialog = ({ onAgentUpdated, projectTypes }: UseAgentDialogP
     handleOpenAgentDialog,
     handleCloseAgentDialog,
     onAgentUpdatedRef,
+    updateEditingAgent,
   };
 };
 

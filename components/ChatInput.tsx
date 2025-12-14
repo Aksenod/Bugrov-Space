@@ -165,8 +165,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
 
         {/* Функциональная группа кнопок - справа */}
         <div className="flex-shrink-0 flex items-center gap-2 pr-[5px] pl-2 pb-[5px]">
-          {/* Микрофон - показываем если нет текста или если есть текст (как вторичная кнопка) */}
-          {!isLoading && (
+          {/* Микрофон - показываем только если нет текста ИЛИ идет активная запись */}
+          {!isLoading && (!hasText || isRecording) && (
             <button
               onClick={handleMicClick}
               disabled={disabled || isVoiceProcessing}
@@ -179,9 +179,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, isLoadin
                   ? 'bg-white/5 text-white/20 cursor-not-allowed'
                   : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
               }`}
-              title={isRecording ? `Запись... ${recordingDuration}с` : 'Голосовой ввод'}
+              title={isRecording ? 'Остановить запись' : 'Голосовой ввод'}
             >
-              <Mic size={18} className={isRecording ? 'animate-pulse' : ''} />
+              {isRecording ? <X size={18} /> : <Mic size={18} />}
             </button>
           )}
 
