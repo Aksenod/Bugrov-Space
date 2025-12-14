@@ -86,7 +86,7 @@ export function useVoiceInput(
       mediaRecorderRef.current = mediaRecorder;
 
       // Собираем аудио чанки
-      // ВАЖНО: добавляем ВСЕ чанки, даже пустые, так как они могут быть нужны для формирования финального Blob
+      // Добавляем только чанки с данными (size > 0)
       mediaRecorder.ondataavailable = (event) => {
         if (import.meta.env.DEV) {
           console.log('[VoiceInput] ondataavailable called:', {
@@ -97,13 +97,14 @@ export function useVoiceInput(
           });
         }
         
-        // Добавляем все чанки, даже если они пустые
-        // Пустые чанки могут быть важны для некоторых браузеров
-        if (event.data) {
+        // Добавляем только чанки с данными
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
           if (import.meta.env.DEV) {
             console.log('[VoiceInput] Data chunk added:', event.data.size, 'bytes, total chunks:', audioChunksRef.current.length);
           }
+        } else if (import.meta.env.DEV) {
+          console.warn('[VoiceInput] Empty chunk ignored');
         }
       };
 
@@ -113,9 +114,9 @@ export function useVoiceInput(
           console.log('[VoiceInput] onstop called, chunks before wait:', audioChunksRef.current.length);
         }
 
-        // Даем больше времени для получения всех данных через ondataavailable
-        // Некоторые браузеры отправляют данные асинхронно
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Даем время для получения всех данных через ondataavailable
+        // Увеличиваем задержку для надежности
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         try {
           setIsProcessing(true);
@@ -131,14 +132,22 @@ export function useVoiceInput(
             }
           }
 
-          // Проверяем, что есть данные
-          if (audioChunksRef.current.length === 0) {
-            throw new Error('Не удалось записать аудио. Убедитесь, что вы говорили во время записи и попробуйте еще раз.');
+          // Проверяем, что есть валидные чанки с данными
+          const hasValidChunks = audioChunksRef.current.some(chunk => chunk && chunk.size > 0);
+          
+          if (!hasValidChunks) {
+            throw new Error('Не удалось записать аудио. Убедитесь, что вы говорили во время записи (минимум 1-2 секунды) и попробуйте еще раз.');
           }
 
-          // Создаем Blob из собранных чанков
-          // ВАЖНО: используем все чанки, даже пустые, так как они могут быть нужны
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+          // Фильтруем только чанки с данными перед созданием Blob
+          const validChunks = audioChunksRef.current.filter(chunk => chunk && chunk.size > 0);
+          
+          if (import.meta.env.DEV) {
+            console.log('[VoiceInput] Valid chunks:', validChunks.length, 'out of', audioChunksRef.current.length);
+          }
+          
+          // Создаем Blob только из валидных чанков
+          const audioBlob = new Blob(validChunks, { type: mimeType });
 
           if (import.meta.env.DEV) {
             console.log('[VoiceInput] Blob created:', {
@@ -189,10 +198,15 @@ export function useVoiceInput(
         setIsProcessing(false);
       };
 
-      // Начинаем запись с timeslice для регулярного сбора данных
-      // Используем небольшой интервал (250мс) для более частого сбора данных
-      mediaRecorder.start(250);
+      // Начинаем запись БЕЗ timeslice
+      // Данные будут собраны при вызове requestData() и stop()
+      // Это более надежный способ для большинства браузеров
+      mediaRecorder.start();
       setIsRecording(true);
+      
+      if (import.meta.env.DEV) {
+        console.log('[VoiceInput] Recording started, will collect data on stop');
+      }
 
       if (import.meta.env.DEV) {
         console.log('[VoiceInput] Recording started with stream:', {
@@ -241,21 +255,29 @@ export function useVoiceInput(
 
       // Запрашиваем все оставшиеся данные перед остановкой
       if (mediaRecorderRef.current.state === 'recording') {
-        // Запрашиваем данные
+        // Запрашиваем данные несколько раз для надежности
         mediaRecorderRef.current.requestData();
         
-        // Даем время для обработки запроса и получения данных
+        // Даем больше времени для обработки запроса и получения данных
         setTimeout(() => {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            // Запрашиваем еще раз перед остановкой
+            // Запрашиваем еще раз
             mediaRecorderRef.current.requestData();
+            
+            // Даем время для получения данных
             setTimeout(() => {
               if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                mediaRecorderRef.current.stop();
+                // Последний запрос перед остановкой
+                mediaRecorderRef.current.requestData();
+                setTimeout(() => {
+                  if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                  }
+                }, 200);
               }
-            }, 150);
+            }, 200);
           }
-        }, 100);
+        }, 200);
       } else {
         if (import.meta.env.DEV) {
           console.log('[VoiceInput] Recorder not in recording state, current state:', mediaRecorderRef.current.state);
