@@ -11,6 +11,7 @@ import {
 } from '../../services/admin/adminAgentService';
 import { validateAgentTemplate, formatValidationErrors, agentTemplateSchema } from '../../utils/admin/validation';
 import { handleTableNotFoundError, handleValidationError } from '../../utils/admin/errorHandlers';
+import { generateAgentDescription } from '../../services/openaiService';
 
 /**
  * Получить всех агентов-шаблонов
@@ -176,6 +177,38 @@ export const deleteAgent = async (req: Request, res: Response, next: NextFunctio
     res.status(204).send();
   } catch (error: any) {
     logger.error({ error: error.message, stack: error.stack }, 'DELETE /admin/agents/:id error');
+    next(error);
+  }
+};
+
+/**
+ * Сгенерировать описание для агента
+ */
+export const generateAgentDescription = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const agent = await getAgentTemplate(id);
+    if (!agent) {
+      return res.status(404).json({ error: 'Агент не найден' });
+    }
+
+    if (!agent.name || !agent.systemInstruction) {
+      return res.status(400).json({ 
+        error: 'Для генерации описания необходимо указать название и системную инструкцию агента' 
+      });
+    }
+
+    const description = await generateAgentDescription(agent.name, agent.systemInstruction);
+
+    logger.info({ agentId: id }, 'Agent description generated');
+    res.json({ description });
+  } catch (error: any) {
+    logger.error({ 
+      error: error.message, 
+      stack: error.stack,
+      agentId: req.params.id 
+    }, 'POST /admin/agents/:id/generate-description error');
     next(error);
   }
 };

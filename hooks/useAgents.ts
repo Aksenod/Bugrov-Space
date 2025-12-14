@@ -57,25 +57,6 @@ export const useAgents = (activeProjectId: string | null): UseAgentsReturn => {
     try {
       const response = await getAgentsService(projectId);
       const { agents: apiAgents, projectTypeAgents } = response;
-      
-      // Логирование для диагностики quickMessages
-      if (import.meta.env.DEV) {
-        console.log('[useAgents] API response:', {
-          agentsCount: apiAgents?.length || 0,
-          projectTypeAgentsCount: projectTypeAgents?.length || 0,
-          agentsWithQuickMessages: apiAgents?.filter(a => a.quickMessages && a.quickMessages.length > 0).map(a => ({
-            id: a.id,
-            name: a.name,
-            quickMessages: a.quickMessages
-          })) || [],
-          projectTypeAgentsWithQuickMessages: projectTypeAgents?.filter(a => a.quickMessages && a.quickMessages.length > 0).map(a => ({
-            id: a.id,
-            name: a.name,
-            quickMessages: a.quickMessages
-          })) || []
-        });
-      }
-      
       const mappedAgents = sortAgents(apiAgents.map(mapAgent));
       setAgents(mappedAgents);
 

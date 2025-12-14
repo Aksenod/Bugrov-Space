@@ -24,16 +24,6 @@ export const mapFile = (file: ApiFile): UploadedFile => ({
  * Преобразует ApiAgent в Agent
  */
 export const mapAgent = (agent: ApiAgent): Agent => {
-  // Логирование для диагностики quickMessages
-  if (import.meta.env.DEV) {
-    console.log('[mapAgent] Mapping agent:', {
-      id: agent.id,
-      name: agent.name,
-      quickMessages: agent.quickMessages,
-      hasQuickMessages: agent.quickMessages && agent.quickMessages.length > 0
-    });
-  }
-
   return {
     id: agent.id,
     name: agent.name,
@@ -76,16 +66,6 @@ export const mapUser = (user: ApiUser): User => ({
  * Преобразует ApiProjectTypeAgent в Agent
  */
 export const mapProjectTypeAgent = (agent: ApiProjectTypeAgent): Agent => {
-  // Логирование для диагностики quickMessages
-  if (import.meta.env.DEV) {
-    console.log('[mapProjectTypeAgent] Mapping project type agent:', {
-      id: agent.id,
-      name: agent.name,
-      quickMessages: agent.quickMessages,
-      hasQuickMessages: agent.quickMessages && agent.quickMessages.length > 0
-    });
-  }
-
   return {
     id: agent.id,
     name: agent.name,

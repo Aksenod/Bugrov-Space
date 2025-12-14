@@ -31,16 +31,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Логирование для диагностики onSendMessage
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('[ChatArea] onSendMessage prop:', {
-        type: typeof onSendMessage,
-        isFunction: typeof onSendMessage === 'function',
-        value: onSendMessage
-      });
-    }
-  }, [onSendMessage]);
 
   // Автопрокрутка к последнему сообщению
   useEffect(() => {

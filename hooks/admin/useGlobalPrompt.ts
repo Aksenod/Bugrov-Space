@@ -38,7 +38,6 @@ export const useGlobalPrompt = (showAlert: (message: string, title?: string, var
       setGlobalPromptUpdatedAt(prompt?.updatedAt ?? prompt?.createdAt ?? null);
     } catch (error: any) {
       if (error?.status === 404) {
-        console.warn('Global prompt endpoint not found (404), initializing with empty content');
         setGlobalPrompt('');
         setInitialGlobalPrompt('');
         setGlobalPromptUpdatedAt(null);

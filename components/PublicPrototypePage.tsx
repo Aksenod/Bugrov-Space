@@ -44,12 +44,6 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
     if (!iframe) return;
 
     const handleWheel = (e: WheelEvent) => {
-      console.log('[PublicPrototypePage] Wheel event:', { 
-        deltaY: e.deltaY, 
-        clientX: e.clientX, 
-        clientY: e.clientY 
-      });
-
       // Проверяем, что событие происходит над iframe
       const rect = iframe.getBoundingClientRect();
       const isOverIframe = 
@@ -58,11 +52,6 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
         e.clientY >= rect.top &&
         e.clientY <= rect.bottom;
 
-      console.log('[PublicPrototypePage] Is over iframe:', isOverIframe, {
-        rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
-        mouse: { x: e.clientX, y: e.clientY }
-      });
-
       if (!isOverIframe) {
         return;
       }
@@ -70,16 +59,12 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
       const scrollingDown = e.deltaY > 0;
       const scrollingUp = e.deltaY < 0;
 
-      console.log('[PublicPrototypePage] Scrolling:', { scrollingDown, scrollingUp });
-
       // При скролле вниз - поднимаем хедер вверх на 100% его высоты
       if (scrollingDown) {
-        console.log('[PublicPrototypePage] Hiding header');
         setIsHeaderHidden(true);
       } 
       // При скролле вверх - возвращаем хедер на место
       else if (scrollingUp) {
-        console.log('[PublicPrototypePage] Showing header');
         setIsHeaderHidden(false);
       }
 
@@ -88,22 +73,14 @@ export const PublicPrototypePage: React.FC<PublicPrototypePageProps> = ({ protot
         try {
           const currentScrollY = iframe.contentWindow.scrollY || iframe.contentWindow.pageYOffset || 0;
           const currentScrollX = iframe.contentWindow.scrollX || iframe.contentWindow.pageXOffset || 0;
-          console.log('[PublicPrototypePage] Scrolling iframe:', { 
-            currentScrollY, 
-            currentScrollX, 
-            deltaY: e.deltaY, 
-            deltaX: e.deltaX 
-          });
           iframe.contentWindow.scrollTo({
             left: currentScrollX + e.deltaX,
             top: currentScrollY + e.deltaY,
             behavior: 'auto'
           });
         } catch (err) {
-          console.error('[PublicPrototypePage] Error scrolling iframe:', err);
+          // Error scrolling iframe - non-critical
         }
-      } else {
-        console.log('[PublicPrototypePage] No contentWindow available');
       }
     };
 

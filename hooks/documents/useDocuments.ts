@@ -43,17 +43,11 @@ export const useDocuments = (
 
       // Проверяем, не загружается ли уже
       if (isLoadingRef.current) {
-        if (import.meta.env.DEV) {
-          console.log(`[Frontend] Documents already loading, skipping...`);
-        }
         return;
       }
 
       // Проверяем кеш - если уже загружено для этого проекта, пропускаем
       if (loadedSummaryRef.current.has(PROJECT_DOCS_KEY)) {
-        if (import.meta.env.DEV) {
-          console.log(`[Frontend] Documents already loaded for project ${activeProjectId}, skipping...`);
-        }
         return;
       }
 
@@ -62,22 +56,13 @@ export const useDocuments = (
       loadedSummaryRef.current.add(PROJECT_DOCS_KEY);
 
       try {
-        if (import.meta.env.DEV) {
-          console.log(`[Frontend] Loading project documents for agent: ${activeAgentId}, project: ${activeProjectId}`);
-        }
         const { files } = await getSummaryFilesService(activeAgentId, activeProjectId);
-        if (import.meta.env.DEV) {
-          console.log(`[Frontend] ✅ Loaded project documents (ALL files from all agents):`, files.length, 'files');
-        }
         const mapped = files.map(mapFile);
         setDocuments(mapped);
         lastLoadedProjectRef.current = activeProjectId;
       } catch (error: any) {
         // Если 404 - просто нет файлов, это нормально
         if (error?.status === 404 || error?.message?.includes('404') || error?.message?.includes('Not Found')) {
-          if (import.meta.env.DEV) {
-            console.log(`[Frontend] No project documents found (404 is normal if no files exist)`);
-          }
           setDocuments([]);
           lastLoadedProjectRef.current = activeProjectId;
           return;
@@ -102,22 +87,7 @@ export const useDocuments = (
       
       setIsGeneratingSummary(true);
       try {
-        if (import.meta.env.DEV) {
-          console.log('[Frontend] handleGenerateSummary called:', {
-            agentId: activeAgentId,
-            projectId: activeProjectId,
-          });
-        }
-
         const { file } = await generateSummaryService(activeAgentId, activeProjectId);
-
-        if (import.meta.env.DEV) {
-          console.log('[Frontend] Summary generated successfully:', {
-            fileId: file.id,
-            fileName: file.name,
-            agentId: file.agentId,
-          });
-        }
 
         const uploaded = mapFile(file);
         // Добавляем созданный файл в документы
@@ -129,9 +99,6 @@ export const useDocuments = (
         setSummarySuccess(true);
         setTimeout(() => setSummarySuccess(false), 3000);
       } catch (error: any) {
-        if (import.meta.env.DEV) {
-          console.error('[Frontend] Summary generation failed:', error);
-        }
         throw error;
       } finally {
         setIsGeneratingSummary(false);
@@ -214,9 +181,6 @@ export const useDocuments = (
 
       const fileToRemove = documents.find(doc => doc.id === fileId);
       if (!fileToRemove) {
-        if (import.meta.env.DEV) {
-          console.error('[Frontend] File not found in documents:', { fileId });
-        }
         return;
       }
 
@@ -232,13 +196,6 @@ export const useDocuments = (
             const shouldFallback = projectDeleteError?.status === 403 || projectDeleteError?.status === 404;
             if (!shouldFallback) {
               throw projectDeleteError;
-            }
-            if (import.meta.env.DEV) {
-              console.warn('[Frontend] Project-scoped deletion failed, falling back to direct delete', {
-                fileId,
-                projectId: activeProjectId,
-                status: projectDeleteError?.status,
-              });
             }
             await deleteFileByIdService(fileId);
           }
@@ -277,9 +234,6 @@ export const useDocuments = (
 
     // Загружаем документы с небольшой задержкой
     const timer = setTimeout(() => {
-      if (import.meta.env.DEV) {
-        console.log(`[Frontend] useEffect: Переключение на агента ${activeAgentId}, проект ${activeProjectId}, загрузка документов`);
-      }
       ensureSummaryLoaded();
     }, 200);
 

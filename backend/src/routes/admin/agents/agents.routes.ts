@@ -1,11 +1,14 @@
 import { Router } from 'express';
-import { getAllAgents, getAgent, createAgent, updateAgent, deleteAgent } from '../../../controllers/admin/adminAgentsController';
+import { getAllAgents, getAgent, createAgent, updateAgent, deleteAgent, generateAgentDescription } from '../../../controllers/admin/adminAgentsController';
 import { asyncHandler } from '../../../middleware/errorHandler';
 
 const router = Router();
 
 // GET / - получить все агенты-шаблоны
 router.get('/', asyncHandler(getAllAgents));
+
+// POST /:id/generate-description - сгенерировать описание для агента
+router.post('/:id/generate-description', asyncHandler(generateAgentDescription));
 
 // GET /:id - получить конкретный агент-шаблон
 router.get('/:id', asyncHandler(getAgent));

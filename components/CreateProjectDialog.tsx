@@ -166,7 +166,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           return { projectTypeId: type.id, hasAgents: agents.length > 0 };
         } catch (err) {
           // Игнорируем ошибки для отдельных типов проектов
-          console.warn(`Failed to load agents for project type ${type.id}`, err);
+          // Failed to load agents for project type - non-critical
           return { projectTypeId: type.id, hasAgents: false };
         }
       });

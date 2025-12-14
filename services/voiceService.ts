@@ -54,8 +54,9 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
       throw new Error('Не удалось конвертировать аудио в base64');
     }
     
-    // Проверяем минимальный размер base64 (примерно соответствует 1KB исходных данных)
-    const MIN_BASE64_SIZE = 1365; // Примерно 1KB в base64 (1024 * 4/3)
+    // Проверяем минимальный размер base64 (примерно соответствует 100 байт исходных данных)
+    // Уменьшили минимум, так как короткие записи тоже могут быть валидными
+    const MIN_BASE64_SIZE = 134; // Примерно 100 байт в base64 (100 * 4/3 ≈ 134)
     if (base64Audio.length < MIN_BASE64_SIZE) {
       throw new Error('Аудио файл слишком короткий для обработки');
     }

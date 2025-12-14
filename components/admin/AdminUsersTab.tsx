@@ -26,7 +26,6 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
     setFixingSubscriptions(prev => new Set(prev).add(username));
     try {
       const result = await api.fixUserSubscription(username);
-      console.log('[AdminUsersTab] Subscription fixed:', result);
       if (result.success) {
         alert(`Подписка для пользователя ${username} успешно активирована!`);
         if (onUsersReload) {

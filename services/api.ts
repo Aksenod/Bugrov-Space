@@ -129,9 +129,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isDev = import.meta.env.DEV;
 
   try {
-    if (isDev) {
-      console.log(`[API] Request: ${init.method || 'GET'} ${url}`);
-    }
     const response = await fetch(url, {
       ...init,
       ...(controller ? { signal: controller.signal } : {}),
@@ -141,26 +138,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     });
 
     const duration = Date.now() - startTime;
-    if (isDev) {
-      console.log(`[API] Response: ${response.status} in ${duration}ms`);
-    }
 
     if (timeoutId) {
       clearTimeout(timeoutId);
-    }
-
-    // Если запрос к агенту или генерация прототипа заняли больше таймаута, логируем предупреждение, но не ошибку
-    if ((isOpenAiRequest || isPrototypeGeneration) && duration > timeout && isDev) {
-      console.warn(`[API] Request took ${duration}ms (exceeded ${timeout}ms timeout), but response received successfully`);
     }
 
     // Если получили 429 - блокируем все запросы на некоторое время
     // НО не блокируем, если это auth роут - пользователь должен иметь возможность залогиниться
     if (response.status === 429 && !isAuthRoute) {
       rateLimitBlockedUntil = Date.now() + RATE_LIMIT_BLOCK_DURATION;
-      if (isDev) {
-        console.warn(`[API] Rate limit hit! Blocking all requests for ${RATE_LIMIT_BLOCK_DURATION / 1000} seconds`);
-      }
       const message = await parseError(response);
       const error = new Error(message || 'Too many requests from this IP, please try again later.') as Error & { status?: number; isRateLimit?: boolean };
       error.status = 429;
@@ -198,9 +184,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // Если это 429 ошибка - устанавливаем блокировку (но не для auth роутов)
     if (error.status === 429 && !isAuthRoute) {
       rateLimitBlockedUntil = Date.now() + RATE_LIMIT_BLOCK_DURATION;
-      if (isDev) {
-        console.warn(`[API] Rate limit error! Blocking all requests for ${RATE_LIMIT_BLOCK_DURATION / 1000} seconds`);
-      }
     }
 
     // Если уже заблокированы - не логируем как ошибку
@@ -208,17 +191,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       throw error;
     }
 
-    if (isDev) {
-      console.error(`[API] Error after ${duration}ms:`, error.name, error.message);
-    }
-
     // Если запрос был отменен из-за таймаута
     // Для запросов к агентам и генерации прототипа НЕ показываем ошибку таймаута, так как сервер может все равно вернуть ответ
     // Для обычных запросов показываем ошибку таймаута как раньше
     if ((error.name === 'AbortError' || (controller && controller.signal.aborted)) && !isOpenAiRequest && !isPrototypeGeneration) {
-      if (isDev) {
-        console.error(`[API] Request timeout: ${url}`);
-      }
       const timeoutSeconds = 10;
       const timeoutError = new Error(`Request timeout: запрос превысил время ожидания (${timeoutSeconds} секунд). Сервер может быть перегружен или недоступен.`) as Error & { status?: number; isTimeout?: boolean };
       timeoutError.status = 408;
@@ -230,17 +206,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // значит запрос все еще выполняется - не показываем ошибку таймаута
     if (isOpenAiRequest && duration > OPENAI_REQUEST_TIMEOUT && error.name !== 'AbortError') {
       // Запрос все еще выполняется, просто ждем дольше
-      if (isDev) {
-        console.warn(`[API] Agent request taking longer than expected (${duration}ms), but still waiting for response...`);
-      }
       // Продолжаем ждать - не бросаем ошибку таймаута
     }
 
     // Обработка сетевых ошибок
     if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError') || error.message?.includes('Network request failed')) {
-      if (isDev) {
-        console.error(`[API] Network error: ${url}`);
-      }
       const networkError = new Error('Network error: не удалось подключиться к серверу. Проверьте подключение к интернету.') as Error & { status?: number; isNetworkError?: boolean };
       networkError.status = 0;
       networkError.isNetworkError = true;
@@ -370,7 +340,6 @@ export const api = {
   clearRateLimitBlock: () => {
     rateLimitBlockedUntil = null;
     if (import.meta.env.DEV) {
-      console.log('[API] Rate limit block cleared');
     }
   },
   isRateLimitBlocked: () => {
@@ -662,6 +631,12 @@ export const api = {
 
   async detachAgentFromProjectType(agentId: string, projectTypeId: string) {
     return request<void>(`/admin/agents/${agentId}/project-types/${projectTypeId}`, { method: 'DELETE' });
+  },
+
+  async generateAgentDescription(agentId: string) {
+    return request<{ description: string }>(`/admin/agents/${agentId}/generate-description`, {
+      method: 'POST',
+    });
   },
 
   async getGlobalPrompt() {

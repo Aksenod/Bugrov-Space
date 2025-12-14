@@ -86,10 +86,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (import.meta.env.DEV) {
-      console.log('[AuthPage] Form submitted', { mode, username, passwordLength: password.length });
-    }
-    
     // Помечаем все поля как touched при попытке отправки
     const newTouched = { username: true, password: true, newPassword: true };
     setTouched(newTouched);
@@ -98,25 +94,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
     const usernameValidation = validateUsername(username);
     if (!usernameValidation.valid) {
       setUsernameError(usernameValidation.message);
-      if (import.meta.env.DEV) {
-        console.log('[AuthPage] Username validation failed:', usernameValidation.message);
-      }
       return;
     }
     setUsernameError('');
     
     if (mode !== 'forgot' && password.length < 6) {
       setPasswordError('Минимум 6 символов');
-      if (import.meta.env.DEV) {
-        console.log('[AuthPage] Password validation failed: minimum 6 characters');
-      }
       return;
     }
     
     if (mode === 'forgot' && newPassword.length < 6) {
-      if (import.meta.env.DEV) {
-        console.log('[AuthPage] New password validation failed: minimum 6 characters');
-      }
       return;
     }
     
@@ -125,10 +112,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
     setUsernameError('');
     
     setIsLoading(true);
-    
-    if (import.meta.env.DEV) {
-      console.log('[AuthPage] Starting authentication...');
-    }
 
     try {
       if (mode === 'forgot') {
@@ -136,19 +119,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
         setResetSuccess(true);
       } else if (mode === 'signin') {
         await onLogin(username, password);
-        if (import.meta.env.DEV) {
-          console.log('[AuthPage] Login successful');
-        }
       } else {
         await onRegister(username, password);
-        if (import.meta.env.DEV) {
-          console.log('[AuthPage] Registration successful');
-        }
       }
     } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error('[AuthPage] Authentication error:', err);
-      }
       // Error handled by parent via props
     } finally {
       setIsLoading(false);
@@ -429,15 +403,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onRegister, onReset
                   type="submit"
                   disabled={isLoading || (touched.username && !!usernameError) || (touched.password && !!passwordError)}
                   onClick={(e) => {
-                    if (import.meta.env.DEV) {
-                      console.log('[AuthPage] Button clicked', {
-                        isLoading,
-                        usernameError,
-                        passwordError,
-                        touched,
-                        disabled: isLoading || (touched.username && !!usernameError) || (touched.password && !!passwordError)
-                      });
-                    }
                     // Если кнопка disabled, предотвращаем отправку
                     if (isLoading || (touched.username && !!usernameError) || (touched.password && !!passwordError)) {
                       e.preventDefault();

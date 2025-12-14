@@ -454,10 +454,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
 
   // Показывать кнопки только если документ создан агентом-копирайтером
   const showDSLButtons = documentCreatorAgent && hasRole(documentCreatorAgent.role, "copywriter");
-
-  console.log('[ProjectDocumentsModal] Tab visibility:', {
-    isAdmin,
-    currentUserRole: currentUser?.role,
     showDSLButtons,
     shouldShowTabs: activeTab === 'prototype' && showDSLButtons && isAdmin,
     activeTab,
@@ -583,12 +579,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
         verstkaContent: file.verstkaContent,
       };
 
-      console.log('[ProjectDocumentsModal] Generated result:', {
-        hasDSL: !!updatedFile.dslContent,
-        hasVerstka: !!updatedFile.verstkaContent,
-        dslLength: updatedFile.dslContent?.length || 0,
-        verstkaLength: updatedFile.verstkaContent?.length || 0,
-      });
 
       // Сразу обновляем локальное состояние для мгновенного отображения
       setLocalSelectedFile(updatedFile);
@@ -673,14 +663,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
       }
       // Для preview и html возвращаем verstkaContent
       const content = fileToUse.verstkaContent || null;
-      console.log('[ProjectDocumentsModal] getDisplayContent Prototype:', {
-        hasContent: !!content,
-        contentLength: content?.length || 0,
-        selectedFileId: fileToUse.id,
-        isLocalSelected: localSelectedFile?.id === fileToUse.id,
-        subTab: prototypeSubTab,
-        selectedVersionNumber
-      });
       return content;
     }
     return null;
@@ -1302,12 +1284,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       const content = getDisplayContent();
 
                       // Специальная обработка для документов верстальщика или таба прототипа
-                      console.log('[ProjectDocumentsModal] Render check:', {
-                        activeTab,
-                        showVerstkaSubTabs,
-                        prototypeSubTab,
-                        hasContent: !!content
-                      });
 
                       if ((activeTab === 'prototype' && showDSLButtons) || showVerstkaSubTabs) {
                         return renderPrototypeContent();

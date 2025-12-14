@@ -19,30 +19,11 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onS
   // Обновляем ref при изменении onSendMessage
   useEffect(() => {
     onSendMessageRef.current = onSendMessage;
-    console.log('[EmptyChatState] onSendMessage ref updated:', {
-      type: typeof onSendMessage,
-      isFunction: typeof onSendMessage === 'function',
-      value: onSendMessage
-    });
   }, [onSendMessage]);
-
-  // Логирование для диагностики quickMessages
-  React.useEffect(() => {
-    if (import.meta.env.DEV && activeAgent) {
-      console.log('[EmptyChatState] Active agent:', {
-        id: activeAgent.id,
-        name: activeAgent.name,
-        quickMessages: activeAgent.quickMessages,
-        hasQuickMessages: activeAgent.quickMessages && activeAgent.quickMessages.length > 0,
-        quickMessagesLength: activeAgent.quickMessages?.length || 0
-      });
-    }
-  }, [activeAgent?.id, activeAgent?.quickMessages]);
 
   // Используем useCallback с ref для сохранения актуальной ссылки на onSendMessage
   const handleExampleClick = useCallback(async (example: string) => {
     if (!example || !example.trim()) {
-      console.warn('[EmptyChatState] Empty example text, cannot send');
       return;
     }
 
@@ -51,25 +32,13 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({ activeAgent, onS
 
     // Проверка, что sendMessage является функцией
     if (typeof sendMessage !== 'function') {
-      console.error('[EmptyChatState] onSendMessage is not a function:', {
-        type: typeof sendMessage,
-        value: sendMessage,
-        refCurrent: onSendMessageRef.current
-      });
       return;
     }
 
-    console.log('[EmptyChatState] Sending example message:', example, {
-      onSendMessageType: typeof sendMessage,
-      onSendMessageIsFunction: typeof sendMessage === 'function'
-    });
-
     try {
       await sendMessage(example);
-      console.log('[EmptyChatState] Example message sent successfully');
     } catch (error) {
       // Ошибка уже обработана в handleSendMessage
-      console.error('[EmptyChatState] Failed to send example message:', error);
     }
   }, []); // Пустой массив зависимостей, так как используем ref
 

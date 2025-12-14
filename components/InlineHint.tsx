@@ -90,7 +90,6 @@ export const InlineHint: React.FC<InlineHintProps> = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (import.meta.env.DEV) {
-                              console.log('[InlineHint] Example clicked:', example);
                             }
                             onExampleClick(example);
                           }}

@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 
 const WHISPER_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB - лимит Whisper API
+const MIN_FILE_SIZE = 1024; // 1KB - минимальный размер для Whisper API (очень короткие файлы не могут быть декодированы)
 const SUPPORTED_FORMATS = ['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm'];
 
 function ensureApiKey() {
@@ -58,12 +59,16 @@ export async function transcribeAudio(
   filename?: string
 ): Promise<string> {
   // Проверка размера файла
-  if (audioBuffer.length > MAX_FILE_SIZE) {
-    throw new Error(`Файл слишком большой. Максимальный размер: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-  }
-
   if (audioBuffer.length === 0) {
     throw new Error('Аудио файл пуст');
+  }
+
+  if (audioBuffer.length < MIN_FILE_SIZE) {
+    throw new Error(`Аудио файл слишком короткий (${audioBuffer.length} байт). Минимальный размер: ${MIN_FILE_SIZE} байт. Убедитесь, что вы говорили во время записи (минимум 1-2 секунды) и попробуйте еще раз.`);
+  }
+
+  if (audioBuffer.length > MAX_FILE_SIZE) {
+    throw new Error(`Файл слишком большой. Максимальный размер: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
   }
 
   const apiKey = ensureApiKey();

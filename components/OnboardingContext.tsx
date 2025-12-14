@@ -74,7 +74,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         }
       }
     } catch (error) {
-      console.warn('Failed to load onboarding state from localStorage', error);
+      // Failed to load onboarding state from localStorage - non-critical
     }
     
     // Дефолтное состояние для новых пользователей
@@ -98,7 +98,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         version: state.version,
       }));
     } catch (error) {
-      console.warn('Failed to save onboarding state to localStorage', error);
+      // Failed to save onboarding state to localStorage - non-critical
     }
   }, [state]);
 

@@ -480,4 +480,49 @@ export async function generateDocumentResult(
   return text;
 }
 
+/**
+ * Генерирует описание для агента на основе его названия и системной инструкции
+ * @param name - название агента
+ * @param systemInstruction - системная инструкция агента
+ * @returns сгенерированное описание (до 500 символов)
+ */
+export async function generateAgentDescription(
+  name: string,
+  systemInstruction: string,
+): Promise<string> {
+  const prompt = `Создай краткое описание (до 500 символов) для AI-агента с названием "${name}" и следующей системной инструкцией:
+
+${systemInstruction}
+
+Описание должно быть:
+- Понятным для пользователей
+- Объяснять, для чего предназначен агент
+- Кратким и информативным
+- Написанным на русском языке
+- Не более 500 символов
+
+Верни только описание, без дополнительных комментариев.`;
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: 'Ты помощник, который создает понятные и информативные описания для AI-агентов.',
+    },
+    {
+      role: 'user',
+      content: prompt,
+    },
+  ];
+
+  const completion = await callOpenAi(DEFAULT_MODEL, messages);
+  const text = extractMessageText(completion);
+
+  if (!text) {
+    throw new Error('OpenAI did not return any content');
+  }
+
+  // Ограничиваем длину до 500 символов на случай, если модель вернула больше
+  return text.trim().substring(0, 500);
+}
+
 

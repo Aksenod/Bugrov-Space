@@ -50,17 +50,11 @@ export const BootstrapProvider: React.FC<BootstrapProviderProps> = ({ children, 
 
     // Предотвращаем параллельные вызовы bootstrap
     if (bootstrapInProgressRef.current) {
-      if (import.meta.env.DEV) {
-        console.log('[Bootstrap] Already in progress, skipping...');
-      }
       return;
     }
 
     // Если bootstrap уже был выполнен с тем же токеном, пропускаем
     if (lastBootstrapTokenRef.current === token && hasBootstrappedRef.current) {
-      if (import.meta.env.DEV) {
-        console.log('[Bootstrap] Already bootstrapped with this token, skipping...');
-      }
       return;
     }
 

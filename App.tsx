@@ -132,14 +132,6 @@ export default function App() {
   // Используем документы из хука документов
   const projectDocuments = documents.documents;
 
-  // Логирование для диагностики (только в dev режиме)
-  useEffect(() => {
-    if (import.meta.env.DEV && activeAgent) {
-      console.log(`[Frontend] Active agent changed: ${activeAgent.name} (${activeAgent.id})`);
-      console.log(`[Frontend] activeAgentId: ${activeAgentId}`);
-      console.log(`[Frontend] Project documents count: ${projectDocuments.length}`);
-    }
-  }, [activeAgent?.id, activeAgentId, projectDocuments.length]);
 
 
   // Обертка для handleLogout с дополнительной очисткой
@@ -285,91 +277,45 @@ export default function App() {
       // Если bootstrap не удался из-за временной проблемы с БД - не критично
       // Пользователь уже залогинен и может попробовать обновить страницу
       if (import.meta.env.DEV) {
-        console.warn('Bootstrap after registration failed, but user is logged in', bootstrapError);
+        // Bootstrap after registration failed, but user is logged in - non-critical
       }
     }
   }, [handleRegister, setProjects, selectProject, setAgents, setActiveAgentId, chat, bootstrap]);
 
   const handleSendMessage = useCallback(async (text: string) => {
-    if (import.meta.env.DEV) {
-      console.log('[App] handleSendMessage called:', {
-        text: text?.substring(0, 50),
-        hasActiveAgent: !!activeAgent,
-        activeAgentId,
-        activeProjectId,
-        isLoading: chat.isLoading,
-        chatType: typeof chat,
-        chatSendMessageType: typeof chat?.sendMessage,
-      });
-    }
-
     if (!activeAgent) {
-      if (import.meta.env.DEV) {
-        console.warn('[App] Cannot send message: no active agent');
-      }
       showAlert('Ошибка: не выбран активный агент', undefined, 'error', 3000);
       return;
     }
 
     if (!text || !text.trim()) {
-      if (import.meta.env.DEV) {
-        console.warn('[App] Cannot send message: empty text');
-      }
       return;
     }
 
     if (chat.isLoading) {
-      if (import.meta.env.DEV) {
-        console.warn('[App] Cannot send message: chat is loading');
-      }
       return;
     }
 
     if (!activeProjectId) {
-      if (import.meta.env.DEV) {
-        console.warn('[App] Cannot send message: no active project');
-      }
       showAlert('Ошибка: не выбран активный проект', undefined, 'error', 3000);
       return;
     }
 
     try {
-      if (import.meta.env.DEV) {
-        console.log('[App] Calling chat.sendMessage');
-      }
-      
       // Проверка, что chat.sendMessage существует
       if (!chat || typeof chat.sendMessage !== 'function') {
-        console.error('[App] chat.sendMessage is not a function:', {
-          chat: chat,
-          chatSendMessage: chat?.sendMessage,
-          chatSendMessageType: typeof chat?.sendMessage
-        });
+        console.error('[App] chat.sendMessage is not a function');
         showAlert('Ошибка: функция отправки сообщений не доступна', 'Ошибка', 'error', 5000);
         return;
       }
       
       await chat.sendMessage(text);
-      if (import.meta.env.DEV) {
-        console.log('[App] Message sent successfully');
-      }
     } catch (error: any) {
       const errorMessage = error?.message || 'Ошибка генерации. Попробуйте позже.';
       console.error('[App] Failed to send message:', error);
       showAlert(errorMessage, 'Ошибка', 'error', 5000);
     }
   }, [activeAgent, activeAgentId, activeProjectId, chat, showAlert]);
-
-  // Логирование для диагностики handleSendMessage
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('[App] handleSendMessage check:', {
-        type: typeof handleSendMessage,
-        isFunction: typeof handleSendMessage === 'function',
-        value: handleSendMessage
-      });
-    }
-  }, [handleSendMessage]);
 
   const handleDeleteMessage = useCallback(async (messageId: string) => {
     if (!messageId) return;
@@ -446,7 +392,6 @@ export default function App() {
         await loadAgents(mappedProject.id);
       } catch (error) {
         if (import.meta.env.DEV) {
-          console.log('No agents in new project, this is expected');
         }
         setAgents([]);
         setActiveAgentId(null);

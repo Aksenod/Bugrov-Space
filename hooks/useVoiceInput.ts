@@ -28,6 +28,9 @@ export function useVoiceInput(
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const stateCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isProcessingRef = useRef<boolean>(false); // Защита от повторных вызовов onstop
+  const recordingStartTimeRef = useRef<number | null>(null); // Время начала записи
 
   /**
    * Получает доступ к микрофону
@@ -52,9 +55,14 @@ export function useVoiceInput(
    */
   const startRecording = useCallback(async () => {
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:54',message:'startRecording called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
+      // #endregion
       setError(null);
       setRecordingDuration(0);
       audioChunksRef.current = [];
+      isProcessingRef.current = false;
+      recordingStartTimeRef.current = null;
 
       // Убеждаемся, что предыдущий MediaRecorder полностью остановлен
       if (mediaRecorderRef.current) {
@@ -68,6 +76,21 @@ export function useVoiceInput(
 
       // Получаем поток (переиспользуем существующий или запрашиваем новый)
       const stream = await getMediaStream();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:70',message:'Stream obtained',data:{streamId:stream.id,tracksCount:stream.getTracks().length,trackStates:stream.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled,kind:t.kind})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+
+      // Даем потоку время для полной инициализации перед началом записи
+      // Это может помочь избежать проблем с автоматической остановкой MediaRecorder
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Проверяем, что поток все еще активен после задержки
+      if (!stream.active || stream.getTracks().some(track => track.readyState !== 'live')) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:75',message:'WARNING: Stream not ready after delay',data:{streamActive:stream.active,trackStates:stream.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        throw new Error('Поток микрофона не готов. Попробуйте еще раз.');
+      }
 
       // Определяем поддерживаемый формат
       let mimeType = 'audio/webm';
@@ -80,17 +103,69 @@ export function useVoiceInput(
       }
       
       // Нормализуем MIME тип, убирая codecs (например, audio/webm;codecs=opus -> audio/webm)
-      const normalizedMimeType = mimeType.split(';')[0];
+      // Это будет обновлено после создания MediaRecorder с фактическим типом
+      let normalizedMimeType = mimeType.split(';')[0];
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:84',message:'MIME type determined',data:{mimeType,normalizedMimeType,webmSupported:MediaRecorder.isTypeSupported('audio/webm'),mp4Supported:MediaRecorder.isTypeSupported('audio/mp4'),oggSupported:MediaRecorder.isTypeSupported('audio/ogg'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
 
       // Создаем новый MediaRecorder для каждой записи
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType,
-      });
+      // Важно: не указываем mimeType в конструкторе, если он может быть не полностью поддерживаемым
+      // Браузер выберет лучший формат автоматически
+      let mediaRecorder: MediaRecorder;
+      try {
+        // Пробуем создать с указанным mimeType
+        mediaRecorder = new MediaRecorder(stream, {
+          mimeType,
+        });
+      } catch (e) {
+        // Если не получилось, создаем без указания mimeType - браузер выберет сам
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:100',message:'Failed to create MediaRecorder with mimeType, trying without',data:{mimeType,error:e instanceof Error?e.message:'unknown',timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'})}).catch(()=>{});
+        // #endregion
+        mediaRecorder = new MediaRecorder(stream);
+      }
       mediaRecorderRef.current = mediaRecorder;
+      
+      // Получаем фактический MIME тип, который использует браузер
+      const actualMimeType = mediaRecorder.mimeType || mimeType;
+      // Обновляем normalizedMimeType с фактическим типом
+      normalizedMimeType = actualMimeType.split(';')[0];
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:110',message:'MediaRecorder created',data:{requestedMimeType:mimeType,actualMimeType,normalizedMimeType,recorderState:mediaRecorder.state,streamActive:stream.active,tracksState:stream.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'})}).catch(()=>{});
+      // #endregion
+
+      // Отслеживаем события треков потока для диагностики
+      stream.getTracks().forEach((track, index) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:89',message:'Setting up track listeners',data:{trackId:track.id,index,readyState:track.readyState,enabled:track.enabled,kind:track.kind,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        
+        track.onended = () => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:95',message:'TRACK ENDED EVENT',data:{trackId:track.id,index,recorderState:mediaRecorder.state,isRecording,streamActive:stream.active,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+        };
+        
+        track.onmute = () => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:101',message:'TRACK MUTED',data:{trackId:track.id,index,recorderState:mediaRecorder.state,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+        };
+        
+        track.onunmute = () => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:107',message:'TRACK UNMUTED',data:{trackId:track.id,index,recorderState:mediaRecorder.state,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          // #endregion
+        };
+      });
 
       // Собираем аудио чанки
       // Добавляем только чанки с данными (size > 0)
       mediaRecorder.ondataavailable = (event) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:93',message:'ondataavailable event',data:{hasData:!!event.data,dataSize:event.data?.size||0,dataType:event.data?.type||'none',currentChunks:audioChunksRef.current.length,recorderState:mediaRecorder.state,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+        // #endregion
         if (import.meta.env.DEV) {
           console.log('[VoiceInput] ondataavailable called:', {
             hasData: !!event.data,
@@ -103,22 +178,65 @@ export function useVoiceInput(
         // Добавляем только чанки с данными
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:105',message:'Chunk added to array',data:{chunkSize:event.data.size,chunkType:event.data.type,totalChunks:audioChunksRef.current.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+          // #endregion
           if (import.meta.env.DEV) {
             console.log('[VoiceInput] Data chunk added:', event.data.size, 'bytes, total chunks:', audioChunksRef.current.length);
           }
-        } else if (import.meta.env.DEV) {
-          console.warn('[VoiceInput] Empty chunk ignored');
+        } else {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:110',message:'Empty chunk ignored',data:{hasData:!!event.data,dataSize:event.data?.size||0,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+          if (import.meta.env.DEV) {
+            console.warn('[VoiceInput] Empty chunk ignored');
+          }
         }
       };
 
       // Обрабатываем окончание записи
       mediaRecorder.onstop = async () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:115',message:'onstop called',data:{chunksBeforeWait:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type})),recorderState:mediaRecorder.state,isRecordingState:isRecording,isProcessingRef:isProcessingRef.current,streamActive:streamRef.current?.active,streamTracksState:streamRef.current?.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,G,H'})}).catch(()=>{});
+        // #endregion
         if (import.meta.env.DEV) {
           console.log('[VoiceInput] onstop called, chunks before wait:', audioChunksRef.current.length);
         }
 
+        // Защита от повторных вызовов onstop
+        if (isProcessingRef.current) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:122',message:'WARNING: onstop called again while processing',data:{isProcessingRef:isProcessingRef.current,recorderState:mediaRecorder.state,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+          // #endregion
+          return;
+        }
+
+        // Проверяем, не остановилась ли запись слишком быстро (менее 500мс)
+        // Это может указывать на проблему с потоком или автоматическую остановку
+        const MIN_RECORDING_DURATION_MS = 500;
+        if (recordingStartTimeRef.current) {
+          const actualDuration = Date.now() - recordingStartTimeRef.current;
+          if (actualDuration < MIN_RECORDING_DURATION_MS && !isRecording) {
+            // Запись остановилась слишком быстро - это ошибка
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:122',message:'ERROR: Recording stopped too quickly',data:{actualDuration,minDuration:MIN_RECORDING_DURATION_MS,recorderState:mediaRecorder.state,streamActive:streamRef.current?.active,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+            // #endregion
+            const errorMessage = 'Запись остановилась слишком быстро. Убедитесь, что микрофон работает и попробуйте еще раз.';
+            setError(errorMessage);
+            if (onError) {
+              onError(errorMessage);
+            }
+            setIsRecording(false);
+            recordingStartTimeRef.current = null;
+            return;
+          }
+        }
+
         // Даем время для получения всех данных через ondataavailable
         await new Promise(resolve => setTimeout(resolve, 300));
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:121',message:'After 300ms wait',data:{chunksAfterWait:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
 
         try {
           // НЕ устанавливаем isProcessing здесь - установим только после проверки валидности данных
@@ -136,8 +254,14 @@ export function useVoiceInput(
 
           // Проверяем, что есть валидные чанки с данными
           const hasValidChunks = audioChunksRef.current.some(chunk => chunk && chunk.size > 0);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:138',message:'Validating chunks',data:{totalChunks:audioChunksRef.current.length,hasValidChunks,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type,isValid:c&&c.size>0})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,G'})}).catch(()=>{});
+          // #endregion
           
           if (!hasValidChunks) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:141',message:'ERROR: No valid chunks found',data:{totalChunks:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c?.size||0,type:c?.type||'none'})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,G'})}).catch(()=>{});
+            // #endregion
             throw new Error('Не удалось записать аудио. Убедитесь, что вы говорили во время записи (минимум 1-2 секунды) и попробуйте еще раз.');
           }
 
@@ -148,8 +272,12 @@ export function useVoiceInput(
             console.log('[VoiceInput] Valid chunks:', validChunks.length, 'out of', audioChunksRef.current.length);
           }
           
-          // Создаем Blob только из валидных чанков с нормализованным MIME типом
-          const audioBlob = new Blob(validChunks, { type: normalizedMimeType });
+          // Получаем фактический MIME тип из MediaRecorder, если он доступен
+          const actualMimeType = mediaRecorder.mimeType || normalizedMimeType;
+          const blobMimeType = actualMimeType.split(';')[0]; // Убираем codecs для Blob
+          
+          // Создаем Blob только из валидных чанков с фактическим MIME типом
+          const audioBlob = new Blob(validChunks, { type: blobMimeType });
 
           if (import.meta.env.DEV) {
             console.log('[VoiceInput] Blob created:', {
@@ -162,19 +290,33 @@ export function useVoiceInput(
           }
 
           // Проверяем размер Blob (минимум 1KB для валидного аудио)
+          // Whisper API требует минимум 1KB для декодирования
           const MIN_AUDIO_SIZE = 1024; // 1KB
           if (audioBlob.size === 0) {
             throw new Error('Записанное аудио пусто. Попробуйте еще раз.');
           }
           if (audioBlob.size < MIN_AUDIO_SIZE) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:248',message:'Audio too small for Whisper API',data:{audioBlobSize:audioBlob.size,minSize:MIN_AUDIO_SIZE,chunksCount:validChunks.length,recordingDuration:recordingDuration,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+            // #endregion
             throw new Error(`Записанное аудио слишком короткое (${audioBlob.size} байт). Убедитесь, что вы говорили во время записи (минимум 1-2 секунды) и попробуйте еще раз.`);
           }
 
           // Теперь устанавливаем isProcessing, так как данные валидны и начинаем транскрибацию
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:206',message:'Starting transcription - before setIsProcessing',data:{recorderState:mediaRecorder.state,isRecordingState:isRecording,isProcessingRef:isProcessingRef.current,streamActive:streamRef.current?.active,streamTracksState:streamRef.current?.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled})),audioBlobSize:audioBlob.size,audioBlobType:audioBlob.type,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+          // #endregion
+          isProcessingRef.current = true;
           setIsProcessing(true);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:208',message:'Calling transcribeAudio',data:{audioBlobSize:audioBlob.size,audioBlobType:audioBlob.type,recorderState:mediaRecorder.state,isRecordingState:isRecording,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+          // #endregion
 
           // Транскрибируем аудио
           const transcribedText = await transcribeAudio(audioBlob);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:212',message:'transcribeAudio completed',data:{transcribedTextLength:transcribedText?.length||0,transcribedTextPreview:transcribedText?.substring(0,50)||'empty',timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+          // #endregion
 
           if (!transcribedText || !transcribedText.trim()) {
             throw new Error('Не удалось распознать речь. Попробуйте говорить четче.');
@@ -192,12 +334,28 @@ export function useVoiceInput(
             onError(errorMessage);
           }
         } finally {
+          isProcessingRef.current = false;
           setIsProcessing(false);
+          recordingStartTimeRef.current = null;
+        }
+      };
+
+      // Обрабатываем успешное начало записи
+      mediaRecorder.onstart = () => {
+        recordingStartTimeRef.current = Date.now();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:200',message:'MEDIARECORDER STARTED',data:{recorderState:mediaRecorder.state,streamActive:stream.active,tracksState:stream.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        if (import.meta.env.DEV) {
+          console.log('[VoiceInput] Recording confirmed started, state:', mediaRecorder.state);
         }
       };
 
       // Обрабатываем ошибки MediaRecorder
       mediaRecorder.onerror = (event) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:200',message:'MEDIARECORDER ERROR',data:{recorderState:mediaRecorder.state,streamActive:stream.active,tracksState:stream.getTracks().map(t=>({id:t.id,readyState:t.readyState,enabled:t.enabled})),error:event.error?.message||'unknown',timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
+        // #endregion
         const errorMessage = 'Ошибка при записи аудио';
         setError(errorMessage);
         if (onError) {
@@ -206,14 +364,68 @@ export function useVoiceInput(
         setIsRecording(false);
         setIsProcessing(false);
       };
+      
+      // Отслеживаем изменения состояния MediaRecorder
+      const originalStop = mediaRecorder.stop.bind(mediaRecorder);
+      mediaRecorder.stop = function() {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:214',message:'stop() method called',data:{recorderState:mediaRecorder.state,isRecording,stackTrace:new Error().stack?.split('\n').slice(0,5).join('|')||'no stack',timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
+        // #endregion
+        return originalStop();
+      };
 
-      // Начинаем запись с timeslice для регулярного сбора данных
-      // Используем интервал 250мс для надежного сбора данных
-      mediaRecorder.start(250);
+      // Начинаем запись С timeslice для предотвращения автоматической остановки
+      // Timeslice гарантирует, что MediaRecorder будет регулярно получать данные
+      // и не остановится автоматически из-за отсутствия данных
+      const TIMESLICE_MS = 250; // Интервал получения данных (250мс)
+      mediaRecorder.start(TIMESLICE_MS);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:212',message:'Recording started WITH timeslice',data:{timeslice:TIMESLICE_MS,recorderState:mediaRecorder.state,streamActive:stream.active,tracksActive:stream.getTracks().every(t=>t.readyState==='live'),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'})}).catch(()=>{});
+      // #endregion
       setIsRecording(true);
       
+      // Периодически проверяем состояние записи и перезапускаем, если она остановилась неожиданно
+      stateCheckIntervalRef.current = setInterval(() => {
+        // Используем ref для получения актуального состояния
+        const currentRecorder = mediaRecorderRef.current;
+        const currentStream = streamRef.current;
+        
+        if (currentRecorder && currentRecorder.state === 'inactive' && isRecording) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:220',message:'WARNING: Recording stopped unexpectedly, restarting',data:{recorderState:currentRecorder.state,streamActive:currentStream?.active,tracksState:currentStream?.getTracks().map(t=>({id:t.id,readyState:t.readyState})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+          // #endregion
+          // Запись остановилась неожиданно - перезапускаем
+          if (currentStream && currentStream.active && currentStream.getTracks().every(t => t.readyState === 'live')) {
+            try {
+              currentRecorder.start(TIMESLICE_MS);
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:225',message:'Recording restarted',data:{recorderState:currentRecorder.state,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+              // #endregion
+            } catch (e) {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:229',message:'Failed to restart recording',data:{error:e instanceof Error?e.message:'unknown',timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'})}).catch(()=>{});
+              // #endregion
+              if (stateCheckIntervalRef.current) {
+                clearInterval(stateCheckIntervalRef.current);
+                stateCheckIntervalRef.current = null;
+              }
+            }
+          } else {
+            if (stateCheckIntervalRef.current) {
+              clearInterval(stateCheckIntervalRef.current);
+              stateCheckIntervalRef.current = null;
+            }
+          }
+        } else if (!isRecording) {
+          if (stateCheckIntervalRef.current) {
+            clearInterval(stateCheckIntervalRef.current);
+            stateCheckIntervalRef.current = null;
+          }
+        }
+      }, 100) as unknown as NodeJS.Timeout; // Проверяем каждые 100мс
+      
       if (import.meta.env.DEV) {
-        console.log('[VoiceInput] Recording started with timeslice (250ms)');
+        console.log('[VoiceInput] Recording started with timeslice', TIMESLICE_MS, 'ms');
       }
 
       if (import.meta.env.DEV) {
@@ -257,6 +469,9 @@ export function useVoiceInput(
    */
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:258',message:'stopRecording called',data:{recorderState:mediaRecorderRef.current.state,isRecording,recordingDuration,chunksBeforeStop:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F,G'})}).catch(()=>{});
+      // #endregion
       if (import.meta.env.DEV) {
         console.log('[VoiceInput] Stopping recording, state:', mediaRecorderRef.current.state, 'duration:', recordingDuration);
       }
@@ -265,20 +480,32 @@ export function useVoiceInput(
       if (mediaRecorderRef.current.state === 'recording') {
         // Запрашиваем данные несколько раз для надежности
         mediaRecorderRef.current.requestData();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:267',message:'requestData call 1',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
         
         // Даем больше времени для обработки запроса и получения данных
         setTimeout(() => {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             // Запрашиваем еще раз
             mediaRecorderRef.current.requestData();
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:273',message:'requestData call 2',data:{chunksAfterFirstRequest:audioChunksRef.current.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            // #endregion
             
             // Даем время для получения данных
             setTimeout(() => {
               if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
                 // Последний запрос перед остановкой
                 mediaRecorderRef.current.requestData();
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:279',message:'requestData call 3',data:{chunksAfterSecondRequest:audioChunksRef.current.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                // #endregion
                 setTimeout(() => {
                   if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:282',message:'Calling stop()',data:{chunksBeforeStop:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F,G'})}).catch(()=>{});
+                    // #endregion
                     mediaRecorderRef.current.stop();
                   }
                 }, 200);
@@ -287,21 +514,31 @@ export function useVoiceInput(
           }
         }, 200);
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:290',message:'Recorder not in recording state',data:{recorderState:mediaRecorderRef.current.state,chunksBeforeStop:audioChunksRef.current.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
         if (import.meta.env.DEV) {
           console.log('[VoiceInput] Recorder not in recording state, current state:', mediaRecorderRef.current.state);
         }
         // Если уже не записывает, просто останавливаем
         if (mediaRecorderRef.current.state !== 'inactive') {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:295',message:'Calling stop() directly',data:{recorderState:mediaRecorderRef.current.state,chunksBeforeStop:audioChunksRef.current.length,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+          // #endregion
           mediaRecorderRef.current.stop();
         }
       }
       
       setIsRecording(false);
 
-      // Останавливаем таймер
+      // Останавливаем таймеры
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
+      }
+      if (stateCheckIntervalRef.current) {
+        clearInterval(stateCheckIntervalRef.current);
+        stateCheckIntervalRef.current = null;
       }
 
       // Останавливаем поток после задержки, чтобы дать время на обработку данных
@@ -325,11 +562,16 @@ export function useVoiceInput(
       audioChunksRef.current = [];
       setRecordingDuration(0);
       setError(null);
+      recordingStartTimeRef.current = null;
 
-      // Останавливаем таймер
+      // Останавливаем таймеры
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
+      }
+      if (stateCheckIntervalRef.current) {
+        clearInterval(stateCheckIntervalRef.current);
+        stateCheckIntervalRef.current = null;
       }
 
       // Останавливаем поток

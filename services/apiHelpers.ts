@@ -42,9 +42,6 @@ export const clearToken = () => setToken(null);
 
 export const clearRateLimitBlock = () => {
   rateLimitBlockedUntil = null;
-  if (import.meta.env.DEV) {
-    console.log('[API] Rate limit block cleared');
-  }
 };
 
 export const isRateLimitBlocked = () => {

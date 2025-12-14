@@ -22,7 +22,7 @@ const saveGenerationState = (fileId: string, timestamp: number) => {
   try {
     localStorage.setItem(getGenerationKey(fileId), JSON.stringify({ fileId, timestamp }));
   } catch (error) {
-    console.error('Failed to save generation state:', error);
+    // Failed to save generation state - non-critical
   }
 };
 
@@ -38,7 +38,6 @@ const getGenerationState = (fileId: string): { fileId: string; timestamp: number
     }
     return state;
   } catch (error) {
-    console.error('Failed to get generation state:', error);
     return null;
   }
 };
@@ -47,7 +46,7 @@ const clearGenerationState = (fileId: string) => {
   try {
     localStorage.removeItem(getGenerationKey(fileId));
   } catch (error) {
-    console.error('Failed to clear generation state:', error);
+    // Failed to clear generation state - non-critical
   }
 };
 
@@ -234,13 +233,11 @@ export const usePrototypeGeneration = ({
 
     // Запускаем генерацию в фоне, не дожидаясь ответа
     api.generatePrototype(documentCreatorAgent.id, selectedFile.id)
-      .then(({ file }) => {
+      .then(() => {
         // Генерация завершилась, но мы уже отслеживаем через проверку версий
-        // Просто логируем успех
-        console.log('Prototype generation completed');
       })
       .catch((error: any) => {
-        console.error('Failed to generate result:', error);
+        // Failed to generate result - handled by version checking
         
         // Останавливаем проверку
         setIsGeneratingPrototype(false);
