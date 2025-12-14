@@ -86,6 +86,7 @@ model Agent {
   role                String?  @default("")
   order               Int      @default(0)
   isHiddenFromSidebar Boolean  @default(false)
+  disableGlobalPrompt Boolean  @default(false)
   quickMessages       String[] @default([])
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -111,6 +112,7 @@ model ProjectTypeAgent {
   model               String   @default("gpt-5-mini")
   role                String?  @default("")
   isHiddenFromSidebar Boolean  @default(false)
+  disableGlobalPrompt Boolean  @default(false)
   quickMessages       String[] @default([])
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

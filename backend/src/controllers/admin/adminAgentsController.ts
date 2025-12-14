@@ -73,7 +73,7 @@ export const createAgent = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    const { name, description, systemInstruction, summaryInstruction, model, role, isHiddenFromSidebar, quickMessages } = parsed.data;
+    const { name, description, systemInstruction, summaryInstruction, model, role, isHiddenFromSidebar, disableGlobalPrompt, quickMessages } = parsed.data;
 
     let agent: any;
     try {
@@ -85,6 +85,7 @@ export const createAgent = async (req: Request, res: Response, next: NextFunctio
         model,
         role,
         isHiddenFromSidebar,
+        disableGlobalPrompt,
         quickMessages,
       });
     } catch (error: any) {

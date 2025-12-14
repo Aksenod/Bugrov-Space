@@ -265,6 +265,7 @@ export interface ApiAgent {
   projectTypeAgentId?: string;
   files: ApiFile[];
   isHiddenFromSidebar?: boolean;
+  disableGlobalPrompt?: boolean;
 }
 
 export interface ApiProjectType {
@@ -291,6 +292,7 @@ export interface ApiProjectTypeAgent {
   createdAt?: string;
   updatedAt?: string;
   isHiddenFromSidebar?: boolean;
+  disableGlobalPrompt?: boolean;
 }
 
 export interface ApiPublicAgent {
@@ -591,6 +593,7 @@ export const api = {
     model?: string;
     role?: string;
     isHiddenFromSidebar?: boolean;
+    disableGlobalPrompt?: boolean;
   }) {
     return request<{ agent: ApiProjectTypeAgent }>('/admin/agents', {
       method: 'POST',
@@ -606,6 +609,7 @@ export const api = {
     model?: string;
     role?: string;
     isHiddenFromSidebar?: boolean;
+    disableGlobalPrompt?: boolean;
     quickMessages?: string[];
   }) {
     return request<{ agent: ApiProjectTypeAgent }>(`/admin/agents/${agentId}`, {

@@ -15,6 +15,7 @@ export const createAgentTemplate = async (data: {
   model?: string;
   role?: string;
   isHiddenFromSidebar?: boolean;
+  disableGlobalPrompt?: boolean;
   quickMessages?: string[];
 }) => {
   return await withRetry(
@@ -27,6 +28,7 @@ export const createAgentTemplate = async (data: {
         model: data.model || 'gpt-5-mini',
         role: data.role || '',
         isHiddenFromSidebar: data.isHiddenFromSidebar || false,
+        disableGlobalPrompt: data.disableGlobalPrompt || false,
         quickMessages: data.quickMessages || [],
       },
     }),
@@ -46,6 +48,7 @@ export const updateAgentTemplate = async (id: string, data: Partial<{
   model: string;
   role: string;
   isHiddenFromSidebar: boolean;
+  disableGlobalPrompt: boolean;
   quickMessages: string[];
 }>) => {
   const updated = await withRetry(
@@ -171,6 +174,7 @@ export const getAllAgentTemplates = async () => {
       model: agent.model || 'gpt-5.1',
       role: agent.role || '',
       isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
+      disableGlobalPrompt: agent.disableGlobalPrompt || false,
       quickMessages: agent.quickMessages || [],
       createdAt: agent.createdAt,
       updatedAt: agent.updatedAt,
@@ -209,6 +213,7 @@ export const getAllAgentTemplates = async () => {
         model: agent.model || 'gpt-5-mini',
         role: agent.role || '',
         isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
+        disableGlobalPrompt: agent.disableGlobalPrompt || false,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
         projectTypes: [],
@@ -263,6 +268,7 @@ export const getAgentTemplateWithProjectTypes = async (id: string) => {
     model: agent.model || 'gpt-5-mini',
     role: agent.role || '',
     isHiddenFromSidebar: agent.isHiddenFromSidebar || false,
+    disableGlobalPrompt: agent.disableGlobalPrompt || false,
     quickMessages: agent.quickMessages || [],
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
