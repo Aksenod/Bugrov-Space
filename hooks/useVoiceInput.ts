@@ -32,6 +32,7 @@ export function useVoiceInput(
   const dataRequestIntervalRef = useRef<NodeJS.Timeout | null>(null); // Интервал для периодического requestData()
   const isProcessingRef = useRef<boolean>(false); // Защита от повторных вызовов onstop
   const recordingStartTimeRef = useRef<number | null>(null); // Время начала записи
+  const isIntentionalStopRef = useRef<boolean>(false); // Флаг намеренной остановки пользователем
 
   /**
    * Получает доступ к микрофону
@@ -64,6 +65,7 @@ export function useVoiceInput(
       audioChunksRef.current = [];
       isProcessingRef.current = false;
       recordingStartTimeRef.current = null;
+      isIntentionalStopRef.current = false; // Сбрасываем флаг намеренной остановки
 
       // Убеждаемся, что предыдущий MediaRecorder полностью остановлен
       if (mediaRecorderRef.current) {
@@ -214,13 +216,14 @@ export function useVoiceInput(
 
         // Проверяем, не остановилась ли запись слишком быстро (менее 500мс)
         // Это может указывать на проблему с потоком или автоматическую остановку
+        // НО только если это НЕ намеренная остановка пользователем
         const MIN_RECORDING_DURATION_MS = 500;
-        if (recordingStartTimeRef.current) {
+        if (recordingStartTimeRef.current && !isIntentionalStopRef.current) {
           const actualDuration = Date.now() - recordingStartTimeRef.current;
-          if (actualDuration < MIN_RECORDING_DURATION_MS && !isRecording) {
-            // Запись остановилась слишком быстро - это ошибка
+          if (actualDuration < MIN_RECORDING_DURATION_MS) {
+            // Запись остановилась слишком быстро БЕЗ действия пользователя - это ошибка
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:122',message:'ERROR: Recording stopped too quickly',data:{actualDuration,minDuration:MIN_RECORDING_DURATION_MS,recorderState:mediaRecorder.state,streamActive:streamRef.current?.active,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:122',message:'ERROR: Recording stopped too quickly',data:{actualDuration,minDuration:MIN_RECORDING_DURATION_MS,recorderState:mediaRecorder.state,streamActive:streamRef.current?.active,isIntentionalStop:isIntentionalStopRef.current,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
             // #endregion
             const errorMessage = 'Запись остановилась слишком быстро. Убедитесь, что микрофон работает и попробуйте еще раз.';
             setError(errorMessage);
@@ -500,8 +503,10 @@ export function useVoiceInput(
    */
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
+      // Отмечаем, что это намеренная остановка пользователем
+      isIntentionalStopRef.current = true;
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:258',message:'stopRecording called',data:{recorderState:mediaRecorderRef.current.state,isRecording,recordingDuration,chunksBeforeStop:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type})),timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F,G'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useVoiceInput.ts:258',message:'stopRecording called',data:{recorderState:mediaRecorderRef.current.state,isRecording,recordingDuration,chunksBeforeStop:audioChunksRef.current.length,chunksDetails:audioChunksRef.current.map((c,i)=>({index:i,size:c.size,type:c.type})),isIntentionalStop:true,timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F,G'})}).catch(()=>{});
       // #endregion
       if (import.meta.env.DEV) {
         console.log('[VoiceInput] Stopping recording, state:', mediaRecorderRef.current.state, 'duration:', recordingDuration);
@@ -592,6 +597,8 @@ export function useVoiceInput(
    */
   const cancelRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
+      // Отмечаем как намеренную остановку, чтобы не показывать ошибку
+      isIntentionalStopRef.current = true;
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       audioChunksRef.current = [];
