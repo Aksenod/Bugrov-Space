@@ -127,7 +127,23 @@ ${html}
 };
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isCompact = false }) => {
-  const lineHeightClass = isCompact ? 'leading-[1.5]' : 'leading-relaxed';
+  // Настройки отступов в зависимости от режима
+  const spacing = isCompact ? {
+    paragraph: '0.75rem',      // 12px
+    list: '0.75rem',            // 12px
+    listItem: '0.375rem',       // 6px
+    heading: '0.75rem',         // 12px
+    blockquote: '0.75rem',      // 12px
+    lineHeight: '1.4',
+  } : {
+    paragraph: '0.875rem',      // 14px
+    list: '0.875rem',           // 14px
+    listItem: '0.5rem',         // 8px
+    heading: '1rem',            // 16px
+    blockquote: '0.875rem',     // 14px
+    lineHeight: '1.5',
+  };
+
   const [htmlPreviews, setHtmlPreviews] = React.useState<{ [key: string]: boolean }>({});
 
   // Простая функция для создания хеша строки
@@ -142,6 +158,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
   };
 
   // Преобразует текст с тире в markdown список для лучшей читаемости
+  // ВАЖНО: Убрано автоматическое преобразование тире в списки - это создавало лишние буллеты
+  // Теперь функция только нормализует уже существующие markdown списки
   const normalizeListContent = (text: string): string => {
     const lines = text.split('\n');
     const normalizedLines: string[] = [];
@@ -201,38 +219,20 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
         continue;
       }
       
-      // Обрабатываем однострочные списки (тире + пробел + текст + (пробел + тире + пробел + текст)*)
-      // Но только если строка не является частью таблицы
-      const singleLineListPattern = /[—–-]\s+[^—–-]+(?:\s+[—–-]\s+[^—–-]+)+/;
-      if (singleLineListPattern.test(trimmedLine)) {
-        const parts = trimmedLine.split(/\s+[—–-]\s+/);
-        const listItems = parts
-          .map(part => part.trim())
-          .filter(part => part.length > 0)
-          .map(part => `- ${part}`)
-          .join('\n');
-        
-        // Добавляем пустую строку перед списком, если перед ним есть текст
-        if (i > 0 && normalizedLines[normalizedLines.length - 1]?.trim() !== '') {
-          normalizedLines.push('');
-        }
-        normalizedLines.push(listItems);
-        inList = true;
-        continue;
-      }
+      // УБРАНО: Автоматическое преобразование тире в списки
+      // Это создавало лишние буллеты для обычного текста с тире
+      // Теперь обрабатываем только уже существующие markdown списки
       
-      // Проверяем, начинается ли строка с тире (—, –, или -) и пробела
-      const isListItem = /^[—–-]\s/.test(trimmedLine);
+      // Проверяем, является ли строка уже markdown списком
+      const isAlreadyMarkdownList = /^[-*+]\s/.test(trimmedLine) || /^\d+\.\s/.test(trimmedLine);
       
-      if (isListItem) {
-        // Если это первый элемент списка и перед ним нет пустой строки, добавляем её
+      // Обрабатываем только уже существующие markdown списки
+      if (isAlreadyMarkdownList) {
+        // Если мы были в списке и встретили markdown список, продолжаем список
         if (!inList && i > 0 && normalizedLines[normalizedLines.length - 1]?.trim() !== '') {
           normalizedLines.push('');
         }
-        
-        // Преобразуем тире в markdown формат списка
-        const listContent = trimmedLine.replace(/^[—–-]\s/, '- ');
-        normalizedLines.push(listContent);
+        normalizedLines.push(line);
         inList = true;
       } else {
         // Если мы были в списке и встретили не-элемент списка
@@ -248,32 +248,24 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
       }
     }
 
-    return normalizedLines.join('\n');
+    const result = normalizedLines.join('\n');
+    return result;
   };
 
   const normalizedContent = normalizeListContent(content);
-  
-  // Временное логирование для отладки
-  if (import.meta.env.DEV && content.includes('—')) {
-    console.log('[MarkdownRenderer] Original content:', JSON.stringify(content.substring(0, 200)));
-    console.log('[MarkdownRenderer] Normalized content:', JSON.stringify(normalizedContent.substring(0, 200)));
-    console.log('[MarkdownRenderer] Contains list markers:', normalizedContent.includes('- '));
-    console.log('[MarkdownRenderer] First 10 lines of normalized:', normalizedContent.split('\n').slice(0, 10));
-  }
 
   return (
-    <div 
-      ref={(el) => {
-        // #region agent log
-        if (el) {
-          const computed = window.getComputedStyle(el);
-          const parentEl = el.parentElement;
-          const parentComputed = parentEl ? window.getComputedStyle(parentEl) : null;
-          fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:265',message:'MarkdownRenderer root mounted',data:{rootWidth:computed.width,rootMinWidth:computed.minWidth,rootMaxWidth:computed.maxWidth,rootOverflowX:computed.overflowX,parentWidth:parentComputed?.width,parentMinWidth:parentComputed?.minWidth,parentOverflowX:parentComputed?.overflowX,parentOverflowY:parentComputed?.overflowY,parentDisplay:parentComputed?.display},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B'})}).catch(()=>{});
-        }
-        // #endregion
-      }}
-      className={`prose prose-invert prose-base max-w-none break-words py-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 ${lineHeightClass} w-full`} style={{ marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, minWidth: 0 }}>
+    <div
+      className="max-w-none break-words py-0 w-full text-white/95 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0"
+      style={{ 
+        marginTop: 0, 
+        marginBottom: 0, 
+        paddingTop: 0, 
+        paddingBottom: 0, 
+        minWidth: 0,
+        counterReset: 'ordered-list-counter',
+        lineHeight: spacing.lineHeight,
+      }}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -347,20 +339,60 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
               </code>
             );
           },
-          // Все стили типографики настраиваются в tailwind.config.js → typography.invert.css
-          // Здесь оставляем только минимальные классы для функциональности
+          // Кастомные стили для всех markdown элементов
           
           ul({ children }) {
-            return <ul>{children}</ul>;
+            return (
+              <ul 
+                className="list-disc [&:first-child]:!mt-0 [&:last-child]:!mb-0"
+                style={{
+                  marginTop: spacing.list,
+                  marginBottom: spacing.list,
+                  paddingLeft: '1.25rem',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                }}
+              >
+                {children}
+              </ul>
+            );
           },
-          ol({ children }) {
-            return <ol style={{ counterReset: 'list-counter' }}>{children}</ol>;
+          ol({ node, children, ...props }: any) {
+            // Пытаемся определить start значение из первого элемента списка
+            let startValue: number | undefined = undefined;
+            if (node && node.children && node.children.length > 0) {
+              const firstChild = node.children[0];
+              if (firstChild.children && firstChild.children.length > 0) {
+                const firstText = firstChild.children[0].value || '';
+                const match = firstText.match(/^(\d+)\.\s/);
+                if (match) {
+                  startValue = parseInt(match[1], 10);
+                }
+              }
+            }
+            return (
+              <ol 
+                {...(startValue ? { start: startValue } : {})}
+                className="list-decimal [&:first-child]:!mt-0 [&:last-child]:!mb-0"
+                style={{
+                  marginTop: spacing.list,
+                  marginBottom: spacing.list,
+                  paddingLeft: '1.25rem',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                }}
+              >
+                {children}
+              </ol>
+            );
           },
           li({ children }) {
             return (
               <li 
-                className="[counter-increment:list-counter]"
-                style={{ display: 'list-item' }}
+                style={{ 
+                  display: 'list-item',
+                  marginTop: spacing.listItem,
+                  marginBottom: spacing.listItem,
+                  lineHeight: spacing.lineHeight,
+                }}
               >
                 {children}
               </li>
@@ -368,51 +400,139 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           },
           a({ href, children }) {
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer">
+              <a 
+                href={href} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+              >
                 {children}
               </a>
             );
           },
           p({ children }) {
-            return <p data-markdown-p style={{ marginTop: 0, marginBottom: '20px', lineHeight: '1.3' }} className="!mt-0 leading-[1.3]">{children}</p>;
+            return (
+              <p 
+                className="[&:last-child]:!mb-0"
+                style={{ 
+                  marginTop: 0, 
+                  marginBottom: spacing.paragraph, 
+                  lineHeight: spacing.lineHeight,
+                  color: 'rgba(255, 255, 255, 0.95)',
+                }}
+              >
+                {children}
+              </p>
+            );
           },
           h1({ children }) {
-            return <h1>{children}</h1>;
+            return (
+              <h1 
+                className="[&:first-child]:!mt-0"
+                style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  color: 'rgba(255, 255, 255, 1)',
+                  marginTop: spacing.heading,
+                  marginBottom: '0.75rem',
+                  lineHeight: '1.2',
+                }}
+              >
+                {children}
+              </h1>
+            );
           },
           h2({ children }) {
-            return <h2>{children}</h2>;
+            return (
+              <h2 
+                className="[&:first-child]:!mt-0"
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'rgba(255, 255, 255, 1)',
+                  marginTop: spacing.heading,
+                  marginBottom: '0.5rem',
+                  lineHeight: '1.3',
+                }}
+              >
+                {children}
+              </h2>
+            );
           },
           h3({ children }) {
-            return <h3>{children}</h3>;
+            return (
+              <h3 
+                className="[&:first-child]:!mt-0"
+                style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 600,
+                  color: 'rgba(255, 255, 255, 1)',
+                  marginTop: spacing.heading,
+                  marginBottom: '0.5rem',
+                  lineHeight: '1.4',
+                }}
+              >
+                {children}
+              </h3>
+            );
           },
           strong({ children }) {
-            return <strong>{children}</strong>;
+            return (
+              <strong 
+                style={{
+                  fontWeight: 600,
+                  color: 'rgba(255, 255, 255, 1)',
+                }}
+              >
+                {children}
+              </strong>
+            );
           },
           em({ children }) {
-            return <em>{children}</em>;
+            return (
+              <em 
+                style={{
+                  fontStyle: 'italic',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                }}
+              >
+                {children}
+              </em>
+            );
           },
           blockquote({ children }) {
-            return <blockquote>{children}</blockquote>;
+            return (
+              <blockquote 
+                className="[&:first-child]:!mt-0 [&:last-child]:!mb-0"
+                style={{
+                  borderLeftWidth: '4px',
+                  borderLeftColor: 'rgba(99, 102, 241, 0.5)',
+                  paddingLeft: '1rem',
+                  marginTop: spacing.blockquote,
+                  marginBottom: spacing.blockquote,
+                  fontStyle: 'italic',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                }}
+              >
+                {children}
+              </blockquote>
+            );
           },
           hr() {
-            return <hr style={{ marginTop: '1rem', marginBottom: '1rem' }} />;
+            return (
+              <hr 
+                style={{ 
+                  marginTop: spacing.heading, 
+                  marginBottom: spacing.heading,
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  borderWidth: '1px 0 0 0',
+                }} 
+              />
+            );
           },
           table({ children }) {
             return (
-              <div 
-                ref={(el) => {
-                  // #region agent log
-                  if (el) {
-                    setTimeout(() => {
-                      const computed = window.getComputedStyle(el);
-                      const parentComputed = el.parentElement ? window.getComputedStyle(el.parentElement) : null;
-                      const tableEl = el.querySelector('table');
-                      const tableComputed = tableEl ? window.getComputedStyle(tableEl) : null;
-                      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:400',message:'Table wrapper after render',data:{wrapperWidth:computed.width,wrapperMaxWidth:computed.maxWidth,wrapperOverflowX:computed.overflowX,wrapperOverflowY:computed.overflowY,parentWidth:parentComputed?.width,parentMinWidth:parentComputed?.minWidth,parentOverflowX:parentComputed?.overflowX,tableWidth:tableComputed?.width,tableMinWidth:tableComputed?.minWidth,tableScrollWidth:tableEl?.scrollWidth,tableClientWidth:tableEl?.clientWidth,wrapperScrollWidth:el.scrollWidth,wrapperClientWidth:el.clientWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'fix5',hypothesisId:'F,G'})}).catch(()=>{});
-                    }, 100);
-                  }
-                  // #endregion
-                }}
+              <div
                 className="my-4 overflow-x-auto" 
                 style={{ 
                   width: '100%',
@@ -464,14 +584,6 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isC
           td({ children }) {
             return (
               <td
-                ref={(el) => {
-                  // #region agent log
-                  if (el) {
-                    const computed = window.getComputedStyle(el);
-                    fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarkdownRenderer.tsx:439',message:'Table cell rendered',data:{cellWidth:computed.width,cellMinWidth:computed.minWidth,cellMaxWidth:computed.maxWidth,cellScrollWidth:el.scrollWidth,cellClientWidth:el.clientWidth,textContent:el.textContent?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'fix4',hypothesisId:'G'})}).catch(()=>{});
-                  }
-                  // #endregion
-                }}
                 className="border border-white/10 px-4 py-2 text-white/90 align-top break-words min-w-[240px] sm:min-w-0"
                 style={{
                   lineHeight: '1.4',

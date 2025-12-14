@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { transcribeAudio, correctText } from '../services/voiceService';
 
 interface UseVoiceInputReturn {
@@ -30,6 +30,30 @@ export function useVoiceInput(
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
+   * Получает доступ к микрофону, переиспользуя существующий поток если он активен
+   */
+  const getMediaStream = useCallback(async (): Promise<MediaStream> => {
+    // Проверяем, есть ли уже активный поток
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
+      const hasActiveTrack = tracks.some(track => track.readyState === 'live');
+      
+      if (hasActiveTrack) {
+        // Переиспользуем существующий поток
+        return streamRef.current;
+      } else {
+        // Поток неактивен, очищаем ссылку
+        streamRef.current = null;
+      }
+    }
+
+    // Запрашиваем новый доступ к микрофону
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+    return stream;
+  }, []);
+
+  /**
    * Начинает запись аудио
    */
   const startRecording = useCallback(async () => {
@@ -38,9 +62,8 @@ export function useVoiceInput(
       setRecordingDuration(0);
       audioChunksRef.current = [];
 
-      // Запрашиваем доступ к микрофону
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      // Получаем поток (переиспользуем существующий или запрашиваем новый)
+      const stream = await getMediaStream();
 
       // Определяем поддерживаемый формат
       let mimeType = 'audio/webm';
@@ -135,10 +158,10 @@ export function useVoiceInput(
         onError(errorMessage);
       }
     }
-  }, [onTextReady, onError]);
+  }, [onTextReady, onError, getMediaStream]);
 
   /**
-   * Останавливает запись
+   * Останавливает запись (но НЕ останавливает поток микрофона)
    */
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -151,11 +174,8 @@ export function useVoiceInput(
         durationIntervalRef.current = null;
       }
 
-      // Останавливаем поток
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
+      // НЕ останавливаем поток - оставляем его активным для следующей записи
+      // Это позволяет избежать повторных запросов разрешения
     }
   }, [isRecording]);
 
@@ -182,6 +202,29 @@ export function useVoiceInput(
         streamRef.current = null;
       }
     }
+  }, [isRecording]);
+
+  /**
+   * Cleanup при размонтировании компонента
+   */
+  useEffect(() => {
+    return () => {
+      // Останавливаем таймер
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+
+      // Останавливаем запись если она активна
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+      }
+
+      // Останавливаем поток микрофона
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
   }, [isRecording]);
 
   return {

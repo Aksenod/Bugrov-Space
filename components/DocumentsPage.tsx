@@ -621,7 +621,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                             }
                             // #endregion
                           }}
-                          className="prose prose-invert prose-lg max-w-none break-words [&>*]:!my-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0 w-full" style={{ overflowX: 'visible', minWidth: 0 }}>
+                          className="max-w-none break-words w-full" style={{ overflowX: 'visible', minWidth: 0 }}>
                           <MarkdownRenderer content={decodeContent(content)} />
                         </div>
                       );
