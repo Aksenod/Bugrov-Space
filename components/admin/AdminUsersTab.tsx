@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, Gift } from 'lucide-react';
 import { ApiAdminUser, api } from '../../services/api';
 import { formatDate } from './utils';
 
@@ -19,6 +19,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
   onUsersReload,
 }) => {
   const [fixingSubscriptions, setFixingSubscriptions] = useState<Set<string>>(new Set());
+  const [togglingFreeAccess, setTogglingFreeAccess] = useState<Set<string>>(new Set());
 
   const handleFixSubscription = async (username: string) => {
     if (fixingSubscriptions.has(username)) return;
@@ -48,6 +49,30 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
       });
     }
   };
+
+  const handleToggleFreeAccess = async (userId: string, currentStatus: boolean) => {
+    if (togglingFreeAccess.has(userId)) return;
+
+    setTogglingFreeAccess(prev => new Set(prev).add(userId));
+    try {
+      const result = await api.toggleUserFreeAccess(userId, !currentStatus);
+      if (result.success) {
+        if (onUsersReload) {
+          onUsersReload();
+        }
+      }
+    } catch (error: any) {
+      console.error('[AdminUsersTab] Failed to toggle free access:', error);
+      alert(`Ошибка при изменении бесплатного доступа: ${error?.message || 'Неизвестная ошибка'}`);
+    } finally {
+      setTogglingFreeAccess(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
       <div className="flex items-center gap-2 flex-wrap">
@@ -77,7 +102,7 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
               key={user.id}
               className="bg-white/5 rounded-lg border border-white/10 p-3 sm:p-4"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-7 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-8 gap-3 sm:gap-4">
                 <div>
                   <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
                     Логин
@@ -146,6 +171,30 @@ export const AdminUsersTab: React.FC<AdminUsersTabProps> = ({
                   </div>
                   <div className="text-sm sm:text-base text-white/80">
                     {user.subscriptionExpiresAt ? formatDate(user.subscriptionExpiresAt) : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-1">
+                    Бесплатно
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleFreeAccess(user.id, user.hasFreeAccess ?? false)}
+                      disabled={togglingFreeAccess.has(user.id)}
+                      className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full border font-medium transition-all ${
+                        user.hasFreeAccess
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30'
+                          : 'bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={user.hasFreeAccess ? 'Отключить бесплатный доступ' : 'Включить бесплатный доступ'}
+                    >
+                      {togglingFreeAccess.has(user.id) ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Gift size={12} />
+                      )}
+                      {user.hasFreeAccess ? 'Да' : 'Нет'}
+                    </button>
                   </div>
                 </div>
               </div>

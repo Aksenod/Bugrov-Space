@@ -68,6 +68,7 @@ export interface User {
   role?: string;
   isPaid?: boolean;
   subscriptionExpiresAt?: Date | null;
+  hasFreeAccess?: boolean;
 }
 
 export interface ProjectType {
