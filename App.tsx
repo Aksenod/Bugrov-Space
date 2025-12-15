@@ -889,8 +889,10 @@ export default function App() {
             agents={agents}
             project={projects.find(p => p.id === activeProjectId) || null}
             onAgentClick={(agentId) => {
-              // Переключаемся на выбранного агента
-              setActiveAgentId(agentId);
+              // Переключаемся на выбранного агента только если он существует
+              if (agents.some(a => a.id === agentId)) {
+                setActiveAgentId(agentId);
+              }
               routing.setRouteState({ isDocumentsOpen: false });
               routing.navigateTo('#/projects');
             }}
@@ -975,7 +977,10 @@ export default function App() {
             onClearChat={handleClearChat}
             onOpenAdmin={(agentId) => {
               routing.navigateTo('#/admin');
-              routing.setRouteState({ adminInitialAgentId: agentId || activeAgentId || undefined, isAdminOpen: true });
+              // Валидируем ID агента - передаём только если агент существует в списке
+              const targetAgentId = agentId || activeAgentId;
+              const validAgentId = targetAgentId && agents.some(a => a.id === targetAgentId) ? targetAgentId : undefined;
+              routing.setRouteState({ adminInitialAgentId: validAgentId, isAdminOpen: true });
             }}
             onSelectAgent={setActiveAgentId}
             onSaveChat={handleGenerateSummary}
