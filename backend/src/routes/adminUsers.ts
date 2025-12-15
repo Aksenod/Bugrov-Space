@@ -36,6 +36,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
           createdAt: true,
           isPaid: true,
           subscriptionExpiresAt: true,
+          hasFreeAccess: true,
           _count: {
             select: {
               projects: true,
@@ -73,6 +74,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       projectsCount: user._count.projects,
       isPaid: user.isPaid,
       subscriptionExpiresAt: user.subscriptionExpiresAt ? user.subscriptionExpiresAt.toISOString() : null,
+      hasFreeAccess: user.hasFreeAccess,
     }));
 
     logger.info({ usersCount: usersWithCount.length }, 'Admin users fetched');
@@ -104,6 +106,37 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     console.error('[GET /admin/users] Error:', error);
     throw error;
   }
+}));
+
+// PATCH /:userId/free-access - переключить бесплатный доступ для пользователя
+router.patch('/:userId/free-access', asyncHandler(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+  const { hasFreeAccess } = req.body;
+
+  if (typeof hasFreeAccess !== 'boolean') {
+    return res.status(400).json({ error: 'hasFreeAccess must be a boolean' });
+  }
+
+  console.log(`[PATCH /admin/users/${userId}/free-access] Setting hasFreeAccess to ${hasFreeAccess}`);
+
+  const user = await withRetry(
+    () => prisma.user.update({
+      where: { id: userId },
+      data: { hasFreeAccess },
+      select: {
+        id: true,
+        username: true,
+        hasFreeAccess: true,
+      },
+    }),
+    3,
+    `PATCH /admin/users/${userId}/free-access`
+  );
+
+  logger.info({ userId, hasFreeAccess }, 'User free access updated');
+  console.log(`[PATCH /admin/users/${userId}/free-access] Successfully updated user ${user.username}`);
+
+  res.json({ success: true, user });
 }));
 
 export default router;

@@ -235,6 +235,7 @@ export interface ApiAdminUser {
   projectsCount: number;
   isPaid?: boolean;
   subscriptionExpiresAt?: string | null;
+  hasFreeAccess?: boolean;
 }
 
 export interface ApiFile {
@@ -657,6 +658,13 @@ export const api = {
   // Admin users API
   async getUsers() {
     return request<{ users: ApiAdminUser[]; totalUsers: number; totalProjects: number }>('/admin/users');
+  },
+
+  async toggleUserFreeAccess(userId: string, hasFreeAccess: boolean) {
+    return request<{ success: boolean; user: { id: string; username: string; hasFreeAccess: boolean } }>(`/admin/users/${userId}/free-access`, {
+      method: 'PATCH',
+      body: JSON.stringify({ hasFreeAccess }),
+    });
   },
 
   // Admin fix subscription API

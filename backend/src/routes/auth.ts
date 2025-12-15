@@ -131,6 +131,7 @@ authRouter.post('/login', authRateLimiter, async (req, res, next) => {
         role: user.role,
         isPaid: user.isPaid,
         subscriptionExpiresAt: user.subscriptionExpiresAt,
+        hasFreeAccess: user.hasFreeAccess,
       },
     });
   } catch (error: any) {
@@ -210,6 +211,7 @@ authRouter.get('/me', authMiddleware, async (req, res, next) => {
           role: true,
           isPaid: true,
           subscriptionExpiresAt: true,
+          hasFreeAccess: true,
         },
       }),
       2,

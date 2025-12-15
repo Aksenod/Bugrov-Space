@@ -26,6 +26,7 @@ model User {
 
   isPaid                Boolean   @default(false)
   subscriptionExpiresAt DateTime?
+  hasFreeAccess         Boolean   @default(false)
 }
 
 model Payment {

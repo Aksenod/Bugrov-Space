@@ -580,7 +580,8 @@ export default function App() {
     }
 
     // Проверка подписки для НЕ-админов (сразу после аутентификации)
-    if (!isAdmin && currentUser.isPaid === false) {
+    // Пропускаем пользователей с бесплатным доступом или оплаченной подпиской
+    if (!isAdmin && currentUser.isPaid === false && currentUser.hasFreeAccess !== true) {
       return (
         <div className="flex items-center justify-center h-full bg-black text-white p-4">
           <div className="max-w-md w-full bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center space-y-6">

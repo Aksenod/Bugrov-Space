@@ -61,6 +61,7 @@ export const mapUser = (user: ApiUser): User => ({
   role: user.role,
   isPaid: (user as any).isPaid,
   subscriptionExpiresAt: (user as any).subscriptionExpiresAt ? new Date((user as any).subscriptionExpiresAt) : null,
+  hasFreeAccess: (user as any).hasFreeAccess,
 });
 
 /**
