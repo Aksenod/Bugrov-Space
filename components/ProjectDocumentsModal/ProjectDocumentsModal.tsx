@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown, ChevronLeft } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown, ChevronLeft, MousePointer2 } from 'lucide-react';
 import { UploadedFile, Agent, Project, User } from '../../types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { api } from '../../services/api';
 import { useOnboarding } from '../OnboardingContext';
 import { DocumentsSidebar } from './DocumentsSidebar';
 import { SyntaxHighlighterWrapper } from './SyntaxHighlighterWrapper';
+import { SectionEditModal } from './SectionEditModal';
 import { useDocumentSelection } from '../../hooks/documents/useDocumentSelection';
 import { useDocumentTabs } from '../../hooks/documents/useDocumentTabs';
 import { useDocumentEditor } from '../../hooks/documents/useDocumentEditor';
 import { usePrototypeGeneration } from '../../hooks/documents/usePrototypeGeneration';
 import { usePrototypeVersions } from '../../hooks/documents/usePrototypeVersions';
+import { useSectionEdit } from '../../hooks/documents/useSectionEdit';
 import { hasRole, getAgentName, formatDateTime } from '../../utils/documentHelpers';
 import { getPrototypeContent } from '../../utils/prototypeHelpers';
 import { getDocumentDisplayName, formatDocumentDateTime } from './helpers';
@@ -111,6 +113,30 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     setSelectedVersionNumber,
   });
 
+  const {
+    isEditMode,
+    selectedSection,
+    editPrompt,
+    isProcessing: isSectionProcessing,
+    isModalOpen: isSectionModalOpen,
+    setEditPrompt,
+    setIsModalOpen: setIsSectionModalOpen,
+    toggleEditMode,
+    cancelEdit,
+    applyEdit,
+    getEditableHtml,
+    setIframeRef,
+  } = useSectionEdit({
+    selectedFile,
+    selectedFileId,
+    prototypeVersions,
+    selectedVersionNumber,
+    onDocumentUpdate,
+    onShowAlert,
+    setPrototypeVersions,
+    setSelectedVersionNumber,
+  });
+
   // Загружаем состояние sidebar из localStorage
   useEffect(() => {
     const saved = localStorage.getItem('documents-sidebar-collapsed');
@@ -199,14 +225,23 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
     }
 
     if (content) {
+      // Применяем скрипт редактирования если режим активен
+      const displayContent = isEditMode ? getEditableHtml(content) : content;
+
       return (
         <div className="w-full flex-1 relative" style={{ minHeight: 0, maxHeight: '100%' }}>
           <iframe
-            srcDoc={content}
-            className="absolute inset-0 w-full h-full border-0 rounded-xl"
+            ref={setIframeRef}
+            srcDoc={displayContent}
+            className={`absolute inset-0 w-full h-full border-0 rounded-xl ${isEditMode ? 'ring-2 ring-indigo-500/50' : ''}`}
             title="HTML Preview"
             sandbox="allow-same-origin allow-scripts"
           />
+          {isEditMode && (
+            <div className="absolute top-2 left-2 px-2 py-1 bg-indigo-500/90 text-white text-xs rounded-md pointer-events-none">
+              Режим редактирования: кликните на секцию
+            </div>
+          )}
         </div>
       );
     }
@@ -542,6 +577,20 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                             )}
                           </div>
                         )}
+                        {prototypeSubTab === 'preview' && (
+                          <button
+                            onClick={toggleEditMode}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                              isEditMode
+                                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50'
+                                : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10'
+                            }`}
+                            title={isEditMode ? 'Выключить режим редактирования' : 'Редактировать секцию'}
+                          >
+                            <MousePointer2 size={14} />
+                            <span>{isEditMode ? 'Выберите секцию' : 'Редактировать'}</span>
+                          </button>
+                        )}
                         <button
                           onClick={handleOpenInNewTab}
                           className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5"
@@ -668,6 +717,17 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Section Edit Modal */}
+      <SectionEditModal
+        isOpen={isSectionModalOpen}
+        onClose={cancelEdit}
+        selectedSection={selectedSection}
+        editPrompt={editPrompt}
+        onEditPromptChange={setEditPrompt}
+        isProcessing={isSectionProcessing}
+        onApply={applyEdit}
+      />
     </div>
   );
 };

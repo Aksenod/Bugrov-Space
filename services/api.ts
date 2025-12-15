@@ -453,6 +453,18 @@ export const api = {
     });
   },
 
+  async editSection(fileId: string, payload: {
+    sectionId: string;
+    sectionHtml: string;
+    editPrompt: string;
+    versionNumber?: number;
+  }) {
+    return request<{ newSectionHtml: string; fullHtml: string; versionNumber: number }>(`/agents/files/${fileId}/edit-section`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   // Projects API
   async getProjects() {
     return request<{ projects: ApiProject[] }>('/projects');
