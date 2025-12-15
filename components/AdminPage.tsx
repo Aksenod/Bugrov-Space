@@ -1737,26 +1737,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               </section>
 
               {/* Настройки отображения - Группа 7 */}
-              <section className="bg-gradient-to-br from-purple-900/20 to-indigo-900/10 p-3 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border border-purple-500/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <div className="p-1 sm:p-1.5 bg-purple-500/20 rounded-lg">
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Hide from sidebar toggle */}
+                <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-br from-purple-900/20 to-indigo-900/10 border border-purple-500/20 rounded-xl">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <div className="p-1 sm:p-1.5 bg-purple-500/20 rounded-lg flex-shrink-0">
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                       </svg>
                     </div>
-                    <div className="flex-1">
-                      <label className="block text-xs sm:text-sm font-bold text-purple-300">
+                    <div className="min-w-0">
+                      <label className="block text-xs sm:text-sm font-bold text-purple-300 truncate">
                         Не отображать в сайдбаре
                       </label>
-                      <p className="text-[9px] sm:text-[10px] text-purple-300/60 mt-0.5">
-                        Агент не будет виден в списке агентов проекта
+                      <p className="text-[9px] sm:text-[10px] text-purple-300/60 mt-0.5 truncate">
+                        Агент не будет виден в списке
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setAgentIsHiddenFromSidebar(!agentIsHiddenFromSidebar)}
-                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${agentIsHiddenFromSidebar ? 'bg-purple-500' : 'bg-white/10'
+                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors flex-shrink-0 ml-2 ${agentIsHiddenFromSidebar ? 'bg-purple-500' : 'bg-white/10'
                       }`}
                   >
                     <span
@@ -1767,23 +1768,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
 
                 {/* Disable Global Prompt Toggle */}
-                <div className="flex items-center justify-between p-2.5 sm:p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <div className="p-1 sm:p-1.5 bg-amber-500/20 rounded-lg">
+                <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-br from-amber-900/20 to-orange-900/10 border border-amber-500/20 rounded-xl">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <div className="p-1 sm:p-1.5 bg-amber-500/20 rounded-lg flex-shrink-0">
                       <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
                     </div>
-                    <div className="flex-1">
-                      <label className="block text-xs sm:text-sm font-bold text-amber-300">
-                        Отключить глобальный промпт
+                    <div className="min-w-0">
+                      <label className="block text-xs sm:text-sm font-bold text-amber-300 truncate">
+                        Без глобального промпта
                       </label>
-                      <p className="text-[9px] sm:text-[10px] text-amber-300/60 mt-0.5">
-                        Агент не будет использовать глобальную инструкцию
+                      <p className="text-[9px] sm:text-[10px] text-amber-300/60 mt-0.5 truncate">
+                        Не использовать глобальную инструкцию
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setAgentDisableGlobalPrompt(!agentDisableGlobalPrompt)}
-                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${agentDisableGlobalPrompt ? 'bg-amber-500' : 'bg-white/10'
+                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors flex-shrink-0 ml-2 ${agentDisableGlobalPrompt ? 'bg-amber-500' : 'bg-white/10'
                       }`}
                   >
                     <span
