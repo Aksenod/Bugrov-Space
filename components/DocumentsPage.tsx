@@ -560,14 +560,6 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                 )}
 
                 <div
-                  ref={(el) => {
-                    // #region agent log
-                    if (el) {
-                      const computed = window.getComputedStyle(el);
-                      fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DocumentsPage.tsx:563',message:'Content container mounted',data:{containerWidth:computed.width,containerMinWidth:computed.minWidth,containerMaxWidth:computed.maxWidth,containerOverflowX:computed.overflowX,containerOverflowY:computed.overflowY,containerDisplay:computed.display,containerFlexDirection:computed.flexDirection,containerClientWidth:el.clientWidth,containerScrollWidth:el.scrollWidth},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                    }
-                    // #endregion
-                  }}
                   className="bg-black/50 backdrop-blur-sm border-[5px] border-white/10 shadow-inner rounded-[2rem] overflow-y-auto flex-1 p-4 sm:p-6 md:p-8 min-w-0 max-w-full"
                   style={{ margin: 0, display: 'flex', flexDirection: 'column', maxHeight: '100%', overflowX: 'visible' }}
                 >
@@ -612,16 +604,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({
                       }
 
                       return (
-                        <div 
-                          ref={(el) => {
-                            // #region agent log
-                            if (el) {
-                              const computed = window.getComputedStyle(el);
-                              fetch('http://127.0.0.1:7242/ingest/9d98fffd-a48f-4d13-a7f2-828626c8ca26',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DocumentsPage.tsx:607',message:'Prose wrapper mounted',data:{proseWidth:computed.width,proseMinWidth:computed.minWidth,proseMaxWidth:computed.maxWidth,proseOverflowX:computed.overflowX,proseDisplay:computed.display},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'B,E'})}).catch(()=>{});
-                            }
-                            // #endregion
-                          }}
-                          className="max-w-none break-words w-full" style={{ overflowX: 'visible', minWidth: 0 }}>
+                        <div className="max-w-none break-words w-full" style={{ overflowX: 'visible', minWidth: 0 }}>
                           <MarkdownRenderer content={decodeContent(content)} />
                         </div>
                       );
