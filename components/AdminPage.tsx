@@ -320,10 +320,29 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           setIsAgentDialogOpen(true);
         } catch (error: any) {
           console.error('Failed to load agent directly', error);
-          // Если не удалось загрузить агента напрямую, сбрасываем флаг
-          // чтобы резервный вариант мог попытаться найти его в списке
           if (isMounted) {
-            hasAutoOpenedRef.current = false;
+            // Проверяем, является ли ошибка 404 (агент не найден)
+            const is404 = error?.message?.includes('не найден') ||
+                          error?.message?.includes('not found') ||
+                          error?.status === 404;
+
+            if (is404) {
+              // Агент был удалён - показываем уведомление и не пытаемся искать в списке
+              setAlertDialog({
+                isOpen: true,
+                message: 'Агент был удалён или не существует',
+                title: 'Агент не найден',
+                variant: 'warning',
+                duration: 3000,
+              });
+              setTimeout(() => {
+                setAlertDialog(prev => ({ ...prev, isOpen: false }));
+              }, 3000);
+              // Оставляем флаг true чтобы не пытаться искать в списке
+            } else {
+              // Другая ошибка - сбрасываем флаг для резервного варианта
+              hasAutoOpenedRef.current = false;
+            }
           }
         }
       };
