@@ -577,7 +577,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                             )}
                           </div>
                         )}
-                        {prototypeSubTab === 'preview' && (
+                        {prototypeSubTab === 'preview' && getDisplayContent() && (
                           <button
                             onClick={toggleEditMode}
                             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
