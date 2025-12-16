@@ -405,7 +405,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                 )}
 
                 {/* Tabs */}
-                {(showDSLButtons || isAdmin) && (
+                {(showDSLButtons || showVerstkaSubTabs || isAdmin) && (
                   <div className="mb-6 flex items-center gap-4 border-b border-white/10 flex-wrap">
                     <div className="flex items-center gap-2">
                       <button
@@ -551,7 +551,7 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                             )}
                           </div>
                         )}
-                        {prototypeSubTab === 'preview' && showDSLButtons && !isEditing && (
+                        {prototypeSubTab === 'preview' && (showDSLButtons || showVerstkaSubTabs) && !isEditing && (
                           <button
                             onClick={(e) => {
                               e.preventDefault();
