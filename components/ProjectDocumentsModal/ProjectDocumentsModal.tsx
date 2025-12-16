@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown, ChevronLeft, MousePointer2 } from 'lucide-react';
+import { X, FileText, Download, Calendar, Eye, Trash2, Loader2, ArrowLeft, Maximize2, Edit, Save, ExternalLink, Upload, ChevronDown, ChevronLeft, MousePointer2, RefreshCw } from 'lucide-react';
 import { UploadedFile, Agent, Project, User } from '../../types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { api } from '../../services/api';
@@ -428,32 +428,6 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                       </button>
                     </div>
 
-                    {showDSLButtons && !isEditing && (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleGenerateResult();
-                        }}
-                        disabled={isGeneratingPrototype}
-                        className="text-cyan-400 hover:text-cyan-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
-                      >
-                        {isGeneratingPrototype ? (
-                          <span className="flex items-center gap-2">
-                            <span className="relative flex items-center justify-center">
-                              <span className="absolute inset-0 bg-cyan-500/20 blur-md rounded-full animate-pulse"></span>
-                              <Loader2 size={14} className="relative animate-spin text-cyan-400" />
-                            </span>
-                            <span className="flex flex-col items-start">
-                              <span className="leading-tight">Генерация прототипа...</span>
-                              <span className="text-xs text-cyan-400/70 leading-tight">В среднем до 3 минут</span>
-                            </span>
-                          </span>
-                        ) : (
-                          "Сгенерировать прототип"
-                        )}
-                      </button>
-                    )}
-
                     {/* Sub-tabs for Prototype */}
                     {activeTab === 'prototype' && (
                       <div className="flex items-center gap-2 ml-auto">
@@ -576,6 +550,24 @@ export const ProjectDocumentsModal: React.FC<ProjectDocumentsModalProps> = ({
                               </div>
                             )}
                           </div>
+                        )}
+                        {prototypeSubTab === 'preview' && showDSLButtons && !isEditing && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleGenerateResult();
+                            }}
+                            disabled={isGeneratingPrototype}
+                            className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Сгенерировать прототип"
+                          >
+                            {isGeneratingPrototype ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={14} />
+                            )}
+                            <span>{isGeneratingPrototype ? 'Генерация...' : 'Сгенерировать'}</span>
+                          </button>
                         )}
                         {prototypeSubTab === 'preview' && getDisplayContent() && (
                           <button
