@@ -133,11 +133,75 @@ export const limitPrototypeVersions = async (fileId: string, maxVersions: number
         }
       }
     });
-    logger.info({ 
-      fileId, 
+    logger.info({
+      fileId,
       deletedVersions: versionsToDelete.length,
-      remainingVersions: maxVersions 
+      remainingVersions: maxVersions
     }, 'Deleted old prototype versions');
   }
+};
+
+/**
+ * Сгенерировать обновленную секцию HTML
+ */
+export const generateSectionEdit = async (
+  verstkaAgent: any,
+  sectionHtml: string,
+  editPrompt: string,
+  projectInfo?: { name: string | null; description: string | null; projectTypeName: string | null }
+): Promise<string> => {
+  logger.info({ verstkaAgentId: verstkaAgent.id, editPrompt }, 'Generating section edit');
+
+  const verstkaAgentWithFiles = { ...verstkaAgent, files: [] };
+
+  // Формируем специальный промпт для редактирования секции
+  const editInstruction = `ЗАДАЧА: Отредактировать HTML секцию согласно инструкции пользователя.
+
+ТЕКУЩИЙ HTML СЕКЦИИ:
+${sectionHtml}
+
+ИНСТРУКЦИЯ ПОЛЬЗОВАТЕЛЯ:
+${editPrompt}
+
+ТРЕБОВАНИЯ:
+1. Верни ТОЛЬКО обновленный HTML контент секции (innerHTML), без внешнего тега.
+2. Сохрани общую структуру и стилизацию.
+3. Внеси изменения согласно инструкции пользователя.
+4. Не добавляй комментарии или объяснения, только чистый HTML.
+5. Сохрани все существующие классы и атрибуты, если инструкция не требует их изменения.`;
+
+  const newSectionHtml = await generateDocumentResult(
+    verstkaAgentWithFiles,
+    editInstruction,
+    'verstka',
+    projectInfo
+  );
+
+  return newSectionHtml;
+};
+
+/**
+ * Заменить секцию в полном HTML по data-section-id
+ */
+export const replaceSectionInHtml = (
+  fullHtml: string,
+  sectionId: string,
+  newInnerHtml: string
+): string => {
+  // Ищем элемент с data-section-id и заменяем его содержимое
+  // Используем регулярное выражение для поиска и замены
+  const regex = new RegExp(
+    `(<[^>]+data-section-id=["']${sectionId}["'][^>]*>)([\\s\\S]*?)(<\\/[^>]+>)`,
+    'i'
+  );
+
+  const match = fullHtml.match(regex);
+  if (!match) {
+    logger.warn({ sectionId }, 'Section not found in HTML');
+    return fullHtml;
+  }
+
+  // Заменяем содержимое секции
+  return fullHtml.replace(regex, `$1${newInnerHtml}$3`);
 };
 

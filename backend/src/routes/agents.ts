@@ -1564,6 +1564,198 @@ router.get('/files/:fileId/prototype-versions', authMiddleware, async (req, res,
   }
 });
 
+// POST /api/agents/files/:fileId/edit-section - редактировать секцию прототипа
+router.post('/files/:fileId/edit-section', authMiddleware, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { fileId } = authReq.params;
+    const userId = authReq.userId;
+    const { sectionId, sectionHtml, editPrompt, versionNumber } = req.body;
+
+    logger.info({ fileId, userId, sectionId, editPrompt, versionNumber }, 'POST /agents/files/:fileId/edit-section');
+
+    // Validate request body
+    if (!sectionId || typeof sectionId !== 'string') {
+      return res.status(400).json({ error: 'sectionId is required' });
+    }
+    if (!sectionHtml || typeof sectionHtml !== 'string') {
+      return res.status(400).json({ error: 'sectionHtml is required' });
+    }
+    if (!editPrompt || typeof editPrompt !== 'string') {
+      return res.status(400).json({ error: 'editPrompt is required' });
+    }
+
+    // Get file and verify ownership
+    const file = await withRetry(
+      () => prisma.file.findFirst({
+        where: { id: fileId },
+        include: { agent: true }
+      }),
+      3,
+      `POST /agents/files/${fileId}/edit-section - find file`
+    );
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (!file.agent || file.agent.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const projectId = file.agent.projectId;
+    if (!projectId) {
+      return res.status(400).json({ error: 'File is not associated with a project' });
+    }
+
+    // Get project info
+    const project = await withRetry(
+      () => prisma.project.findFirst({
+        where: { id: projectId },
+        include: { projectType: true }
+      }),
+      3,
+      `POST /agents/files/${fileId}/edit-section - find project`
+    );
+
+    // Find verstka agent
+    const projectAgents = await withRetry(
+      () => prisma.agent.findMany({ where: { projectId } }),
+      3,
+      `POST /agents/files/${fileId}/edit-section - find agents`
+    );
+
+    const { findVerstkaAgent, generateSectionEdit, replaceSectionInHtml, getNextPrototypeVersion, limitPrototypeVersions } = await import('../services/agents/prototypeService');
+
+    const verstkaAgent = findVerstkaAgent(projectAgents);
+    if (!verstkaAgent) {
+      return res.status(400).json({ error: 'Verstka agent not found in project' });
+    }
+
+    // Get current HTML from version or file
+    let currentHtml: string | null = null;
+
+    if (versionNumber) {
+      const version = await withRetry(
+        () => prisma.prototypeVersion.findUnique({
+          where: {
+            fileId_versionNumber: {
+              fileId,
+              versionNumber: parseInt(versionNumber, 10)
+            }
+          },
+          select: { verstkaContent: true }
+        }),
+        3,
+        `POST /agents/files/${fileId}/edit-section - find version`
+      );
+      currentHtml = version?.verstkaContent || null;
+    }
+
+    if (!currentHtml) {
+      currentHtml = file.verstkaContent;
+    }
+
+    if (!currentHtml) {
+      return res.status(400).json({ error: 'No prototype HTML found' });
+    }
+
+    // Generate edited section
+    const projectInfo = project ? {
+      name: project.name || null,
+      description: project.description || null,
+      projectTypeName: project.projectType?.name || null
+    } : undefined;
+
+    const newSectionHtml = await generateSectionEdit(
+      verstkaAgent,
+      sectionHtml,
+      editPrompt,
+      projectInfo
+    );
+
+    // Replace section in full HTML
+    const updatedHtml = replaceSectionInHtml(currentHtml, sectionId, newSectionHtml);
+
+    // Create new version
+    const nextVersionNumber = await getNextPrototypeVersion(fileId);
+
+    // Get current DSL (keep it unchanged)
+    let currentDsl: string | null = null;
+    if (versionNumber) {
+      const version = await withRetry(
+        () => prisma.prototypeVersion.findUnique({
+          where: {
+            fileId_versionNumber: {
+              fileId,
+              versionNumber: parseInt(versionNumber, 10)
+            }
+          },
+          select: { dslContent: true }
+        }),
+        3,
+        `POST /agents/files/${fileId}/edit-section - find version dsl`
+      );
+      currentDsl = version?.dslContent || null;
+    }
+    if (!currentDsl) {
+      currentDsl = file.dslContent;
+    }
+
+    const newVersion = await withRetry(
+      async () => {
+        const version = await prisma.prototypeVersion.create({
+          data: {
+            fileId,
+            versionNumber: nextVersionNumber,
+            dslContent: currentDsl,
+            verstkaContent: updatedHtml
+          }
+        });
+
+        await limitPrototypeVersions(fileId, 10);
+        return version;
+      },
+      3,
+      `POST /agents/files/${fileId}/edit-section - create version`
+    );
+
+    // Update file with latest version
+    await withRetry(
+      () => prisma.file.update({
+        where: { id: fileId },
+        data: {
+          dslContent: currentDsl,
+          verstkaContent: updatedHtml
+        }
+      }),
+      3,
+      `POST /agents/files/${fileId}/edit-section - update file`
+    );
+
+    logger.info({
+      fileId,
+      sectionId,
+      versionNumber: nextVersionNumber
+    }, 'Section edited successfully');
+
+    res.json({
+      newSectionHtml,
+      fullHtml: updatedHtml,
+      versionNumber: nextVersionNumber
+    });
+  } catch (error) {
+    const authReq = req as AuthenticatedRequest;
+    logger.error({
+      fileId: authReq.params.fileId,
+      userId: authReq.userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 'Failed to edit section');
+    res.status(500).json({ error: 'Failed to edit section' });
+  }
+});
+
 // DELETE /api/agents/files/:fileId/prototype-versions/:versionNumber - удалить версию
 router.delete('/files/:fileId/prototype-versions/:versionNumber', authMiddleware, async (req, res, next) => {
   try {
